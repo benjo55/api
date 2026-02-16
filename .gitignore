@@ -1,0 +1,41 @@
+# =====================
+# .NET
+# =====================
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.log
+*.bak
+Data/*.bak
+
+# =====================
+# Node / Front
+# =====================
+node_modules/
+dist/
+build/
+.vite/
+.next/
+.out/
+
+# =====================
+# OS / IDE
+# =====================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# =====================
+# Env & secrets
+# =====================
+.env
+.env.*
+
+# =====================
+# Database backups
+# =====================
+*.bak
+Data/*.bak

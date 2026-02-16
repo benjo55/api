@@ -1,0 +1,8 @@
+
+CREATE UNIQUE INDEX ui_idPerson ON dbo.Persons(Id)
+CREATE FULLTEXT CATALOG ft AS DEFAULT;
+
+CREATE FULLTEXT INDEX ON dbo.Persons(LastName)
+   KEY INDEX ui_idPerson
+   WITH STOPLIST = SYSTEM;
+GO
