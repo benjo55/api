@@ -111,7 +111,7 @@ namespace api.Repository
         {
             foreach (var alloc in allocations)
             {
-                if (alloc.CompartmentId == null)
+                if (alloc.CompartmentId < 0)
                     throw new InvalidOperationException(
                         $"CompartmentId manquant dans opération {operation.Id}");
 
@@ -129,7 +129,8 @@ namespace api.Repository
                 var holding = await context.Set<ContractSupportHolding>()
                     .SingleOrDefaultAsync(h =>
                         h.ContractId == operation.ContractId &&
-                        h.SupportId == alloc.SupportId, ct)
+                        h.SupportId == alloc.SupportId &&
+                        h.CompartmentId == alloc.CompartmentId, ct)
                     ?? throw new InvalidOperationException("Holding introuvable");
 
                 if (shares > holding.TotalShares)
@@ -188,7 +189,8 @@ namespace api.Repository
             var holding = await context.Set<ContractSupportHolding>()
                 .SingleOrDefaultAsync(h =>
                     h.ContractId == operation.ContractId &&
-                    h.SupportId == alloc.SupportId, ct);
+                    h.SupportId == alloc.SupportId &&
+                    h.CompartmentId == alloc.CompartmentId, ct);
 
             if (holding != null)
                 return holding;
@@ -197,6 +199,7 @@ namespace api.Repository
             {
                 ContractId = operation.ContractId,
                 SupportId = alloc.SupportId,
+                CompartmentId = alloc.CompartmentId!.Value,
                 TotalShares = 0m,
                 TotalInvested = 0m,
                 Pru = 0m

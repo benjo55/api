@@ -25,6 +25,7 @@ namespace api.Models
 
         // Données génériques
         public DateTime OperationDate { get; set; }
+        public DateTime? ExecutionDate { get; set; }
         [Column(TypeName = "decimal(20,7)")]
         public decimal? Amount { get; set; }
         public string Currency { get; set; } = "EUR";

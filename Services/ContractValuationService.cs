@@ -49,7 +49,15 @@ public class ContractValuationService : IContractValuationService
                 .Where(h => h.ContractId == contractId)
                 .ToListAsync();
 
-            _logger.LogWarning("Nombre de holdings trouvés: {Count}", holdings.Count);
+            foreach (var h in holdings)
+            {
+                _logger.LogWarning(
+                    "Holding trouvé → Support={SupportId}, Compartment={CompartmentId}, Shares={Shares}",
+                    h.SupportId,
+                    h.CompartmentId,
+                    h.TotalShares
+                );
+            }
 
             // 3️⃣ Mettre à jour les montants holdings (DERIVÉ)
             foreach (var h in holdings)
@@ -71,7 +79,12 @@ public class ContractValuationService : IContractValuationService
                 {
                     h.PerformancePercent = 0m;
                 }
-                _logger.LogWarning("Holding {SupportId} Perf calculée = {Perf}", h.SupportId, h.PerformancePercent);
+                _logger.LogWarning(
+                    "Holding Support={SupportId} Compartment={CompartmentId} Perf={Perf}",
+                    h.SupportId,
+                    h.CompartmentId,
+                    h.PerformancePercent
+                );
                 _logger.LogWarning("Before SaveChanges Perf state = {State}", _context.Entry(h).Property(x => x.PerformancePercent).IsModified);
 
                 h.LastUpdated = DateTime.UtcNow;
@@ -147,6 +160,32 @@ public class ContractValuationService : IContractValuationService
             contract.UpdatedDate = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+
+            // 🔥 CONSOLIDATION PAR SUPPORT (DEBUG / ANALYSE)
+            var grouped = holdings
+                .GroupBy(h => h.SupportId)
+                .Select(g => new
+                {
+                    SupportId = g.Key,
+                    TotalInvested = g.Sum(x => x.TotalInvested),
+                    TotalValue = g.Sum(x => x.CurrentAmount ?? 0m)
+                });
+
+            foreach (var g in grouped)
+            {
+                var perf = g.TotalInvested > 0
+                    ? (g.TotalValue - g.TotalInvested) / g.TotalInvested * 100m
+                    : 0m;
+
+                _logger.LogWarning(
+                    "🔎 Support GLOBAL → Support={SupportId} Value={Value} Invested={Invested} Perf={Perf}",
+                    g.SupportId,
+                    g.TotalValue,
+                    g.TotalInvested,
+                    Math.Round(perf, 4)
+                );
+            }
 
             // 🔟 Suppression holdings vides
             var emptyHoldings = holdings.Where(h => h.TotalShares <= 0).ToList();

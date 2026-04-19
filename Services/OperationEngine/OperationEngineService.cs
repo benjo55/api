@@ -200,6 +200,7 @@ namespace api.Services
                     }
 
                     op.Status = OperationStatus.Executed;
+                    op.ExecutionDate = finalized.Max(f => f.date);
                     op.UpdatedDate = DateTime.UtcNow;
 
                     await _operationApplier.ApplyAsync(op, _context);
@@ -245,47 +246,90 @@ namespace api.Services
 
             foreach (var contract in contracts)
             {
-                if (contract.ManagementFeesRate == null || contract.ManagementFeesRate == 0) continue;
+                if (contract.ManagementFeesRate == null || contract.ManagementFeesRate == 0)
+                    continue;
+
+                // 🔥 ANTI-DOUBLON FRAIS
+                var now = DateTime.UtcNow;
+
+                var alreadyApplied = await _context.Operations.AnyAsync(o =>
+                    o.ContractId == contract.Id &&
+                    o.Type == OperationType.ManagementFee &&
+                    o.Status == OperationStatus.Executed &&
+                    o.ExecutionDate >= new DateTime(now.Year, now.Month, 1) &&
+                    o.ExecutionDate < new DateTime(now.Year, now.Month, 1).AddMonths(1)
+                );
+                if (alreadyApplied)
+                {
+                    _logger.LogInformation(
+                        $"⏭️ Frais déjà appliqués aujourd’hui pour contrat {contract.Id}"
+                    );
+                    continue;
+                }
 
                 try
                 {
-                    // Supposons que les frais soient annuels, ponctionnés mensuellement
                     var monthlyRate = (contract.ManagementFeesRate.Value / 100m) / 12m;
 
                     foreach (var alloc in contract.Supports)
                     {
-                        if (alloc.Support?.LastValuationAmount is not decimal vl || vl <= 0) continue;
+                        if (alloc.Support?.LastValuationAmount is not decimal vl || vl <= 0)
+                            continue;
 
-                        var feeAmount = (alloc.AllocationPercentage / 100m) * contract.CurrentValue * monthlyRate;
+                        var feeAmount = (alloc.AllocationPercentage / 100m)
+                                        * contract.CurrentValue
+                                        * monthlyRate;
 
-                        if (feeAmount <= 0) continue;
+                        if (feeAmount <= 0)
+                            continue;
 
-                        // Enregistrer une "opération de frais"
+                        var sharesToRemove = Math.Round(feeAmount / vl, 7);
+
                         var feeOperation = new Operation
                         {
                             ContractId = contract.Id,
                             Type = OperationType.ManagementFee,
-                            Status = OperationStatus.Executed,
+
+                            // ✅ date effet (logique métier)
                             OperationDate = DateTime.UtcNow,
+
+                            // ✅ date exécution (immédiate ici)
+                            ExecutionDate = DateTime.UtcNow,
+
+                            Status = OperationStatus.Executed,
+
                             Amount = feeAmount,
                             Currency = contract.Currency,
+
                             Allocations = new List<OperationSupportAllocation>
+                    {
+                        new OperationSupportAllocation
                         {
-                            new OperationSupportAllocation
-                            {
-                                SupportId = alloc.SupportId,
-                                Amount = feeAmount,
-                                Percentage = alloc.AllocationPercentage
-                            }
-                        },
+                            SupportId = alloc.SupportId,
+                            Amount = feeAmount,
+
+                            // 🔥 IMPORTANT → retrait en parts
+                            Shares = sharesToRemove,
+
+                            NavAtOperation = vl,
+                            NavDateAtOperation = alloc.Support.LastValuationDate,
+
+                            CompartmentId = alloc.CompartmentId // ⚠️ IMPORTANT
+                        }
+                    },
+
                             CreatedDate = DateTime.UtcNow,
                             UpdatedDate = DateTime.UtcNow,
-                            // Locked = true
                         };
 
                         await _context.Operations.AddAsync(feeOperation);
 
-                        _logger.LogInformation($"💸 Frais de gestion appliqués : contrat {contract.Id}, support {alloc.SupportId} → {feeAmount:F2}");
+                        // 🔥 APPLIQUER L’EFFET FINANCIER
+                        await _operationApplier.ApplyAsync(feeOperation, _context);
+
+                        _logger.LogInformation(
+                            $"💸 Frais appliqués : contrat {contract.Id}, support {alloc.SupportId} → {feeAmount:F2} ({sharesToRemove} parts)"
+                        );
                     }
                 }
                 catch (Exception ex)
@@ -295,9 +339,9 @@ namespace api.Services
             }
 
             await _context.SaveChangesAsync();
+
             _logger.LogInformation("✅ ApplyManagementFeesAsync terminé");
         }
-
         public async Task RebuildContractAsync(int contractId)
         {
             _logger.LogWarning("♻️ Démarrage REBUILD COMPLET du contrat {ContractId}", contractId);

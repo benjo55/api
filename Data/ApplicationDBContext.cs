@@ -169,55 +169,71 @@ namespace api.Data
                 entity.Property(o => o.Shares)
                     .HasPrecision(20, 7);
 
-                // 🔹 Index logique (opération + support) pour éviter doublons internes
-                entity.HasIndex(o => new { o.OperationId, o.SupportId })
+                // 🔹 Index logique (opération + support + compartiment) pour éviter doublons internes
+                entity.HasIndex(o => new { o.OperationId, o.SupportId, o.CompartmentId })
                     .IsUnique()
-                    .HasDatabaseName("UX_OSA_Operation_Support");
+                    .HasDatabaseName("UX_OSA_Operation_Support_Compartment");
 
             });
 
-            modelBuilder.Entity<ContractSupportHolding>()
-                .ToTable("ContractSupportHoldings");
+            modelBuilder.Entity<ContractSupportHolding>(entity =>
+            {
+                entity.ToTable("ContractSupportHoldings");
 
-            modelBuilder.Entity<ContractSupportHolding>()
-                .HasOne(h => h.Support)
-                .WithMany()
-                .HasForeignKey(h => h.SupportId)
-                .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(h => h.Contract)
+                    .WithMany(c => c.ContractSupportHoldings)
+                    .HasForeignKey(h => h.ContractId)
+                    .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<ContractSupportHolding>()
-                .Property(h => h.Pru).HasPrecision(20, 7);
-            modelBuilder.Entity<ContractSupportHolding>()
-                .Property(h => h.TotalShares).HasPrecision(20, 7);
-            modelBuilder.Entity<ContractSupportHolding>()
-                .Property(h => h.TotalInvested).HasPrecision(20, 7);
+                entity.HasOne(h => h.Support)
+                    .WithMany()
+                    .HasForeignKey(h => h.SupportId)
+                    .OnDelete(DeleteBehavior.Restrict);
 
-            modelBuilder.Entity<ContractSupportHolding>()
-                .HasIndex(h => new { h.ContractId, h.SupportId })
-                .IsUnique();
+                // 🔥 AJOUT MANQUANT
+                entity.HasOne(h => h.Compartment)
+                    .WithMany()
+                    .HasForeignKey(h => h.CompartmentId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.Property(h => h.Pru).HasPrecision(20, 7);
+                entity.Property(h => h.TotalShares).HasPrecision(20, 7);
+                entity.Property(h => h.TotalInvested).HasPrecision(20, 7);
+
+                // 🔥 CORRECTION MAJEURE
+                entity.HasIndex(h => new { h.ContractId, h.CompartmentId, h.SupportId })
+                    .IsUnique()
+                    .HasDatabaseName("UX_Holding_Contract_Compartment_Support");
+            });
 
 
             // ==========================================================
             // 🔗 Relation Compartment ↔ FinancialSupportAllocation
             // ==========================================================
-            modelBuilder.Entity<Compartment>()
-                .HasMany(c => c.Supports)
-                .WithOne(fsa => fsa.Compartment)
-                .HasForeignKey(fsa => fsa.CompartmentId)
-                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<Compartment>(entity =>
+            {
+                entity.ToTable("Compartments");
 
-            modelBuilder.Entity<Compartment>()
-                .HasIndex(c => new { c.ContractId, c.IsDefault })
-                .IsUnique()
-                .HasFilter("[IsDefault] = 1"); // ✅ un seul compartiment global par contrat
+                // 🔒 Un seul compartiment global par contrat
+                entity.HasIndex(c => new { c.ContractId, c.IsDefault })
+                    .IsUnique()
+                    .HasFilter("[IsDefault] = 1");
 
-            modelBuilder.Entity<Compartment>()
-                .Property(c => c.Label)
-                .HasMaxLength(100);
+                // 🏷️ Label
+                entity.Property(c => c.Label)
+                    .HasMaxLength(100)
+                    .IsRequired(); // 🔥 recommandé
 
-            modelBuilder.Entity<Compartment>()
-                .Property(c => c.CurrentValue)
-                .HasPrecision(20, 7);
+                // 💰 Valeur
+                entity.Property(c => c.CurrentValue)
+                    .HasPrecision(20, 7);
+
+                // 🔗 Relation explicite avec Contract (souvent oubliée)
+                entity.HasOne(c => c.Contract)
+                    .WithMany(c => c.Compartments)
+                    .HasForeignKey(c => c.ContractId)
+                    .OnDelete(DeleteBehavior.Cascade); // OK ici
+            });
 
             // WithdrawalDetail
             modelBuilder.Entity<WithdrawalDetail>().ToTable("WithdrawalDetails");
@@ -314,41 +330,30 @@ namespace api.Data
             // ==========================================================
             modelBuilder.Entity<FinancialSupportAllocation>(entity =>
             {
-                // 🔹 Contrat (1-N)
                 entity.HasOne(fsa => fsa.Contract)
                     .WithMany(c => c.Supports)
                     .HasForeignKey(fsa => fsa.ContractId)
-                    .OnDelete(DeleteBehavior.Cascade); // cohérent : si contrat supprimé, ses allocations aussi
+                    .OnDelete(DeleteBehavior.Cascade);
 
-                // 🔹 Support financier (1-N)
                 entity.HasOne(fsa => fsa.Support)
                     .WithMany()
                     .HasForeignKey(fsa => fsa.SupportId)
-                    .OnDelete(DeleteBehavior.Restrict); // on empêche la suppression d’un support utilisé
+                    .OnDelete(DeleteBehavior.Restrict);
 
-                // 🔹 Compartiment (1-N, désormais obligatoire)
                 entity.HasOne(fsa => fsa.Compartment)
                     .WithMany(c => c.Supports)
                     .HasForeignKey(fsa => fsa.CompartmentId)
-                    .IsRequired() // ✅ le rattachement est toujours obligatoire
-                    .OnDelete(DeleteBehavior.Restrict); // évite les suppressions accidentelles
+                    .IsRequired()
+                    .OnDelete(DeleteBehavior.Restrict); // 🔥 IMPORTANT
 
-                // 🔹 Précision des décimales
-                entity.Property(f => f.AllocationPercentage)
-                    .HasPrecision(18, 4);
-
-                entity.Property(f => f.CurrentShares)
-                    .HasPrecision(20, 7);
-
-                entity.Property(f => f.CurrentAmount)
-                    .HasPrecision(20, 7);
-
-                // 🔹 Contrainte d’unicité logique : un support unique par contrat + compartiment
                 entity.HasIndex(f => new { f.ContractId, f.CompartmentId, f.SupportId })
                     .IsUnique()
                     .HasDatabaseName("UX_FSA_Contract_Compartment_Support");
-            });
 
+                entity.Property(f => f.AllocationPercentage).HasPrecision(18, 4);
+                entity.Property(f => f.CurrentShares).HasPrecision(20, 7);
+                entity.Property(f => f.CurrentAmount).HasPrecision(20, 7);
+            });
 
             // 🧠 ContractOption → Contract & Type
             modelBuilder.Entity<ContractOption>()

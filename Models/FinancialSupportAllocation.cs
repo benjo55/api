@@ -10,9 +10,9 @@ namespace api.Models
         [ForeignKey("ContractId")]
         public Contract Contract { get; set; } = null!;
 
-        public int? CompartmentId { get; set; }
+        public int CompartmentId { get; set; }
         [ForeignKey(nameof(CompartmentId))]
-        public Compartment? Compartment { get; set; }
+        public Compartment Compartment { get; set; } = null!;
 
         public int SupportId { get; set; }
         [ForeignKey("SupportId")]

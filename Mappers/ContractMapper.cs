@@ -94,7 +94,7 @@ namespace api.Mappers
                         Id = s.Id,
                         ContractId = s.ContractId,
                         SupportId = s.SupportId,
-                        CompartmentId = s.CompartmentId ?? 0,
+                        CompartmentId = s.CompartmentId,
 
                         AllocationPercentage = s.AllocationPercentage,
 
@@ -131,7 +131,7 @@ namespace api.Mappers
                                 Id = s.Id,
                                 ContractId = s.ContractId,
                                 SupportId = s.SupportId,
-                                CompartmentId = s.CompartmentId ?? 0,      // 🟢 FIX 3
+                                CompartmentId = s.CompartmentId,      // 🟢 FIX 3
 
                                 AllocationPercentage = s.AllocationPercentage,
 

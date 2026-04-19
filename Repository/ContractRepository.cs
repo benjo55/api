@@ -374,7 +374,7 @@ namespace api.Repository
                     InvestedAmount = h.TotalInvested,
                     Pru = h.Pru,
                     Performance = h.PerformancePercent ?? 0m,
-                    CompartmentId = null
+                    CompartmentId = h.CompartmentId
                 })
                 .OrderByDescending(s => s.CurrentAmount)
                 .ToList();
@@ -385,13 +385,15 @@ namespace api.Repository
             // =====================================================
 
             var holdingBySupportId = contract.ContractSupportHoldings
-                .ToDictionary(h => h.SupportId);
+                .ToDictionary(
+                    x => (x.SupportId, x.CompartmentId)
+                );
 
             foreach (var comp in contract.Compartments)
             {
                 foreach (var s in comp.Supports)
                 {
-                    if (holdingBySupportId.TryGetValue(s.SupportId, out var holding))
+                    if (holdingBySupportId.TryGetValue((s.SupportId, s.CompartmentId), out var holding))
                     {
                         s.Pru = holding.Pru;
                         s.Performance = holding.PerformancePercent ?? 0m;
@@ -477,8 +479,8 @@ namespace api.Repository
                         Support = s.Support,
                         CurrentShares = s.CurrentShares,
                         CurrentAmount = s.CurrentAmount,
-                        Compartments = s.CompartmentId.HasValue
-                            ? new List<int> { s.CompartmentId.Value }
+                        Compartments = s.CompartmentId > 0
+                            ? new List<int> { s.CompartmentId }
                             : new List<int>(),
                         IsMultiCompartment = false,
                         CreatedDate = s.CreatedDate,
@@ -513,8 +515,7 @@ namespace api.Repository
                     var first = g.First();
                     var compartments = g
                         .Select(x => x.CompartmentId)
-                        .Where(cid => cid.HasValue)
-                        .Select(cid => cid!.Value)
+                        .Where(cid => cid > 0)
                         .Distinct()
                         .ToList();
 
@@ -527,7 +528,7 @@ namespace api.Repository
                         CurrentAmount = g.Sum(x => x.CurrentAmount),
                         Compartments = compartments,
                         IsMultiCompartment = compartments.Count > 1,
-                        CompartmentId = null,
+                        CompartmentId = first.CompartmentId, // Peut être nul, mais on s’en fiche car on a la liste complète dans Compartments
                         CreatedDate = first.CreatedDate,
                         UpdatedDate = first.UpdatedDate
                     };
@@ -638,8 +639,7 @@ namespace api.Repository
                 .ToList();
 
             var globalSupportsValue = (contract.Supports ?? Enumerable.Empty<FinancialSupportAllocation>())
-                .Where(s => s.CompartmentId == null)
-                .Sum(s => s.CurrentAmount);
+                                .Sum(s => s.CurrentAmount);
 
             var result = new
             {
@@ -726,7 +726,7 @@ namespace api.Repository
                     .ToList();
 
                 var globalSupportsValue = (fullContract.Supports ?? Enumerable.Empty<FinancialSupportAllocation>())
-                    .Where(s => s.CompartmentId == null)
+
                     .Sum(s => s.CurrentAmount);
 
                 var response = new

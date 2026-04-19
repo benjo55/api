@@ -16,6 +16,10 @@ namespace api.Models
         public int SupportId { get; set; }
         public FinancialSupport Support { get; set; } = null!;
 
+        public int CompartmentId { get; set; }
+        public Compartment Compartment { get; set; } = null!;
+
+
         [Column(TypeName = "decimal(20,7)")]
         public decimal TotalShares { get; set; }
 

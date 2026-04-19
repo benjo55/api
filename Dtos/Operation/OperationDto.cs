@@ -19,6 +19,7 @@ namespace api.Dtos.Operation
         public OperationStatus Status { get; set; }
 
         public DateTime OperationDate { get; set; }
+        public DateTime? ExecutionDate { get; set; }
         public decimal? Amount { get; set; }
         public string Currency { get; set; } = "EUR";
 
