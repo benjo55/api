@@ -45,6 +45,11 @@ namespace api.Models
         [Column(TypeName = "decimal(18,5)")]
         public decimal TotalWithdrawals { get; set; }
 
+        public int TotalSwitches { get; set; }
+
+        [Column(TypeName = "decimal(18,5)")]
+        public decimal TotalSwitchesAmount { get; set; }
+
         [Column(TypeName = "decimal(18,5)")]
         public decimal NetInvested { get; set; }
 

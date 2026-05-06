@@ -40,6 +40,8 @@ namespace api.Dtos.Contract
         public decimal WithdrawnExecuted { get; set; }
         public decimal WithdrawnPending { get; set; }
         public decimal TotalWithdrawals { get; set; }
+        public int TotalSwitches { get; set; }
+        public decimal TotalSwitchesAmount { get; set; }
         public decimal NetInvested { get; set; }
         public decimal CurrentValue { get; set; }
         public decimal? PerformancePercent { get; set; }
@@ -84,10 +86,10 @@ namespace api.Dtos.Contract
         public ICollection<DocumentDto> Documents { get; set; } = new List<DocumentDto>();
 
         // 🆕 Versements cumulés sur le contrat
-        public ICollection<PaymentDetailDto> Payments { get; set; } = new List<PaymentDetailDto>();
+        public ICollection<PaymentDetailsDto> Payments { get; set; } = new List<PaymentDetailsDto>();
 
         // 🆕 Retraits cumulés liés au contrat
-        public ICollection<WithdrawalDetailDto> Withdrawals { get; set; } = new List<WithdrawalDetailDto>();
+        public ICollection<WithdrawalDetailsDto> Withdrawals { get; set; } = new List<WithdrawalDetailsDto>();
 
         // public List<FinancialSupportAllocationDto> ConsolidatedSupports { get; set; } = new();
 

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 using api.Interfaces;
 using api.Helpers;
 using api.Data;
@@ -120,6 +121,114 @@ namespace api.Controllers
                     error = ex.Message
                 });
             }
+        }
+
+        /// <summary>
+        /// 🔄 Forcer un recalcul complet de TOUS les contrats.
+        /// </summary>
+        [HttpPost("recompute-all-contracts")]
+        public async Task<IActionResult> RecomputeAllContracts()
+        {
+            using var scope = _services.CreateScope();
+
+            var context = scope.ServiceProvider.GetRequiredService<api.Data.ApplicationDBContext>();
+            var valuationService = scope.ServiceProvider.GetRequiredService<IContractValuationService>();
+
+            var contractIds = await context.Contracts
+                .Select(c => c.Id)
+                .ToListAsync();
+
+            int success = 0, failed = 0;
+
+            foreach (var id in contractIds)
+            {
+                try
+                {
+                    await valuationService.ComputeContractValueAsync(id);
+                    success++;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "❌ Recompute contrat {id} échoué", id);
+                    failed++;
+                }
+            }
+
+            return Ok(new
+            {
+                total = contractIds.Count,
+                success,
+                failed
+            });
+        }
+
+        /// <summary>
+        /// 🧹 Purge les positions résiduelles (< seuil de parts) dans ContractSupportHolding et FinancialSupportAllocation.
+        /// </summary>
+        [HttpPost("cleanup-residual-holdings")]
+        public async Task<IActionResult> CleanupResidualHoldings([FromQuery] decimal threshold = 0.01m)
+        {
+            using var scope = _services.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDBContext>();
+            var valuationService = scope.ServiceProvider.GetRequiredService<IContractValuationService>();
+
+            // 1) Holdings résiduels : TotalShares > 0 mais < threshold
+            var residualHoldings = await context.ContractSupportHoldings
+                .Where(h => h.TotalShares > 0m && h.TotalShares < threshold)
+                .ToListAsync();
+
+            var affectedContractIds = residualHoldings.Select(h => h.ContractId).Distinct().ToList();
+
+            // 2) Zeroing des FSA correspondantes
+            foreach (var h in residualHoldings)
+            {
+                var fsa = await context.FinancialSupportAllocations
+                    .FirstOrDefaultAsync(f =>
+                        f.ContractId == h.ContractId &&
+                        f.SupportId == h.SupportId &&
+                        f.CompartmentId == h.CompartmentId);
+
+                if (fsa != null)
+                {
+                    fsa.CurrentShares = 0m;
+                    fsa.InvestedAmount = 0m;
+                }
+
+                h.TotalShares = 0m;
+                h.TotalInvested = 0m;
+                h.Pru = 0m;
+                h.CurrentAmount = 0m;
+            }
+
+            await context.SaveChangesAsync();
+
+            _logger.LogInformation("🧹 Cleanup résidus: {Count} holdings purgés sur {ContractCount} contrats",
+                residualHoldings.Count, affectedContractIds.Count);
+
+            // 3) Recompute des contrats affectés pour mettre à jour la valorisation
+            int recomputeSuccess = 0, recomputeFailed = 0;
+            foreach (var contractId in affectedContractIds)
+            {
+                try
+                {
+                    await valuationService.ComputeContractValueAsync(contractId);
+                    recomputeSuccess++;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "❌ Recompute après cleanup échoué pour contrat {ContractId}", contractId);
+                    recomputeFailed++;
+                }
+            }
+
+            return Ok(new
+            {
+                threshold,
+                residualHoldingsPurged = residualHoldings.Count,
+                affectedContracts = affectedContractIds.Count,
+                recomputeSuccess,
+                recomputeFailed
+            });
         }
 
     }

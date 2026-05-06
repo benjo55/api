@@ -66,7 +66,6 @@ public class OperationRepository : IOperationRepository
             .Include(o => o.PaymentDetail)
             .Include(o => o.Allocations).ThenInclude(a => a.Support)
             .Include(o => o.Contract)
-            .Include(o => o.Compartment)
             .FirstOrDefaultAsync(o => o.Id == id);
 
     public async Task<IEnumerable<Operation>> GetByContractAsync(int contractId) =>
@@ -78,19 +77,6 @@ public class OperationRepository : IOperationRepository
             .Include(o => o.PaymentDetail)
             .Include(o => o.Allocations).ThenInclude(a => a.Support)
             .Include(o => o.Contract)
-            .Include(o => o.Compartment)
-            .ToListAsync();
-
-    public async Task<IEnumerable<Operation>> GetByCompartmentAsync(int contractId, int compartmentId) =>
-        await _context.Operations
-            .Where(o => o.ContractId == contractId && o.CompartmentId == compartmentId)
-            .Include(o => o.WithdrawalDetail)
-            .Include(o => o.ArbitrageDetail)
-            .Include(o => o.AdvanceDetail)
-            .Include(o => o.PaymentDetail)
-            .Include(o => o.Allocations).ThenInclude(a => a.Support)
-            .Include(o => o.Contract)
-            .Include(o => o.Compartment)
             .ToListAsync();
 
     public async Task<Operation> AddAsync(Operation operation)
@@ -102,28 +88,6 @@ public class OperationRepository : IOperationRepository
 
         try
         {
-            // ==========================================================
-            // 0️⃣ Attacher automatiquement au compartiment GLOBAL (IsDefault uniquement)
-            // ==========================================================
-            if (operation.CompartmentId == null || operation.CompartmentId == 0)
-            {
-                var globalCompartmentId = await _context.Compartments
-                    .Where(c => c.ContractId == operation.ContractId && c.IsDefault)
-                    .Select(c => c.Id)
-                    .FirstOrDefaultAsync();
-
-                if (globalCompartmentId <= 0)
-                {
-                    _logger.LogWarning(
-                        "⚠️ Aucun compartiment Global (IsDefault) trouvé pour contrat {ContractId}",
-                        operation.ContractId);
-                }
-                else
-                {
-                    operation.CompartmentId = globalCompartmentId;
-                }
-            }
-
             // ==========================================================
             // 1️⃣ Validation métier
             // ==========================================================
@@ -147,10 +111,18 @@ public class OperationRepository : IOperationRepository
             // ==========================================================
             // 3️⃣ Création allocations estimées
             // ==========================================================
+            var normalizedAllocations = NormalizeAllocations(operation.Type, rawAllocations);
             var cleanAllocations = new List<OperationSupportAllocation>();
 
-            foreach (var a in rawAllocations.Where(a => (a.Amount ?? 0m) > 0m))
+            foreach (var a in normalizedAllocations)
             {
+                if (a.CompartmentId == null || a.CompartmentId <= 0)
+                {
+                    throw new InvalidOperationException(
+                        $"CompartmentId obligatoire dans les allocations (support {a.SupportId})"
+                    );
+                }
+
                 var support = await _context.FinancialSupports
                     .FirstOrDefaultAsync(s => s.Id == a.SupportId);
 
@@ -174,10 +146,12 @@ public class OperationRepository : IOperationRepository
                 {
                     OperationId = operation.Id,
                     SupportId = a.SupportId,
-                    CompartmentId = a.CompartmentId ?? operation.CompartmentId,
+                    CompartmentId = a.CompartmentId,
 
                     Amount = a.Amount,
                     Percentage = a.Percentage,
+
+                    Flow = a.Flow,
 
                     EstimatedNav = lastNav,
                     EstimatedShares = estimatedShares,
@@ -244,7 +218,6 @@ public class OperationRepository : IOperationRepository
         existing.OperationDate = operation.OperationDate;
         existing.Amount = operation.Amount;
         existing.Currency = operation.Currency;
-        existing.CompartmentId = operation.CompartmentId;
         existing.UpdatedDate = DateTime.UtcNow;
 
         // ==========================================================
@@ -255,8 +228,17 @@ public class OperationRepository : IOperationRepository
 
         if (operation.Allocations != null)
         {
-            foreach (var a in operation.Allocations.Where(a => (a.Amount ?? 0) > 0m))
+            var normalizedAllocations = NormalizeAllocations(existing.Type, operation.Allocations);
+
+            foreach (var a in normalizedAllocations)
             {
+                if (a.CompartmentId == null || a.CompartmentId <= 0)
+                {
+                    throw new InvalidOperationException(
+                        $"CompartmentId obligatoire dans les allocations (support {a.SupportId})"
+                    );
+                }
+
                 var support = await _context.FinancialSupports
                     .FirstOrDefaultAsync(s => s.Id == a.SupportId);
 
@@ -271,10 +253,11 @@ public class OperationRepository : IOperationRepository
                 {
                     OperationId = existing.Id,
                     SupportId = a.SupportId,
-                    CompartmentId = existing.CompartmentId,
+                    CompartmentId = a.CompartmentId,
 
                     Amount = a.Amount,
                     Percentage = a.Percentage,
+                    Flow = a.Flow,
 
                     // ⭐ ESTIMATIONS UNIQUEMENT
                     EstimatedNav = lastNav,
@@ -351,6 +334,59 @@ public class OperationRepository : IOperationRepository
         return await _context.Operations
             .Where(o => o.ContractId == contractId)
             .ToListAsync();
+    }
+
+    private List<OperationSupportAllocation> NormalizeAllocations(
+        OperationType operationType,
+        IEnumerable<OperationSupportAllocation> allocations)
+    {
+        var filtered = (allocations ?? Enumerable.Empty<OperationSupportAllocation>())
+            .Where(a => (a.Amount ?? 0m) > 0m)
+            .ToList();
+
+        foreach (var a in filtered)
+        {
+            if (a.CompartmentId == null || a.CompartmentId <= 0)
+            {
+                throw new InvalidOperationException(
+                    $"CompartmentId obligatoire dans les allocations (support {a.SupportId})");
+            }
+
+            if (operationType == OperationType.Arbitrage && a.Flow == null)
+            {
+                throw new InvalidOperationException(
+                    $"Flow obligatoire pour arbitrage (support {a.SupportId})");
+            }
+        }
+
+        var grouped = filtered
+            .GroupBy(a => new
+            {
+                a.SupportId,
+                a.CompartmentId,
+                Flow = operationType == OperationType.Arbitrage ? a.Flow : null,
+            })
+            .Select(g => new OperationSupportAllocation
+            {
+                SupportId = g.Key.SupportId,
+                CompartmentId = g.Key.CompartmentId,
+                Flow = g.Key.Flow,
+                Amount = g.Sum(x => x.Amount ?? 0m),
+                Percentage = g.Any(x => x.Percentage.HasValue)
+                    ? g.Sum(x => x.Percentage ?? 0m)
+                    : null,
+            })
+            .ToList();
+
+        if (grouped.Count != filtered.Count)
+        {
+            _logger.LogWarning(
+                "⚠️ Allocations normalisées (fusion doublons): {BeforeCount} -> {AfterCount}",
+                filtered.Count,
+                grouped.Count);
+        }
+
+        return grouped;
     }
 
 

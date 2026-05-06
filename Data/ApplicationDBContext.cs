@@ -127,12 +127,6 @@ namespace api.Data
                 .HasForeignKey(o => o.ContractId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<Operation>()
-                .HasOne(o => o.Compartment)
-                .WithMany()
-                .HasForeignKey(o => o.CompartmentId)
-                .OnDelete(DeleteBehavior.Restrict);
-
             // ==========================================================
             // 🔗 OperationSupportAllocation — Relations et contraintes
             // ==========================================================
@@ -169,10 +163,12 @@ namespace api.Data
                 entity.Property(o => o.Shares)
                     .HasPrecision(20, 7);
 
-                // 🔹 Index logique (opération + support + compartiment) pour éviter doublons internes
-                entity.HasIndex(o => new { o.OperationId, o.SupportId, o.CompartmentId })
+                // 🔹 Index logique (opération + support + compartiment + flow)
+                // Permet SOURCE et TARGET sur le même support/compartiment dans une même opération.
+                entity.HasIndex(o => new { o.OperationId, o.SupportId, o.CompartmentId, o.Flow })
                     .IsUnique()
-                    .HasDatabaseName("UX_OSA_Operation_Support_Compartment");
+                    .HasFilter(null)
+                    .HasDatabaseName("UX_OSA_Operation_Support_Compartment_Flow");
 
             });
 

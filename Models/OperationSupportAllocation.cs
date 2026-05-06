@@ -2,6 +2,13 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace api.Models
 {
+
+    public enum OperationFlow
+    {
+        Source = 0,
+        Target = 1
+    }
+
     public class OperationSupportAllocation
     {
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -36,6 +43,8 @@ namespace api.Models
         [Column(TypeName = "decimal(20,7)")]
         public decimal? NavAtOperation { get; set; }       // VL utilisée
         public DateTime? NavDateAtOperation { get; set; }  // Date de cette VL
+
+        public OperationFlow? Flow { get; set; }  // Flux de l'opération (Source ou Target)
 
         // =====================================================================
         // 🆕 Champs enrichis uniquement pour la logique métier / front

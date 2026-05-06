@@ -9,7 +9,7 @@ using api.Helpers;
 using api.Interfaces;
 using api.Models;
 using api.Services;
-using AutoMapper;
+using Mapster;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
 
@@ -19,16 +19,13 @@ namespace api.Repository
     {
         private readonly ApplicationDBContext _context;
         private readonly EntityHistoryService _entityHistoryService;  // Service d'historisation
-        private readonly IMapper _mapper; // AutoMapper pour éviter d'affecter manuellement les champs
         private readonly BusinessRuleValidator _validator;
 
-        public PersonRepository(ApplicationDBContext context, EntityHistoryService entityHistoryService, IMapper mapper, BusinessRuleValidator validator)
+        public PersonRepository(ApplicationDBContext context, EntityHistoryService entityHistoryService, BusinessRuleValidator validator)
         {
             _context = context;
             _entityHistoryService = entityHistoryService;
-            _mapper = mapper;
             _validator = validator;
-            _mapper = mapper;
         }
 
         public async Task<Person> CreateAsync(Person personModel)
@@ -65,8 +62,6 @@ namespace api.Repository
         {
             var persons = _context.Persons
                 .AsNoTracking()
-                .AsSplitQuery() // 🔥 optimisation clé
-                .Include(p => p.Contracts)
                 .AsQueryable();
 
             // Filtres dynamiques
@@ -108,7 +103,28 @@ namespace api.Repository
             var totalCount = await persons.CountAsync();
             var totalPages = (int)Math.Ceiling((double)totalCount / query.PageSize);
             var skipNumber = (query.PageNumber - 1) * query.PageSize;
-            var pagedPersons = await persons.Skip(skipNumber).Take(query.PageSize).ToListAsync();
+
+            var pagedIds = await persons
+                .Select(p => p.Id)
+                .Skip(skipNumber)
+                .Take(query.PageSize)
+                .ToListAsync();
+
+            var pagedPersons = await _context.Persons
+                .AsNoTracking()
+                .AsSplitQuery()
+                .Include(p => p.Contracts)
+                .Where(p => pagedIds.Contains(p.Id))
+                .ToListAsync();
+
+            var order = pagedIds
+                .Select((id, index) => new { id, index })
+                .ToDictionary(x => x.id, x => x.index);
+
+            pagedPersons = pagedPersons
+                .OrderBy(p => order.TryGetValue(p.Id, out var idx) ? idx : int.MaxValue)
+                .ToList();
+
             var hasNextPage = query.PageNumber < totalPages;
 
             return new PagedResult<Person>
@@ -197,10 +213,10 @@ namespace api.Repository
 
             // Sauvegarde de l'état initial pour l'historique
             var originalPerson = new Person();
-            _mapper.Map(existingPerson, originalPerson);
+            existingPerson.Adapt(originalPerson);
 
-            // Mise à jour automatique des champs avec AutoMapper
-            _mapper.Map(updatePersonDto, existingPerson);
+            // Mise à jour des champs avec Mapster
+            updatePersonDto.Adapt(existingPerson);
             existingPerson.UpdatedDate = DateTime.UtcNow; // Met à jour la date de modification
 
             // Historisation des changements
@@ -254,7 +270,7 @@ namespace api.Repository
                 return null;
 
             var original = new Person();
-            _mapper.Map(person, original);
+            person.Adapt(original);
 
             person.Locked = locked;
             person.UpdatedDate = DateTime.UtcNow;

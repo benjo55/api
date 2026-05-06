@@ -1,25 +1,8 @@
-using AutoMapper;
 using api.Models;
 using api.Dtos.FinancialSupport;
 
 namespace api.Mappers
 {
-    public class FinancialSupportProfile : Profile
-    {
-        public FinancialSupportProfile()
-        {
-            // Création (DTO -> entity)
-            CreateMap<CreateFinancialSupportRequestDto, FinancialSupport>();
-
-            // Mise à jour partielle (DTO -> entity)
-            CreateMap<UpdateFinancialSupportRequestDto, FinancialSupport>()
-                .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
-
-            // Lecture (entity -> DTO)
-            CreateMap<FinancialSupport, FinancialSupportDto>();
-        }
-    }
-
     public static class FinancialSupportMapper
     {
         public static FinancialSupportDto ToFinancialSupportDto(this FinancialSupport model)

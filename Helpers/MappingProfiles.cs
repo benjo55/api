@@ -7,128 +7,126 @@ using api.Dtos.Product;
 using api.Models;
 using api.Dtos.Yahoo;
 using api.Dtos.FinancialSupport;
-using AutoMapper;
 using api.Dtos.Eod;
 using api.Dtos.Compartment;
-using api.Dtos.Operation; // 🔹 contient OperationDto & détails
+using api.Dtos.Operation;
+using Mapster;
 
 namespace api.Helpers
 {
-    public class MappingProfiles : Profile
+    public class MappingConfig : IRegister
     {
-        public MappingProfiles()
+        public void Register(TypeAdapterConfig config)
         {
             // --------- PERSON ---------
-            CreateMap<Person, PersonDto>().ReverseMap(); // ✅ mapping bidirectionnel
-            CreateMap<UpdatePersonRequestDto, Person>()
-                .ForMember(dest => dest.UpdatedDate, opt => opt.MapFrom(_ => DateTime.UtcNow));
-            CreateMap<Person, Person>(); // Pour l'historisation
+            config.NewConfig<Person, PersonDto>();
+            config.NewConfig<PersonDto, Person>();
+            config.NewConfig<UpdatePersonRequestDto, Person>()
+                .Map(dest => dest.UpdatedDate, src => DateTime.UtcNow);
+            config.NewConfig<Person, Person>(); // Historisation
 
             // --------- BENEFICIARY CLAUSE ---------
-            CreateMap<BeneficiaryClausePerson, BeneficiaryClausePersonDto>()
-                .ForMember(dest => dest.Person, opt => opt.MapFrom(src => src.Person));
-            CreateMap<BeneficiaryClausePersonDto, BeneficiaryClausePerson>();
-            CreateMap<UpdateBeneficiaryClauseRequestDto, BeneficiaryClause>();
-            CreateMap<CreateBeneficiaryClauseRequestDto, BeneficiaryClause>();
-            CreateMap<BeneficiaryClause, BeneficiaryClause>(); // Historisation
+            config.NewConfig<BeneficiaryClausePerson, BeneficiaryClausePersonDto>()
+                .Map(dest => dest.Person, src => src.Person);
+            config.NewConfig<BeneficiaryClausePersonDto, BeneficiaryClausePerson>();
+            config.NewConfig<UpdateBeneficiaryClauseRequestDto, BeneficiaryClause>();
+            config.NewConfig<CreateBeneficiaryClauseRequestDto, BeneficiaryClause>();
+            config.NewConfig<BeneficiaryClause, BeneficiaryClause>(); // Historisation
 
             // --------- BRAND ---------
-            CreateMap<UpdateBrandRequestDto, Brand>();
-            CreateMap<Brand, Brand>();
+            config.NewConfig<UpdateBrandRequestDto, Brand>();
+            config.NewConfig<Brand, Brand>(); // Historisation
 
             // --------- FINANCIAL SUPPORT ---------
-            CreateMap<FinancialSupport, FinancialSupportDto>();
-            CreateMap<FinancialSupportAllocation, FinancialSupportAllocationDto>()
-                .ForMember(dest => dest.Support, opt => opt.MapFrom(src => src.Support))
-                .ForMember(dest => dest.CompartmentId, opt => opt.MapFrom(src => src.CompartmentId)); // ✅ ajouté
+            config.NewConfig<FinancialSupport, FinancialSupportDto>();
+            config.NewConfig<FinancialSupportAllocation, FinancialSupportAllocationDto>()
+                .Map(dest => dest.Support, src => src.Support)
+                .Map(dest => dest.CompartmentId, src => src.CompartmentId);
+            config.NewConfig<FinancialSupportAllocationDto, FinancialSupportAllocation>()
+                .Ignore(dest => dest.Support)
+                .Map(dest => dest.CreatedDate, src => src.CreatedDate)
+                .Map(dest => dest.UpdatedDate, src => DateTime.UtcNow)
+                .Map(dest => dest.CompartmentId, src => src.CompartmentId);
 
-            CreateMap<FinancialSupportAllocationDto, FinancialSupportAllocation>()
-                .ForMember(dest => dest.Support, opt => opt.Ignore())
-                .ForMember(dest => dest.CreatedDate, opt => opt.MapFrom(src => src.CreatedDate))
-                .ForMember(dest => dest.UpdatedDate, opt => opt.MapFrom(_ => DateTime.UtcNow))
-                .ForMember(dest => dest.CompartmentId, opt => opt.MapFrom(src => src.CompartmentId)); // ✅ ajouté
-
-            CreateMap<FinancialSupport, FinancialSupportLightDto>()
-                .ForMember(dest => dest.Isin, opt => opt.MapFrom(src => src.ISIN))
-                .ForMember(dest => dest.Label, opt => opt.MapFrom(src => src.Label));
+            config.NewConfig<FinancialSupport, FinancialSupportLightDto>()
+                .Map(dest => dest.Isin, src => src.ISIN)
+                .Map(dest => dest.Label, src => src.Label);
 
             // --------- COMPARTMENT ---------
-            CreateMap<Compartment, CompartmentDto>().ReverseMap();
+            config.NewConfig<Compartment, CompartmentDto>();
+            config.NewConfig<CompartmentDto, Compartment>();
 
             // --------- INSURER ---------
-            CreateMap<UpdateInsurerRequestDto, Insurer>();
-            CreateMap<Insurer, Insurer>();
+            config.NewConfig<UpdateInsurerRequestDto, Insurer>();
+            config.NewConfig<Insurer, Insurer>(); // Historisation
 
             // --------- PRODUCT ---------
-            CreateMap<UpdateProductRequestDto, Product>();
-            CreateMap<Product, Product>();
+            config.NewConfig<UpdateProductRequestDto, Product>();
+            config.NewConfig<Product, Product>(); // Historisation
 
             // --------- FINANCIAL SUPPORT CREATE/UPDATE ---------
-            CreateMap<CreateFinancialSupportRequestDto, FinancialSupport>();
-            CreateMap<UpdateFinancialSupportRequestDto, FinancialSupport>()
-                .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+            config.NewConfig<CreateFinancialSupportRequestDto, FinancialSupport>();
+            config.NewConfig<UpdateFinancialSupportRequestDto, FinancialSupport>()
+                .IgnoreNullValues(true);
 
-            CreateMap<EodFundProfile, CreateFinancialSupportRequestDto>()
-                .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+            config.NewConfig<EodFundProfile, CreateFinancialSupportRequestDto>()
+                .IgnoreNullValues(true);
 
-            CreateMap<YahooETFDto, UpdateFinancialSupportRequestDto>()
-                .ForMember(dest => dest.Label, opt => opt.MapFrom(src => src.Label))
-                .ForMember(dest => dest.Currency, opt => opt.MapFrom(src => src.Currency))
-                .ForMember(dest => dest.LastValuationAmount, opt => opt.MapFrom(src => src.LastNav))
-                .ForMember(dest => dest.LastValuationDate, opt => opt.MapFrom(src => src.LastNavDate))
-                .ForAllMembers(opt => opt.Ignore());
+            // Mapping Yahoo → UpdateDto : seulement les 4 champs explicites, reste ignoré
+            config.NewConfig<YahooETFDto, UpdateFinancialSupportRequestDto>()
+                .Map(dest => dest.Label, src => src.Label)
+                .Map(dest => dest.Currency, src => src.Currency)
+                .Map(dest => dest.LastValuationAmount, src => src.LastNav)
+                .Map(dest => dest.LastValuationDate, src => src.LastNavDate)
+                .IgnoreNonMapped(true);
 
-            CreateMap<YahooETFDto, CreateFinancialSupportRequestDto>()
-                .ForMember(dest => dest.Label, opt => opt.MapFrom(src => src.Label))
-                .ForMember(dest => dest.Currency, opt => opt.MapFrom(src => src.Currency))
-                .ForMember(dest => dest.LastValuationAmount, opt => opt.MapFrom(src => src.LastNav))
-                .ForMember(dest => dest.LastValuationDate, opt => opt.MapFrom(src => src.LastNavDate))
-                .ForAllMembers(opt => opt.Ignore());
+            // Mapping Yahoo → CreateDto : seulement les 4 champs explicites, reste ignoré
+            config.NewConfig<YahooETFDto, CreateFinancialSupportRequestDto>()
+                .Map(dest => dest.Label, src => src.Label)
+                .Map(dest => dest.Currency, src => src.Currency)
+                .Map(dest => dest.LastValuationAmount, src => src.LastNav)
+                .Map(dest => dest.LastValuationDate, src => src.LastNavDate)
+                .IgnoreNonMapped(true);
 
             // --------- CONTRACT ---------
-            CreateMap<ContractOption, ContractOptionDto>().ReverseMap(); // ✅ ajout essentiel
-            CreateMap<Contract, ContractDto>()
-                .ForMember(dest => dest.Person, opt => opt.MapFrom(src => src.Person))
-                .ForMember(dest => dest.Options, opt => opt.MapFrom(src => src.Options)); // ✅ ajouté
-            CreateMap<ContractDto, Contract>().ReverseMap();
-
+            config.NewConfig<ContractOption, ContractOptionDto>();
+            config.NewConfig<ContractOptionDto, ContractOption>();
+            config.NewConfig<Contract, ContractDto>()
+                .Map(dest => dest.Person, src => src.Person)
+                .Map(dest => dest.Options, src => src.Options);
+            config.NewConfig<ContractDto, Contract>();
+            config.NewConfig<Contract, ContractDto>();
 
             // --------- OPERATION ---------
-            CreateMap<Operation, OperationDto>()
-                .ForMember(dest => dest.WithdrawalDetail, opt => opt.MapFrom(src => src.WithdrawalDetail))
-                .ForMember(dest => dest.ArbitrageDetail, opt => opt.MapFrom(src => src.ArbitrageDetail))
-                .ForMember(dest => dest.AdvanceDetail, opt => opt.MapFrom(src => src.AdvanceDetail))
-                .ForMember(dest => dest.PaymentDetail, opt => opt.MapFrom(src => src.PaymentDetail))
-                .ForMember(dest => dest.ContractId, opt => opt.MapFrom(src => src.ContractId))
-                .ForMember(dest => dest.CompartmentId, opt => opt.MapFrom(src => src.CompartmentId))
-                .ForMember(dest => dest.Allocations, opt => opt.MapFrom(src => src.Allocations))
-                .ForMember(dest => dest.Contract, opt => opt.MapFrom(src => src.Contract)); // ✅ inclure contrat complet
+            config.NewConfig<Operation, OperationDto>()
+                .Map(dest => dest.Details, src => OperationDetailsMapper.ToDto(src))
+                .Map(dest => dest.AdvanceDetail, src => src.AdvanceDetail)
+                .Map(dest => dest.ContractId, src => src.ContractId)
+                .Map(dest => dest.Allocations, src => src.Allocations)
+                .Map(dest => dest.Contract, src => src.Contract);
 
-            CreateMap<OperationDto, Operation>()
-                .ForMember(dest => dest.Contract, opt => opt.Ignore())
-                .ForMember(dest => dest.Compartment, opt => opt.Ignore())
-                .ForMember(dest => dest.WithdrawalDetail, opt => opt.MapFrom(src => src.WithdrawalDetail))
-                .ForMember(dest => dest.ArbitrageDetail, opt => opt.MapFrom(src => src.ArbitrageDetail))
-                .ForMember(dest => dest.AdvanceDetail, opt => opt.MapFrom(src => src.AdvanceDetail))
-                .ForMember(dest => dest.PaymentDetail, opt => opt.MapFrom(src => src.PaymentDetail))
-                .ForMember(dest => dest.Allocations, opt => opt.MapFrom(src => src.Allocations));
+            config.NewConfig<OperationDto, Operation>()
+                .Ignore(dest => dest.Contract)
+                .Map(dest => dest.PaymentDetail, src => OperationDetailsMapper.ToPaymentModel(src.Details))
+                .Map(dest => dest.WithdrawalDetail, src => OperationDetailsMapper.ToWithdrawalModel(src.Details))
+                .Map(dest => dest.ArbitrageDetail, src => (ArbitrageDetail?)OperationDetailsMapper.ToArbitrageModel(src.Details))
+                .Map(dest => dest.AdvanceDetail, src => src.AdvanceDetail)
+                .Map(dest => dest.Allocations, src => src.Allocations);
 
-            // --------- DETAILS (Withdrawal, Arbitrage, Advance, Payment) ---------
-            CreateMap<WithdrawalDetail, WithdrawalDetailDto>().ReverseMap();
-            CreateMap<ArbitrageDetail, ArbitrageDetailDto>().ReverseMap();
-            CreateMap<AdvanceDetail, AdvanceDetailDto>().ReverseMap();
-            CreateMap<PaymentDetail, PaymentDetailDto>().ReverseMap();
+            // --------- DETAILS (Advance) ---------
+            config.NewConfig<AdvanceDetail, AdvanceDetailDto>();
+            config.NewConfig<AdvanceDetailDto, AdvanceDetail>();
 
             // --------- ALLOCATIONS (Operation) ---------
-            CreateMap<OperationSupportAllocation, OperationSupportAllocationDto>()
-                .ForMember(dest => dest.Support, opt => opt.MapFrom(src => src.Support))
-                .ForMember(dest => dest.CompartmentId, opt => opt.MapFrom(src => src.CompartmentId))
-                .ForMember(dest => dest.Shares, opt => opt.MapFrom(src => src.Shares));
-            CreateMap<OperationSupportAllocationDto, OperationSupportAllocation>()
-                .ForMember(dest => dest.Operation, opt => opt.Ignore())
-                .ForMember(dest => dest.Support, opt => opt.Ignore())
-                .ForMember(dest => dest.CompartmentId, opt => opt.MapFrom(src => src.CompartmentId))
-                .ForMember(dest => dest.Shares, opt => opt.MapFrom(src => src.Shares));
+            config.NewConfig<OperationSupportAllocation, OperationSupportAllocationDto>()
+                .Map(dest => dest.Support, src => src.Support)
+                .Map(dest => dest.CompartmentId, src => src.CompartmentId)
+                .Map(dest => dest.Shares, src => src.Shares);
+            config.NewConfig<OperationSupportAllocationDto, OperationSupportAllocation>()
+                .Ignore(dest => dest.Operation)
+                .Ignore(dest => dest.Support)
+                .Map(dest => dest.CompartmentId, src => src.CompartmentId)
+                .Map(dest => dest.Shares, src => src.Shares);
         }
     }
 }

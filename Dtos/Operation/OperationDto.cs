@@ -1,6 +1,6 @@
-using api.Dtos.Compartment;
 using api.Dtos.Contract;
 using api.Dtos.FinancialSupport;
+using api.Models;
 
 namespace api.Dtos.Operation
 {
@@ -10,10 +10,7 @@ namespace api.Dtos.Operation
 
         public int ContractId { get; set; }
         public string? ContractNumber { get; set; }
-
-        public int? CompartmentId { get; set; }   // 🔹 Optionnel
         public ContractDto? Contract { get; set; }
-        public CompartmentDto? Compartment { get; set; }
 
         public OperationType Type { get; set; }
         public OperationStatus Status { get; set; }
@@ -23,28 +20,13 @@ namespace api.Dtos.Operation
         public decimal? Amount { get; set; }
         public string Currency { get; set; } = "EUR";
 
-        // 🔹 Détails optionnels
-        public WithdrawalDetailDto? WithdrawalDetail { get; set; }
-        public ArbitrageDetailDto? ArbitrageDetail { get; set; }
+        // 🔹 Détails polymorphes (discriminant JSON : "kind")
+        public OperationDetailsDto? Details { get; set; }
+
+        // 🔹 Rétrocompatibilité — conservés pour AdvanceDetail (pas encore migré)
         public AdvanceDetailDto? AdvanceDetail { get; set; }
-        public PaymentDetailDto? PaymentDetail { get; set; }
 
         public List<OperationSupportAllocationDto> Allocations { get; set; } = new();
-    }
-
-    public class WithdrawalDetailDto
-    {
-        public decimal GrossAmount { get; set; }
-        public bool IsScheduled { get; set; }
-        public string? Frequency { get; set; }
-        public DateTime? StartDate { get; set; }
-    }
-
-    public class ArbitrageDetailDto
-    {
-        public int FromSupportId { get; set; }
-        public int ToSupportId { get; set; }
-        public decimal Percentage { get; set; }
     }
 
     public class AdvanceDetailDto
@@ -52,15 +34,6 @@ namespace api.Dtos.Operation
         public decimal Amount { get; set; }
         public decimal InterestRate { get; set; }
         public DateTime MaturityDate { get; set; }
-    }
-
-    public class PaymentDetailDto
-    {
-        public string PaymentMethod { get; set; } = "Virement";
-        public string? Frequency { get; set; }
-        public string? SourceOfFunds { get; set; }
-        public decimal Amount { get; set; }
-        public DateTime? StartDate { get; set; }
     }
 
     public class OperationSupportAllocationDto
@@ -75,6 +48,9 @@ namespace api.Dtos.Operation
         public FinancialSupportLightDto? Support { get; set; }  // 👈 enrichi
 
         public int? CompartmentId { get; set; }
+
+        public OperationFlow? Flow { get; set; }
+
     }
 
     public class OperationListDto

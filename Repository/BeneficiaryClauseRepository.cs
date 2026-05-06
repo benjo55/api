@@ -9,7 +9,7 @@ using api.Helpers;
 using api.Interfaces;
 using api.Models;
 using api.Services;
-using AutoMapper;
+using Mapster;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,13 +19,10 @@ namespace api.Repository
     {
         private readonly ApplicationDBContext _context;
         private readonly EntityHistoryService _entityHistoryService;
-        private readonly IMapper _mapper;
-
-        public BeneficiaryClauseRepository(ApplicationDBContext context, EntityHistoryService entityHistoryService, IMapper mapper)
+        public BeneficiaryClauseRepository(ApplicationDBContext context, EntityHistoryService entityHistoryService)
         {
             _context = context;
             _entityHistoryService = entityHistoryService;
-            _mapper = mapper;
         }
 
         public async Task<BeneficiaryClause> CreateAsync(BeneficiaryClause beneficiaryClauseModel)
@@ -140,10 +137,10 @@ namespace api.Repository
 
             // Sauvegarde de l'état initial pour l'historique
             var originalBeneficiaryClause = new BeneficiaryClause();
-            _mapper.Map(existingBeneficiaryClause, originalBeneficiaryClause);
+            existingBeneficiaryClause.Adapt(originalBeneficiaryClause);
 
-            // Mise à jour automatique des champs avec AutoMapper
-            _mapper.Map(updateBeneficiaryClauseDto, existingBeneficiaryClause);
+            // Mise à jour avec Mapster
+            updateBeneficiaryClauseDto.Adapt(existingBeneficiaryClause);
             existingBeneficiaryClause.UpdatedDate = DateTime.UtcNow;
 
             // Historisation des changements (à personnaliser avec l'utilisateur courant)

@@ -190,6 +190,128 @@ namespace api.Services
                         continue;
                     }
 
+                    if (op.Type == OperationType.Arbitrage)
+                    {
+                        var sourceHoldingMap = await _context.ContractSupportHoldings
+                            .Where(h => h.ContractId == op.ContractId)
+                            .ToDictionaryAsync(
+                                h => (h.SupportId, h.CompartmentId),
+                                h => h.TotalShares
+                            );
+
+                        // 1) Cap des SOURCES à la quantité réellement détenue
+                        for (var i = 0; i < finalized.Count; i++)
+                        {
+                            var item = finalized[i];
+                            var alloc = item.alloc;
+
+                            if (alloc.Flow != OperationFlow.Source || alloc.CompartmentId == null)
+                                continue;
+
+                            sourceHoldingMap.TryGetValue(
+                                (alloc.SupportId, alloc.CompartmentId.Value),
+                                out var heldShares
+                            );
+
+                            var requestedShares = item.shares;
+                            var effectiveShares = Math.Min(requestedShares, heldShares);
+
+                            // Si le résidu est négligeable (< 0.01 parts OU < 0.1% de la position),
+                            // on force la liquidation totale pour éviter les miettes.
+                            var residualShares = heldShares - effectiveShares;
+                            if (residualShares > 0m && heldShares > 0m &&
+                                (residualShares < 0.01m || residualShares / heldShares < 0.001m))
+                            {
+                                _logger.LogInformation(
+                                    "🧹 Arbitrage {OpId} snap liquidation totale support={SupportId} compartment={CompartmentId}: résidu={Residual} parts absorbé",
+                                    op.Id,
+                                    alloc.SupportId,
+                                    alloc.CompartmentId,
+                                    residualShares
+                                );
+                                effectiveShares = heldShares;
+                            }
+                            else if (effectiveShares < requestedShares)
+                            {
+                                _logger.LogWarning(
+                                    "⚠️ Arbitrage {OpId} cap SOURCE support={SupportId} compartment={CompartmentId}: requested={Requested} held={Held}",
+                                    op.Id,
+                                    alloc.SupportId,
+                                    alloc.CompartmentId,
+                                    requestedShares,
+                                    heldShares
+                                );
+                            }
+
+                            var effectiveAmount = item.nav > 0
+                                ? NumericPolicy.RoundMoney(effectiveShares * item.nav)
+                                : 0m;
+
+                            alloc.Amount = effectiveAmount;
+                            finalized[i] = (alloc, item.nav, item.date, effectiveShares);
+                        }
+
+                        // 2) Rééquilibrage des TARGETS par compartiment sur le budget SOURCE réel
+                        var compartments = finalized
+                            .Where(f => f.alloc.CompartmentId.HasValue)
+                            .Select(f => f.alloc.CompartmentId!.Value)
+                            .Distinct()
+                            .ToList();
+
+                        foreach (var compartmentId in compartments)
+                        {
+                            var sourceBudget = finalized
+                                .Where(f => f.alloc.Flow == OperationFlow.Source && f.alloc.CompartmentId == compartmentId)
+                                .Sum(f => f.alloc.Amount ?? 0m);
+
+                            var targetIndexes = finalized
+                                .Select((f, idx) => new { f, idx })
+                                .Where(x => x.f.alloc.Flow == OperationFlow.Target && x.f.alloc.CompartmentId == compartmentId)
+                                .Select(x => x.idx)
+                                .ToList();
+
+                            if (!targetIndexes.Any())
+                                continue;
+
+                            var originalTargetTotal = targetIndexes.Sum(idx => finalized[idx].alloc.Amount ?? 0m);
+
+                            if (sourceBudget <= 0m || originalTargetTotal <= 0m)
+                            {
+                                foreach (var idx in targetIndexes)
+                                {
+                                    var item = finalized[idx];
+                                    item.alloc.Amount = 0m;
+                                    finalized[idx] = (item.alloc, item.nav, item.date, 0m);
+                                }
+
+                                continue;
+                            }
+
+                            decimal distributed = 0m;
+
+                            for (var j = 0; j < targetIndexes.Count; j++)
+                            {
+                                var idx = targetIndexes[j];
+                                var item = finalized[idx];
+                                var originalAmount = item.alloc.Amount ?? 0m;
+
+                                var nextAmount = j == targetIndexes.Count - 1
+                                    ? NumericPolicy.RoundMoney(sourceBudget - distributed)
+                                    : NumericPolicy.RoundMoney(sourceBudget * (originalAmount / originalTargetTotal));
+
+                                distributed += nextAmount;
+
+                                item.alloc.Amount = nextAmount;
+
+                                var nextShares = item.nav > 0m
+                                    ? NumericPolicy.RoundShares(nextAmount / item.nav)
+                                    : 0m;
+
+                                finalized[idx] = (item.alloc, item.nav, item.date, nextShares);
+                            }
+                        }
+                    }
+
                     foreach (var f in finalized)
                     {
                         f.alloc.NavAtOperation = f.nav;

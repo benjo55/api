@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using System;
 using System.Linq;
 using api.Helpers;
+using Mapster;
 
 namespace api.Controllers
 {
@@ -22,21 +23,18 @@ namespace api.Controllers
         private readonly IBeneficiaryClauseRepository _beneficiaryClauseRepository;
         private readonly IBeneficiaryClausePersonRepository _beneficiaryClausePersonRepository;
         private readonly EntityHistoryService _entityHistoryService;
-        private readonly AutoMapper.IMapper _mapper;
 
         public BeneficiaryClauseController(
             ApplicationDBContext context,
             IBeneficiaryClauseRepository beneficiaryClauseRepository,
             IBeneficiaryClausePersonRepository beneficiaryClausePersonRepository,
-            EntityHistoryService entityHistoryService,
-            AutoMapper.IMapper mapper
+            EntityHistoryService entityHistoryService
         )
         {
             _context = context;
             _beneficiaryClauseRepository = beneficiaryClauseRepository;
             _beneficiaryClausePersonRepository = beneficiaryClausePersonRepository;
             _entityHistoryService = entityHistoryService;
-            _mapper = mapper;
         }
 
         [HttpGet]
@@ -101,7 +99,7 @@ namespace api.Controllers
 
             // 2. Historisation si nécessaire
             var original = new BeneficiaryClause();
-            _mapper.Map(clause, original); // Clone original pour suivi
+            clause.Adapt(original); // Clone original pour suivi
 
             // 3. Appliquer la mise à jour des champs simples
             updateDto.ToBeneficiaryClauseFromUpdateDto(clause);
@@ -147,7 +145,7 @@ namespace api.Controllers
             if (clause.Locked) return BadRequest("Déjà verrouillée.");
 
             var original = new BeneficiaryClause();
-            _mapper.Map(clause, original);
+            clause.Adapt(original);
 
             clause.Locked = true;
             clause.UpdatedDate = DateTime.UtcNow;
@@ -166,7 +164,7 @@ namespace api.Controllers
             if (!clause.Locked) return BadRequest("Déjà déverrouillée.");
 
             var original = new BeneficiaryClause();
-            _mapper.Map(clause, original);
+            clause.Adapt(original);
 
             clause.Locked = false;
             clause.UpdatedDate = DateTime.UtcNow;

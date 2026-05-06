@@ -10,7 +10,6 @@ public interface IOperationRepository
     Task<PagedResult<Operation>> GetAllAsync(QueryObject query);
     Task<Operation?> GetByIdAsync(int id);
     Task<IEnumerable<Operation>> GetByContractAsync(int contractId);
-    Task<IEnumerable<Operation>> GetByCompartmentAsync(int contractId, int compartmentId);
 
     // ==========================================================
     // 🔹 Écriture

@@ -119,28 +119,62 @@ public class ContractValuationService : IContractValuationService
                 );
             }
 
+            // 5️⃣ BIS 🔥 Synchronisation CASH : Holding.TotalInvested = somme FSA
+            foreach (var h in holdings)
+            {
+                var investedFromFsa = fsas
+                    .Where(f => f.SupportId == h.SupportId &&
+                                f.CompartmentId == h.CompartmentId)
+                    .Sum(f => f.InvestedAmount);
+
+                h.TotalInvested = Math.Round(investedFromFsa, 2);
+            }
+
             // 7️⃣ 🔥 Valeur contrat = somme des compartiments (FSA)
             decimal totalContractValue = contract.Compartments.Sum(c => c.CurrentValue);
 
             // 8️⃣ Mise à jour des flux du contrat
             var allOps = await _context.Operations
                 .Where(o => o.ContractId == contractId)
-                .Select(o => new { o.Type, o.Amount })
+                .Select(o => new { o.Type, o.Amount, o.Status })
                 .ToListAsync();
 
-            decimal initialPremium = allOps
+            var executedOps = allOps.Where(o => o.Status == OperationStatus.Executed).ToList();
+
+            var pendingOps = allOps
+                .Where(o => o.Status == OperationStatus.Pending)
+                .ToList();
+
+            decimal initialPremium = executedOps
                 .Where(o => o.Type == OperationType.InitialPayment)
                 .Sum(o => o.Amount ?? 0m);
 
-            decimal totalPayments = allOps
+            decimal totalPayments = executedOps
                 .Where(o => o.Type == OperationType.FreePayment ||
                             o.Type == OperationType.ScheduledPayment)
                 .Sum(o => o.Amount ?? 0m);
 
-            decimal totalWithdrawals = allOps
+            decimal totalWithdrawals = executedOps
                 .Where(o => o.Type == OperationType.PartialWithdrawal ||
                             o.Type == OperationType.TotalWithdrawal ||
                             o.Type == OperationType.ScheduledWithdrawal)
+                .Sum(o => o.Amount ?? 0m);
+
+            var arbitrageOps = executedOps
+                .Where(o => o.Type == OperationType.Arbitrage)
+                .ToList();
+            int totalSwitches = arbitrageOps.Count;
+            decimal totalSwitchesAmount = arbitrageOps.Sum(o => o.Amount ?? 0m);
+
+            decimal pendingWithdrawals = pendingOps
+                .Where(o => o.Type == OperationType.PartialWithdrawal ||
+                            o.Type == OperationType.TotalWithdrawal ||
+                            o.Type == OperationType.ScheduledWithdrawal)
+                .Sum(o => o.Amount ?? 0m);
+
+            decimal pendingPayments = pendingOps
+                .Where(o => o.Type == OperationType.FreePayment ||
+                            o.Type == OperationType.ScheduledPayment)
                 .Sum(o => o.Amount ?? 0m);
 
             decimal netInvested = initialPremium + totalPayments - totalWithdrawals;
@@ -149,6 +183,8 @@ public class ContractValuationService : IContractValuationService
             contract.InitialPremium = initialPremium;
             contract.TotalPayments = totalPayments;
             contract.TotalWithdrawals = totalWithdrawals;
+            contract.TotalSwitches = totalSwitches;
+            contract.TotalSwitchesAmount = totalSwitchesAmount;
             contract.NetInvested = netInvested;
 
             contract.CurrentValue = Math.Round(totalContractValue, 2);

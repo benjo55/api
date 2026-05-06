@@ -9,7 +9,7 @@ using api.Helpers;
 using api.Interfaces;
 using api.Models;
 using api.Services;
-using AutoMapper;
+using Mapster;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
@@ -20,13 +20,10 @@ namespace api.Repository
     {
         private readonly ApplicationDBContext _context;
         private readonly EntityHistoryService _entityHistoryService;  // Service d'historisation
-        private readonly IMapper _mapper; // AutoMapper pour éviter d'affecter manuellement les champs
-
-        public InsurerRepository(ApplicationDBContext context, EntityHistoryService entityHistoryService, IMapper mapper)
+        public InsurerRepository(ApplicationDBContext context, EntityHistoryService entityHistoryService)
         {
             _context = context;
             _entityHistoryService = entityHistoryService;
-            _mapper = mapper;
         }
 
         public async Task<Insurer> CreateAsync(Insurer InsurerModel)
@@ -101,10 +98,10 @@ namespace api.Repository
 
             // 1️⃣ Cloner l'état initial pour l'historisation
             var originalInsurer = new Insurer();
-            _mapper.Map(existingInsurer, originalInsurer);
+            existingInsurer.Adapt(originalInsurer);
 
-            // 2️⃣ Mise à jour automatique avec AutoMapper
-            _mapper.Map(updateInsurerDto, existingInsurer);
+            // 2️⃣ Mise à jour avec Mapster
+            updateInsurerDto.Adapt(existingInsurer);
             existingInsurer.UpdatedDate = DateTime.UtcNow;
 
             // 3️⃣ Historisation des changements

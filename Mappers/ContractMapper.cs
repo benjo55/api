@@ -46,6 +46,8 @@ namespace api.Mappers
                 WithdrawnExecuted = contractModel.WithdrawnExecuted,
                 WithdrawnPending = contractModel.WithdrawnPending,
                 TotalWithdrawals = contractModel.WithdrawnExecuted + contractModel.WithdrawnPending,
+                TotalSwitches = contractModel.TotalSwitches,
+                TotalSwitchesAmount = contractModel.TotalSwitchesAmount,
 
                 NetInvested = contractModel.NetInvested,
                 PerformancePercent = contractModel.PerformancePercent,

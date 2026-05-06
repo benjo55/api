@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using api.Data;
 
@@ -11,9 +12,11 @@ using api.Data;
 namespace api.Migrations
 {
     [DbContext(typeof(ApplicationDBContext))]
-    partial class ApplicationDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260503075851_RemoveOperationCompartmentFromOperation")]
+    partial class RemoveOperationCompartmentFromOperation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -632,12 +635,6 @@ namespace api.Migrations
                         .HasColumnType("decimal(20,7)");
 
                     b.Property<decimal>("TotalPayments")
-                        .HasColumnType("decimal(18,5)");
-
-                    b.Property<int>("TotalSwitches")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("TotalSwitchesAmount")
                         .HasColumnType("decimal(18,5)");
 
                     b.Property<decimal>("TotalWithdrawals")
@@ -1602,9 +1599,9 @@ namespace api.Migrations
 
                     b.HasIndex("SupportId");
 
-                    b.HasIndex("OperationId", "SupportId", "CompartmentId", "Flow")
+                    b.HasIndex("OperationId", "SupportId", "CompartmentId")
                         .IsUnique()
-                        .HasDatabaseName("UX_OSA_Operation_Support_Compartment_Flow");
+                        .HasDatabaseName("UX_OSA_Operation_Support_Compartment");
 
                     b.ToTable("OperationSupportAllocations", (string)null);
                 });

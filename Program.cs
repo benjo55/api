@@ -1,6 +1,7 @@
 using api.Extensions;
 using api.Middleware;
-using AutoMapper;
+using Mapster;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,8 +14,8 @@ builder.Services.AddApiCors()
                 .AddApiDependencies(builder.Configuration)
                 .AddQuartzJobs(builder.Configuration);
 
-// ✅ FIX AutoMapper
-builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+// Mapster : scan des configs IRegister dans l'assembly
+TypeAdapterConfig.GlobalSettings.Scan(Assembly.GetExecutingAssembly());
 
 
 // --- PIPELINE ---

@@ -3,7 +3,7 @@ using api.Dtos.Operation;
 using api.Helpers;
 using api.Interfaces;
 using api.Models;
-using AutoMapper;
+using Mapster;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
@@ -13,14 +13,12 @@ public class OperationController : ControllerBase
 {
     private readonly IOperationRepository _repository;
     private readonly IContractRepository _contractRepository;
-    private readonly IMapper _mapper;
     private readonly IOperationEngineService _operationEngineService;
 
-    public OperationController(IOperationRepository repository, IContractRepository contractRepository, IMapper mapper, IOperationEngineService operationEngineService)
+    public OperationController(IOperationRepository repository, IContractRepository contractRepository, IOperationEngineService operationEngineService)
     {
         _repository = repository;
         _contractRepository = contractRepository;
-        _mapper = mapper;
         _operationEngineService = operationEngineService;
     }
 
@@ -30,7 +28,7 @@ public class OperationController : ControllerBase
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
         var operations = await _repository.GetAllAsync(query);
-        var dtoList = _mapper.Map<IEnumerable<OperationDto>>(operations.Items);
+        var dtoList = operations.Items.Adapt<IEnumerable<OperationDto>>();
 
         return Ok(new
         {
@@ -47,21 +45,14 @@ public class OperationController : ControllerBase
     {
         var op = await _repository.GetByIdAsync(id);
         if (op == null) return NotFound();
-        return Ok(_mapper.Map<OperationDto>(op));
+        return Ok(op.Adapt<OperationDto>());
     }
 
     [HttpGet("contract/{contractId}")]
     public async Task<ActionResult<IEnumerable<OperationDto>>> GetByContract(int contractId)
     {
         var ops = await _repository.GetByContractAsync(contractId);
-        return Ok(_mapper.Map<IEnumerable<OperationDto>>(ops));
-    }
-
-    [HttpGet("contract/{contractId}/compartment/{compartmentId}")]
-    public async Task<ActionResult<IEnumerable<OperationDto>>> GetByCompartment(int contractId, int compartmentId)
-    {
-        var ops = await _repository.GetByCompartmentAsync(contractId, compartmentId);
-        return Ok(_mapper.Map<IEnumerable<OperationDto>>(ops));
+        return Ok(ops.Adapt<IEnumerable<OperationDto>>());
     }
 
     [HttpPost]
@@ -70,7 +61,7 @@ public class OperationController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
-        var entity = _mapper.Map<Operation>(dto);
+        var entity = dto.Adapt<Operation>();
         var created = await _repository.AddAsync(entity);
 
         if (created == null || created.Id <= 0)
@@ -107,9 +98,9 @@ public class OperationController : ControllerBase
     {
         if (id != dto.Id) return BadRequest();
 
-        var entity = _mapper.Map<Operation>(dto);
+        var entity = dto.Adapt<Operation>();
         var updated = await _repository.UpdateAsync(entity);
-        return Ok(_mapper.Map<OperationDto>(updated));
+        return Ok(updated.Adapt<OperationDto>());
     }
 
     [HttpDelete("{id}")]

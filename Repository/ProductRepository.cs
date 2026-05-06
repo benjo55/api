@@ -9,7 +9,7 @@ using api.Helpers;
 using api.Interfaces;
 using api.Models;
 using api.Services;
-using AutoMapper;
+using Mapster;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,13 +19,10 @@ namespace api.Repository
     {
         private readonly ApplicationDBContext _context;
         private readonly EntityHistoryService _entityHistoryService;  // Service d'historisation
-        private readonly IMapper _mapper; // AutoMapper pour éviter d'affecter manuellement les champs
-
-        public ProductRepository(ApplicationDBContext context, EntityHistoryService entityHistoryService, IMapper mapper)
+        public ProductRepository(ApplicationDBContext context, EntityHistoryService entityHistoryService)
         {
             _context = context;
             _entityHistoryService = entityHistoryService;
-            _mapper = mapper;
         }
 
         public async Task<Product> CreateAsync(Product productModel)
@@ -99,10 +96,10 @@ namespace api.Repository
 
             // 1️⃣ Cloner l'état initial pour l'historisation
             var originalProduct = new Product();
-            _mapper.Map(existingProduct, originalProduct);
+            existingProduct.Adapt(originalProduct);
 
-            // 2️⃣ Mise à jour automatique avec AutoMapper
-            _mapper.Map(updateProductDto, existingProduct);
+            // 2️⃣ Mise à jour avec Mapster
+            updateProductDto.Adapt(existingProduct);
             existingProduct.UpdatedDate = DateTime.UtcNow;
 
             // 3️⃣ Historisation des changements
@@ -127,7 +124,7 @@ namespace api.Repository
                 return null;
 
             var original = new Product();
-            _mapper.Map(product, original);
+            product.Adapt(original);
 
             product.Locked = locked;
             product.UpdatedDate = DateTime.UtcNow;

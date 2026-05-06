@@ -11,7 +11,7 @@ using api.Models;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using api.Services;
-using AutoMapper;
+using Mapster;
 
 namespace api.Repository
 {
@@ -19,13 +19,10 @@ namespace api.Repository
     {
         private readonly ApplicationDBContext _context;
         private readonly EntityHistoryService _entityHistoryService;  // Service d'historisation
-        private readonly IMapper _mapper; // AutoMapper pour éviter d'affecter manuellement les champs
-
-        public BrandRepository(ApplicationDBContext context, EntityHistoryService entityHistoryService, IMapper mapper)
+        public BrandRepository(ApplicationDBContext context, EntityHistoryService entityHistoryService)
         {
             _context = context;
             _entityHistoryService = entityHistoryService;
-            _mapper = mapper;
         }
 
         public async Task<Brand> CreateAsync(Brand brandModel)
@@ -89,10 +86,10 @@ namespace api.Repository
 
             // Sauvegarde de l'état initial pour l'historique
             var originalBrand = new Brand();
-            _mapper.Map(existingBrand, originalBrand);
+            existingBrand.Adapt(originalBrand);
 
-            // Mise à jour automatique des champs avec AutoMapper
-            _mapper.Map(updateBrandDto, existingBrand);
+            // Mise à jour avec Mapster
+            updateBrandDto.Adapt(existingBrand);
             existingBrand.UpdatedDate = DateTime.UtcNow;
 
             // Historisation des changements
@@ -109,7 +106,7 @@ namespace api.Repository
                 return null;
 
             var original = new Brand();
-            _mapper.Map(brand, original);
+            brand.Adapt(original);
 
             brand.Locked = locked;
             brand.UpdatedDate = DateTime.UtcNow;

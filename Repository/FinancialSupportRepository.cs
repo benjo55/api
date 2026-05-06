@@ -10,7 +10,7 @@ using api.Interfaces;
 using api.Models;
 using Microsoft.EntityFrameworkCore;
 using api.Services;
-using AutoMapper;
+using Mapster;
 
 namespace api.Repository
 {
@@ -18,13 +18,10 @@ namespace api.Repository
     {
         private readonly ApplicationDBContext _context;
         private readonly EntityHistoryService _entityHistoryService;
-        private readonly IMapper _mapper;
-
-        public FinancialSupportRepository(ApplicationDBContext context, EntityHistoryService entityHistoryService, IMapper mapper)
+        public FinancialSupportRepository(ApplicationDBContext context, EntityHistoryService entityHistoryService)
         {
             _context = context;
             _entityHistoryService = entityHistoryService;
-            _mapper = mapper;
         }
 
         public async Task<PagedResult<FinancialSupportDto>> GetAllAsync(QueryObject query)
@@ -45,7 +42,7 @@ namespace api.Repository
             var skipNumber = (query.PageNumber - 1) * query.PageSize;
             var paged = await supports.Skip(skipNumber).Take(query.PageSize).ToListAsync();
 
-            var dtos = paged.Select(_mapper.Map<FinancialSupportDto>).ToList();
+            var dtos = paged.Select(s => s.Adapt<FinancialSupportDto>()).ToList();
 
             return new PagedResult<FinancialSupportDto>
             {
@@ -60,24 +57,24 @@ namespace api.Repository
         public async Task<FinancialSupportDto?> GetByIdAsync(int id)
         {
             var entity = await _context.FinancialSupports.FindAsync(id);
-            return entity == null ? null : _mapper.Map<FinancialSupportDto>(entity);
+            return entity == null ? null : entity.Adapt<FinancialSupportDto>();
         }
 
         public async Task<FinancialSupportDto?> GetByCodeAsync(string code)
         {
             var entity = await _context.FinancialSupports
                 .FirstOrDefaultAsync(fs => fs.Code == code);
-            return entity == null ? null : _mapper.Map<FinancialSupportDto>(entity);
+            return entity == null ? null : entity.Adapt<FinancialSupportDto>();
         }
 
         public async Task<FinancialSupportDto> CreateAsync(CreateFinancialSupportRequestDto createDto)
         {
-            var entity = _mapper.Map<FinancialSupport>(createDto);
+            var entity = createDto.Adapt<FinancialSupport>();
             entity.CreatedDate = DateTime.UtcNow;
             entity.UpdatedDate = DateTime.UtcNow;
             await _context.FinancialSupports.AddAsync(entity);
             await _context.SaveChangesAsync();
-            return _mapper.Map<FinancialSupportDto>(entity);
+            return entity.Adapt<FinancialSupportDto>();
         }
 
         public async Task<bool> AnyByIsinAsync(string isin)
@@ -93,15 +90,15 @@ namespace api.Repository
             if (existing == null) return null;
 
             var original = new FinancialSupport();
-            _mapper.Map(existing, original);
+            existing.Adapt(original);
 
-            _mapper.Map(updateDto, existing);
+            updateDto.Adapt(existing);
             existing.UpdatedDate = DateTime.UtcNow;
 
             await _entityHistoryService.TrackChangesAsync(original, existing, "Admin");
             await _context.SaveChangesAsync();
 
-            return _mapper.Map<FinancialSupportDto>(existing);
+            return existing.Adapt<FinancialSupportDto>();
         }
 
         public async Task<FinancialSupportDto?> DeleteAsync(int id)
@@ -111,7 +108,7 @@ namespace api.Repository
 
             _context.FinancialSupports.Remove(entity);
             await _context.SaveChangesAsync();
-            return _mapper.Map<FinancialSupportDto>(entity);
+            return entity.Adapt<FinancialSupportDto>();
         }
 
         public async Task<List<FinancialSupportDto>> TypeaheadAsync(string search)
@@ -122,7 +119,7 @@ namespace api.Repository
                     || s.Code.Contains(search))
                 .OrderBy(s => s.Label)
                 .Take(10) // limite pour le typeahead
-                .Select(s => _mapper.Map<FinancialSupportDto>(s))
+                .Select(s => s.Adapt<FinancialSupportDto>())
                 .ToListAsync();
         }
     }

@@ -56,6 +56,9 @@ namespace api.Repository
                     await ApplyWithdrawalAsync(operation, allocations, context, cancellationToken);
                     break;
 
+                case OperationType.Arbitrage:
+                    await ApplyArbitrageAsync(operation, allocations, context, cancellationToken);
+                    break;
                 default:
                     return;
             }
@@ -111,13 +114,16 @@ namespace api.Repository
         {
             foreach (var alloc in allocations)
             {
-                if (alloc.CompartmentId < 0)
+                if (alloc.CompartmentId == null)
                     throw new InvalidOperationException(
                         $"CompartmentId manquant dans opération {operation.Id}");
 
                 var shares = alloc.Shares ?? 0m;
-                if (shares <= 0)
-                    throw new InvalidOperationException("Shares invalides");
+                var amount = alloc.Amount ?? 0m;
+
+                if (shares <= 0 || amount <= 0)
+                    throw new InvalidOperationException(
+                        $"Rachat invalide (shares={shares}, amount={amount})");
 
                 var fsa = await context.Set<FinancialSupportAllocation>()
                     .SingleOrDefaultAsync(f =>
@@ -136,19 +142,134 @@ namespace api.Repository
                 if (shares > holding.TotalShares)
                     throw new InvalidOperationException("Retrait > parts détenues");
 
-                var investedReduction = Math.Round(shares * holding.Pru, 7);
+                // 🔥 CORRECTION : on utilise le montant cash réel
+                var investedReduction = amount;
 
+                // 🔹 Mise à jour FSA
                 fsa.CurrentShares -= shares;
                 fsa.InvestedAmount = Math.Max(0m, fsa.InvestedAmount - investedReduction);
 
+                // 🔹 Mise à jour Holding
                 holding.TotalShares -= shares;
                 holding.TotalInvested = Math.Max(0m, holding.TotalInvested - investedReduction);
 
+                // 🔒 PRU ne change PAS sur rachat
+
+                // 🔹 Nettoyage si position fermée
                 if (holding.TotalShares == 0)
                 {
                     holding.TotalInvested = 0m;
                     holding.Pru = 0m;
+                    fsa.InvestedAmount = 0m;
                 }
+
+                // 🔹 (Optionnel mais recommandé) éviter dérives décimales
+                fsa.InvestedAmount = Math.Round(fsa.InvestedAmount, 2);
+                holding.TotalInvested = Math.Round(holding.TotalInvested, 2);
+            }
+        }
+
+
+        // ============================================================
+        // 🔻 3. ARBITRAGES (SOURCE et TARGET)
+        // ============================================================
+
+
+
+        private static async Task ApplyArbitrageAsync(
+            Operation operation,
+            List<OperationSupportAllocation> allocations,
+            DbContext context,
+            CancellationToken ct)
+        {
+            var sources = allocations.Where(a => a.Flow == OperationFlow.Source).ToList();
+            var targets = allocations.Where(a => a.Flow == OperationFlow.Target).ToList();
+
+            if (!sources.Any() || !targets.Any())
+                throw new InvalidOperationException("Arbitrage invalide : sources ou targets manquants.");
+
+            // ============================================================
+            // 🔻 1. VENTES (SOURCE)
+            // ============================================================
+
+            foreach (var alloc in sources)
+            {
+                if (alloc.CompartmentId == null)
+                    throw new InvalidOperationException("CompartmentId manquant");
+
+                var shares = alloc.Shares ?? 0m;
+                var amount = alloc.Amount ?? 0m;
+
+                if (shares <= 0 || amount <= 0)
+                    throw new InvalidOperationException("Arbitrage SOURCE invalide");
+
+                var fsa = await context.Set<FinancialSupportAllocation>()
+                    .SingleOrDefaultAsync(f =>
+                        f.ContractId == operation.ContractId &&
+                        f.SupportId == alloc.SupportId &&
+                        f.CompartmentId == alloc.CompartmentId, ct)
+                    ?? throw new InvalidOperationException("FSA source introuvable");
+
+                var holding = await context.Set<ContractSupportHolding>()
+                    .SingleOrDefaultAsync(h =>
+                        h.ContractId == operation.ContractId &&
+                        h.SupportId == alloc.SupportId &&
+                        h.CompartmentId == alloc.CompartmentId, ct)
+                    ?? throw new InvalidOperationException("Holding source introuvable");
+
+                if (shares > holding.TotalShares)
+                    throw new InvalidOperationException("Arbitrage > parts détenues");
+
+                // Si on vend la totalité (ou quasi-totalité après snap moteur), liquidation propre
+                if (shares >= holding.TotalShares)
+                {
+                    fsa.CurrentShares = Math.Max(0m, fsa.CurrentShares - shares);
+                    fsa.InvestedAmount = 0m;
+                    holding.TotalShares = 0m;
+                    holding.TotalInvested = 0m;
+                    holding.Pru = 0m;
+                }
+                else
+                {
+                    // 🔥 même logique que withdrawal
+                    var investedReduction = amount;
+
+                    fsa.CurrentShares -= shares;
+                    fsa.InvestedAmount = Math.Max(0m, fsa.InvestedAmount - investedReduction);
+
+                    holding.TotalShares -= shares;
+                    holding.TotalInvested = Math.Max(0m, holding.TotalInvested - investedReduction);
+                }
+            }
+
+            // ============================================================
+            // 🔺 2. ACHATS (TARGET)
+            // ============================================================
+
+            foreach (var alloc in targets)
+            {
+                if (alloc.CompartmentId == null)
+                    throw new InvalidOperationException("CompartmentId manquant");
+
+                var shares = alloc.Shares ?? 0m;
+                var amount = alloc.Amount ?? 0m;
+
+                if (shares <= 0 || amount <= 0)
+                    throw new InvalidOperationException("Arbitrage TARGET invalide");
+
+                var fsa = await GetOrCreateFsaAsync(operation, alloc, context, ct);
+                var holding = await GetOrCreateHoldingAsync(operation, alloc, context, ct);
+
+                fsa.CurrentShares += shares;
+                fsa.InvestedAmount += amount;
+
+                holding.TotalShares += shares;
+                holding.TotalInvested += amount;
+
+                // 🔥 recalcul PRU comme payment
+                holding.Pru = holding.TotalShares > 0
+                    ? Math.Round(holding.TotalInvested / holding.TotalShares, 7)
+                    : 0m;
             }
         }
 

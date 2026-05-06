@@ -15,10 +15,6 @@ namespace api.Models
         public int ContractId { get; set; }
         public Contract Contract { get; set; } = null!;
 
-        // 🔹 Optionnellement lié à un compartiment
-        public int? CompartmentId { get; set; }
-        public Compartment? Compartment { get; set; }
-
         // Type & statut
         public OperationType Type { get; set; }
         public OperationStatus Status { get; set; } = OperationStatus.Pending;

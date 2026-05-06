@@ -6,7 +6,7 @@ using api.Dtos.FinancialSupport;
 using Microsoft.EntityFrameworkCore;
 using api.Interfaces;
 using api.Models;
-using AutoMapper;
+using Mapster;
 using api.Data;
 
 namespace api.Services
@@ -22,7 +22,6 @@ namespace api.Services
         private readonly IServiceProvider _serviceProvider;
         private readonly IContractRepository _contractRepository;
         private readonly IContractValuationService _valuationService;
-        private readonly IMapper _mapper;
 
         public FinancialSupportImportService(
             IYahooFinanceProvider yahooProvider,
@@ -33,8 +32,7 @@ namespace api.Services
             IContractSupportHoldingRepository holdingRepo,
             IServiceProvider serviceProvider,
             IContractRepository contractRepository,
-            IContractValuationService valuationService,
-            IMapper mapper)
+            IContractValuationService valuationService)
         {
             _yahooProvider = yahooProvider;
             _eodProvider = eodProvider;
@@ -45,7 +43,6 @@ namespace api.Services
             _serviceProvider = serviceProvider;
             _contractRepository = contractRepository;
             _valuationService = valuationService;
-            _mapper = mapper;
         }
 
         public async Task ImportFromYahooAsync(string ticker)
@@ -57,13 +54,13 @@ namespace api.Services
 
             if (existing == null)
             {
-                var createDto = _mapper.Map<CreateFinancialSupportRequestDto>(dto);
+                var createDto = dto.Adapt<CreateFinancialSupportRequestDto>();
                 supportDto = await _supportRepo.CreateAsync(createDto);
                 DebugLogger.Log($"[YahooFinance] Created support {dto.Ticker}");
             }
             else
             {
-                var updateDto = _mapper.Map<UpdateFinancialSupportRequestDto>(dto);
+                var updateDto = dto.Adapt<UpdateFinancialSupportRequestDto>();
                 var updatedDto = await _supportRepo.UpdateAsync(existing.Id, updateDto);
                 supportDto = updatedDto ?? existing;
                 DebugLogger.Log($"[YahooFinance] Updated support {dto.Ticker}");
@@ -386,7 +383,7 @@ namespace api.Services
                     };
                 }
 
-                _mapper.Map(profile, yahooDto);
+                profile.Adapt(yahooDto);
             }
 
             return (yahooDto, ticker);
@@ -495,7 +492,7 @@ namespace api.Services
                     DebugLogger.Log($"[AnyProvider] EOD profile: {(eodProfile != null ? "OK" : "NULL")}");
                     if (eodProfile != null)
                     {
-                        var dto = _mapper.Map<CreateFinancialSupportRequestDto>(eodProfile);
+                        var dto = eodProfile.Adapt<CreateFinancialSupportRequestDto>();
                         dto.ISIN = (eodProfile.ISIN ?? isin)?.Trim().ToUpperInvariant();
                         dto.Code = eodTicker;
                         return (dto, eodTicker, "EOD");
