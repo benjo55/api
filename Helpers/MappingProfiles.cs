@@ -23,7 +23,6 @@ namespace api.Helpers
             config.NewConfig<PersonDto, Person>();
             config.NewConfig<UpdatePersonRequestDto, Person>()
                 .Map(dest => dest.UpdatedDate, src => DateTime.UtcNow);
-            config.NewConfig<Person, Person>(); // Historisation
 
             // --------- BENEFICIARY CLAUSE ---------
             config.NewConfig<BeneficiaryClausePerson, BeneficiaryClausePersonDto>()
@@ -31,11 +30,9 @@ namespace api.Helpers
             config.NewConfig<BeneficiaryClausePersonDto, BeneficiaryClausePerson>();
             config.NewConfig<UpdateBeneficiaryClauseRequestDto, BeneficiaryClause>();
             config.NewConfig<CreateBeneficiaryClauseRequestDto, BeneficiaryClause>();
-            config.NewConfig<BeneficiaryClause, BeneficiaryClause>(); // Historisation
 
             // --------- BRAND ---------
             config.NewConfig<UpdateBrandRequestDto, Brand>();
-            config.NewConfig<Brand, Brand>(); // Historisation
 
             // --------- FINANCIAL SUPPORT ---------
             config.NewConfig<FinancialSupport, FinancialSupportDto>();
@@ -58,11 +55,9 @@ namespace api.Helpers
 
             // --------- INSURER ---------
             config.NewConfig<UpdateInsurerRequestDto, Insurer>();
-            config.NewConfig<Insurer, Insurer>(); // Historisation
 
             // --------- PRODUCT ---------
             config.NewConfig<UpdateProductRequestDto, Product>();
-            config.NewConfig<Product, Product>(); // Historisation
 
             // --------- FINANCIAL SUPPORT CREATE/UPDATE ---------
             config.NewConfig<CreateFinancialSupportRequestDto, FinancialSupport>();

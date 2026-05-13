@@ -6,7 +6,9 @@ namespace api.Models
         {
             return type is OperationType.PartialWithdrawal
                        or OperationType.TotalWithdrawal
-                       or OperationType.ScheduledWithdrawal;
+                       or OperationType.ScheduledWithdrawal
+                       or OperationType.ManagementFee
+                       or OperationType.OperationFee;
         }
 
         public static bool IsPayment(this OperationType type)

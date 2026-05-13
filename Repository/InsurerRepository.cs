@@ -97,8 +97,7 @@ namespace api.Repository
             if (existingInsurer == null) return null;
 
             // 1️⃣ Cloner l'état initial pour l'historisation
-            var originalInsurer = new Insurer();
-            existingInsurer.Adapt(originalInsurer);
+            var originalInsurer = (Insurer)_context.Entry(existingInsurer).CurrentValues.ToObject();
 
             // 2️⃣ Mise à jour avec Mapster
             updateInsurerDto.Adapt(existingInsurer);

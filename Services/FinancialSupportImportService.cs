@@ -210,7 +210,7 @@ namespace api.Services
                 UCITSCategory = profile?.UCITSCategory,
                 MinimumSubscription = profile?.MinimumSubscription,
                 MinimumHolding = profile?.MinimumHolding,
-                ManagementFee = profile?.ManagementFee,
+                InternalManagementFeeRate = profile?.ManagementFee,
                 PerformanceFee = profile?.PerformanceFee,
                 TurnoverRate = profile?.TurnoverRate,
                 AUM = profile?.AUM,

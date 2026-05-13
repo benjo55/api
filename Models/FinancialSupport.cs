@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using api.Models.Enum;
 using Microsoft.EntityFrameworkCore;
 
 namespace api.Models
@@ -45,13 +47,23 @@ namespace api.Models
         // Caractéristiques financières
         [Precision(18, 5)] public decimal? MinimumSubscription { get; set; }
         [Precision(18, 5)] public decimal? MinimumHolding { get; set; }
-        [Precision(18, 5)] public decimal? ManagementFee { get; set; }
+        [Column("ManagementFee")]
+        [Precision(18, 5)] public decimal? InternalManagementFeeRate { get; set; }
         [Precision(18, 5)] public decimal? PerformanceFee { get; set; }
         [Precision(18, 5)] public decimal? TurnoverRate { get; set; }
         [Precision(18, 5)] public decimal? AUM { get; set; }
         public bool? IsCapitalGuaranteed { get; set; }
         public bool? IsCurrencyHedged { get; set; }
         [MaxLength(10)] public string? Benchmark { get; set; }
+
+        // Override éventuel du régime de frais contrat pour ce support
+        [Precision(18, 5)] public decimal? ContractManagementFeeOverrideRate { get; set; }
+        public ManagementFeeFrequency? ContractManagementFeeOverrideFrequency { get; set; }
+        public ManagementFeeProrataMethod? ContractManagementFeeOverrideProrataMethod { get; set; }
+        public ManagementFeePostingMode? ContractManagementFeeOverridePostingMode { get; set; }
+        public DateTime? ContractManagementFeeOverrideEffectiveDate { get; set; }
+        public DateTime? ContractManagementFeeOverrideEndDate { get; set; }
+        public bool ContractManagementFeeOverrideEnabled { get; set; }
 
         // ESG / SFDR / MIFID
         public bool? HasESGLabel { get; set; }

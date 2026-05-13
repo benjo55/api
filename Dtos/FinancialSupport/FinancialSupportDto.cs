@@ -1,5 +1,6 @@
 using System;
 using System.Text.Json.Serialization;
+using api.Models.Enum;
 
 namespace api.Dtos.FinancialSupport
 {
@@ -43,13 +44,26 @@ namespace api.Dtos.FinancialSupport
         // Caractéristiques financières
         public decimal? MinimumSubscription { get; set; }
         public decimal? MinimumHolding { get; set; }
-        public decimal? ManagementFee { get; set; }
+        public decimal? InternalManagementFeeRate { get; set; }
+        [JsonPropertyName("managementFee")]
+        public decimal? ManagementFee
+        {
+            get => InternalManagementFeeRate;
+            set => InternalManagementFeeRate = value;
+        }
         public decimal? PerformanceFee { get; set; }
         public decimal? TurnoverRate { get; set; }
         public decimal? AUM { get; set; }
         public bool? IsCapitalGuaranteed { get; set; }
         public bool? IsCurrencyHedged { get; set; }
         public string? Benchmark { get; set; }
+        public decimal? ContractManagementFeeOverrideRate { get; set; }
+        public ManagementFeeFrequency? ContractManagementFeeOverrideFrequency { get; set; }
+        public ManagementFeeProrataMethod? ContractManagementFeeOverrideProrataMethod { get; set; }
+        public ManagementFeePostingMode? ContractManagementFeeOverridePostingMode { get; set; }
+        public DateTime? ContractManagementFeeOverrideEffectiveDate { get; set; }
+        public DateTime? ContractManagementFeeOverrideEndDate { get; set; }
+        public bool ContractManagementFeeOverrideEnabled { get; set; }
 
         // ESG / SFDR / MIFID
         public bool? HasESGLabel { get; set; }

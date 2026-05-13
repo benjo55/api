@@ -3,6 +3,7 @@ using api.Data;
 using api.Interfaces;
 using api.Models;
 using api.Configuration;
+using api.Models.Enum;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Options;
@@ -19,8 +20,9 @@ namespace api.Services
         private readonly IDbContextFactory<ApplicationDBContext> _dbContextFactory;
         private readonly EodSettings _eodSettings;
         private readonly IOperationApplier _operationApplier;
+        private readonly IManagementFeePolicyResolver _managementFeePolicyResolver;
 
-        public OperationEngineService(ApplicationDBContext context, ILogger<OperationEngineService> logger, IContractSupportHoldingRepository holdingRepo, IContractValuationService valuationService, IOptions<EodSettings> eodSettings, IEodDataProvider eodDataProvider, IDbContextFactory<ApplicationDBContext> dbContextFactory, IOperationApplier operationApplier)
+        public OperationEngineService(ApplicationDBContext context, ILogger<OperationEngineService> logger, IContractSupportHoldingRepository holdingRepo, IContractValuationService valuationService, IOptions<EodSettings> eodSettings, IEodDataProvider eodDataProvider, IDbContextFactory<ApplicationDBContext> dbContextFactory, IOperationApplier operationApplier, IManagementFeePolicyResolver managementFeePolicyResolver)
         {
             _context = context;
             _logger = logger;
@@ -30,6 +32,7 @@ namespace api.Services
             _dbContextFactory = dbContextFactory;
             _eodSettings = eodSettings.Value;
             _operationApplier = operationApplier;
+            _managementFeePolicyResolver = managementFeePolicyResolver;
         }
 
         // 1️⃣ Maj quotidienne des VL
@@ -360,86 +363,113 @@ namespace api.Services
         // 5️⃣ Frais de gestion automatiques
         public async Task ApplyManagementFeesAsync()
         {
-            _logger.LogInformation("▶️ Début ApplyManagementFeesAsync");
+            var runDate = DateTime.UtcNow.Date;
+            _logger.LogInformation("▶️ Début ApplyManagementFeesAsync pour la date {RunDate:yyyy-MM-dd}", runDate);
 
             var contracts = await _context.Contracts
+                .Include(c => c.Product)
+                    .ThenInclude(p => p!.ManagementFeePolicy)
                 .Include(c => c.Supports).ThenInclude(s => s.Support)
                 .ToListAsync();
 
+            var accrualStates = await _context.ContractManagementFeeAccruals
+                .ToDictionaryAsync(a => (a.ContractId, a.SupportId, a.CompartmentId));
+
             foreach (var contract in contracts)
             {
-                if (contract.ManagementFeesRate == null || contract.ManagementFeesRate == 0)
-                    continue;
-
-                // 🔥 ANTI-DOUBLON FRAIS
-                var now = DateTime.UtcNow;
-
-                var alreadyApplied = await _context.Operations.AnyAsync(o =>
-                    o.ContractId == contract.Id &&
-                    o.Type == OperationType.ManagementFee &&
-                    o.Status == OperationStatus.Executed &&
-                    o.ExecutionDate >= new DateTime(now.Year, now.Month, 1) &&
-                    o.ExecutionDate < new DateTime(now.Year, now.Month, 1).AddMonths(1)
-                );
-                if (alreadyApplied)
+                foreach (var alloc in contract.Supports)
                 {
-                    _logger.LogInformation(
-                        $"⏭️ Frais déjà appliqués aujourd’hui pour contrat {contract.Id}"
-                    );
-                    continue;
-                }
-
-                try
-                {
-                    var monthlyRate = (contract.ManagementFeesRate.Value / 100m) / 12m;
-
-                    foreach (var alloc in contract.Supports)
+                    try
                     {
-                        if (alloc.Support?.LastValuationAmount is not decimal vl || vl <= 0)
+                        if (alloc.Support == null)
                             continue;
 
-                        var feeAmount = (alloc.AllocationPercentage / 100m)
-                                        * contract.CurrentValue
-                                        * monthlyRate;
-
-                        if (feeAmount <= 0)
+                        var policy = _managementFeePolicyResolver.Resolve(contract, alloc.Support, runDate);
+                        if (policy == null)
                             continue;
 
-                        var sharesToRemove = Math.Round(feeAmount / vl, 7);
+                        var state = GetOrCreateAccrualState(accrualStates, contract.Id, alloc.SupportId, alloc.CompartmentId);
+                        var accrualStart = GetAccrualStartDate(contract, policy, state);
+                        var accrualEnd = GetAccrualEndDate(policy, runDate);
+
+                        if (accrualStart <= accrualEnd)
+                        {
+                            var newlyAccrued = await ComputeDailyAccrualAsync(contract, alloc, policy, accrualStart, accrualEnd);
+                            if (newlyAccrued > 0m)
+                            {
+                                state.AccruedAmount = NumericPolicy.RoundMoney(state.AccruedAmount + newlyAccrued);
+                                _logger.LogInformation(
+                                    "📘 Accrual frais contrat {ContractId}, support {SupportId}, compartiment {CompartmentId} : +{Amount:F7} du {Start:yyyy-MM-dd} au {End:yyyy-MM-dd}",
+                                    contract.Id,
+                                    alloc.SupportId,
+                                    alloc.CompartmentId,
+                                    newlyAccrued,
+                                    accrualStart,
+                                    accrualEnd);
+                            }
+
+                            state.LastAccruedDate = accrualEnd;
+                            state.UpdatedDate = DateTime.UtcNow;
+                        }
+
+                        if (policy.PostingMode == ManagementFeePostingMode.NetServedYield)
+                        {
+                            await _context.SaveChangesAsync();
+                            _logger.LogInformation(
+                                "⏭️ Accrual conservé sans prélèvement en parts pour contrat {ContractId}, support {SupportId} : mode {PostingMode}",
+                                contract.Id,
+                                alloc.SupportId,
+                                policy.PostingMode);
+                            continue;
+                        }
+
+                        if (!ShouldPostForRun(policy, runDate, state.LastPostedDate))
+                            continue;
+
+                        var feeAmount = NumericPolicy.RoundMoney(state.AccruedAmount);
+                        if (feeAmount <= 0m)
+                            continue;
+
+                        var currentHolding = await _context.ContractSupportHoldings
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(h =>
+                                h.ContractId == contract.Id &&
+                                h.SupportId == alloc.SupportId &&
+                                h.CompartmentId == alloc.CompartmentId);
+
+                        if (currentHolding == null || currentHolding.TotalShares <= 0m)
+                            continue;
+
+                        var postingNav = await GetPostingNavAsync(alloc.Support, alloc.SupportId, runDate.AddDays(-1));
+                        if (postingNav <= 0m)
+                            continue;
+
+                        var sharesToRemove = Math.Min(currentHolding.TotalShares, NumericPolicy.RoundShares(feeAmount / postingNav));
+
+                        if (sharesToRemove <= 0m)
+                            continue;
 
                         var feeOperation = new Operation
                         {
                             ContractId = contract.Id,
                             Type = OperationType.ManagementFee,
-
-                            // ✅ date effet (logique métier)
-                            OperationDate = DateTime.UtcNow,
-
-                            // ✅ date exécution (immédiate ici)
-                            ExecutionDate = DateTime.UtcNow,
-
+                            OperationDate = runDate,
+                            ExecutionDate = runDate,
                             Status = OperationStatus.Executed,
-
                             Amount = feeAmount,
                             Currency = contract.Currency,
-
                             Allocations = new List<OperationSupportAllocation>
-                    {
-                        new OperationSupportAllocation
-                        {
-                            SupportId = alloc.SupportId,
-                            Amount = feeAmount,
-
-                            // 🔥 IMPORTANT → retrait en parts
-                            Shares = sharesToRemove,
-
-                            NavAtOperation = vl,
-                            NavDateAtOperation = alloc.Support.LastValuationDate,
-
-                            CompartmentId = alloc.CompartmentId // ⚠️ IMPORTANT
-                        }
-                    },
-
+                            {
+                                new OperationSupportAllocation
+                                {
+                                    SupportId = alloc.SupportId,
+                                    Amount = feeAmount,
+                                    Shares = sharesToRemove,
+                                    NavAtOperation = postingNav,
+                                    NavDateAtOperation = runDate.AddDays(-1),
+                                    CompartmentId = alloc.CompartmentId
+                                }
+                            },
                             CreatedDate = DateTime.UtcNow,
                             UpdatedDate = DateTime.UtcNow,
                         };
@@ -449,21 +479,274 @@ namespace api.Services
                         // 🔥 APPLIQUER L’EFFET FINANCIER
                         await _operationApplier.ApplyAsync(feeOperation, _context);
 
+                        state.AccruedAmount = 0m;
+                        state.LastPostedDate = runDate;
+                        state.UpdatedDate = DateTime.UtcNow;
+
+                        await _context.SaveChangesAsync();
+
                         _logger.LogInformation(
-                            $"💸 Frais appliqués : contrat {contract.Id}, support {alloc.SupportId} → {feeAmount:F2} ({sharesToRemove} parts)"
+                            "💸 Frais postés : contrat {ContractId}, support {SupportId}, compartiment {CompartmentId} → {FeeAmount:F7} ({Shares:F7} parts), source={Source}",
+                            contract.Id,
+                            alloc.SupportId,
+                            alloc.CompartmentId,
+                            feeAmount,
+                            sharesToRemove,
+                            policy.Source
                         );
                     }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"❌ Erreur ApplyManagementFeesAsync sur contrat {contract.Id}");
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(
+                            ex,
+                            "❌ Erreur ApplyManagementFeesAsync sur contrat {ContractId}, support {SupportId}, compartiment {CompartmentId}",
+                            contract.Id,
+                            alloc.SupportId,
+                            alloc.CompartmentId);
+                    }
                 }
             }
 
-            await _context.SaveChangesAsync();
-
             _logger.LogInformation("✅ ApplyManagementFeesAsync terminé");
         }
+
+        private ContractManagementFeeAccrual GetOrCreateAccrualState(
+            IDictionary<(int ContractId, int SupportId, int CompartmentId), ContractManagementFeeAccrual> accrualStates,
+            int contractId,
+            int supportId,
+            int compartmentId)
+        {
+            if (accrualStates.TryGetValue((contractId, supportId, compartmentId), out var existingState))
+            {
+                return existingState;
+            }
+
+            var newState = new ContractManagementFeeAccrual
+            {
+                ContractId = contractId,
+                SupportId = supportId,
+                CompartmentId = compartmentId,
+                AccruedAmount = 0m,
+                CreatedDate = DateTime.UtcNow,
+                UpdatedDate = DateTime.UtcNow,
+            };
+
+            accrualStates[(contractId, supportId, compartmentId)] = newState;
+            _context.ContractManagementFeeAccruals.Add(newState);
+            return newState;
+        }
+
+        private static DateTime GetAccrualStartDate(Contract contract, ResolvedManagementFeePolicy policy, ContractManagementFeeAccrual state)
+        {
+            var nextAccrualDate = state.LastAccruedDate?.Date.AddDays(1) ?? contract.DateEffect.Date;
+            return MaxDate(policy.EffectiveDate.Date, nextAccrualDate);
+        }
+
+        private static DateTime GetAccrualEndDate(ResolvedManagementFeePolicy policy, DateTime runDateUtc)
+        {
+            var yesterday = runDateUtc.Date.AddDays(-1);
+            if (policy.EndDate is DateTime endDate)
+            {
+                return MinDate(yesterday, endDate.Date);
+            }
+
+            return yesterday;
+        }
+
+        private async Task<decimal> ComputeDailyAccrualAsync(
+            Contract contract,
+            FinancialSupportAllocation allocation,
+            ResolvedManagementFeePolicy policy,
+            DateTime startDate,
+            DateTime endDate)
+        {
+            if (startDate > endDate)
+                return 0m;
+
+            var operationAllocations = await _context.OperationSupportAllocations
+                .Include(a => a.Operation)
+                .Where(a =>
+                    a.SupportId == allocation.SupportId &&
+                    a.CompartmentId == allocation.CompartmentId &&
+                    a.Operation != null &&
+                    a.Operation.ContractId == contract.Id &&
+                    a.Operation.Status == OperationStatus.Executed &&
+                    a.Operation.ExecutionDate != null &&
+                    a.Operation.ExecutionDate <= endDate)
+                .AsNoTracking()
+                .ToListAsync();
+
+            var openingShares = operationAllocations
+                .Where(a => a.Operation!.ExecutionDate!.Value.Date < startDate)
+                .Sum(GetSignedShares);
+
+            var dailyShareDeltas = operationAllocations
+                .Where(a => a.Operation!.ExecutionDate!.Value.Date >= startDate)
+                .GroupBy(a => a.Operation!.ExecutionDate!.Value.Date)
+                .ToDictionary(g => g.Key, g => g.Sum(GetSignedShares));
+
+            var historicalRows = await _context.SupportHistoricalDatas
+                .Where(h =>
+                    h.FinancialSupportId == allocation.SupportId &&
+                    h.Date >= startDate &&
+                    h.Date <= endDate)
+                .AsNoTracking()
+                .OrderBy(h => h.Date)
+                .ToListAsync();
+
+            var navByDate = historicalRows
+                .Select(h => new { Date = h.Date.Date, Nav = h.Nav ?? h.Close })
+                .Where(x => x.Nav.HasValue && x.Nav.Value > 0m)
+                .GroupBy(x => x.Date)
+                .ToDictionary(g => g.Key, g => g.Last().Nav!.Value);
+
+            var fallbackNav = await _context.SupportHistoricalDatas
+                .Where(h =>
+                    h.FinancialSupportId == allocation.SupportId &&
+                    h.Date < startDate &&
+                    (h.Nav != null || h.Close != null))
+                .OrderByDescending(h => h.Date)
+                .Select(h => h.Nav ?? h.Close)
+                .FirstOrDefaultAsync();
+
+            var currentNav = fallbackNav > 0m
+                ? fallbackNav
+                : allocation.Support?.LastValuationAmount;
+
+            var shares = openingShares;
+            var accruedAmount = 0m;
+
+            for (var day = startDate.Date; day <= endDate.Date; day = day.AddDays(1))
+            {
+                if (dailyShareDeltas.TryGetValue(day, out var dayDelta))
+                {
+                    shares += dayDelta;
+                }
+
+                if (navByDate.TryGetValue(day, out var dayNav))
+                {
+                    currentNav = dayNav;
+                }
+
+                if (shares <= 0m || currentNav is not decimal nav || nav <= 0m)
+                    continue;
+
+                var dailyAmount = NumericPolicy.RoundMoney(shares * nav * ComputeDailyRate(policy, day));
+                accruedAmount = NumericPolicy.RoundMoney(accruedAmount + dailyAmount);
+            }
+
+            return accruedAmount;
+        }
+
+        private async Task<decimal> GetPostingNavAsync(FinancialSupport support, int supportId, DateTime valuationDate)
+        {
+            decimal? historicalNav = await _context.SupportHistoricalDatas
+                .Where(h =>
+                    h.FinancialSupportId == supportId &&
+                    h.Date <= valuationDate &&
+                    (h.Nav != null || h.Close != null))
+                .OrderByDescending(h => h.Date)
+                .Select(h => h.Nav ?? h.Close)
+                .FirstOrDefaultAsync();
+
+            if (historicalNav is decimal value && value > 0m)
+            {
+                return value;
+            }
+
+            return support.LastValuationAmount ?? 0m;
+        }
+
+        private static bool ShouldPostForRun(ResolvedManagementFeePolicy policy, DateTime runDateUtc, DateTime? lastPostedDateUtc)
+        {
+            var runDate = runDateUtc.Date;
+
+            if (lastPostedDateUtc?.Date == runDate)
+                return false;
+
+            if (policy.EndDate?.Date.AddDays(1) == runDate)
+                return true;
+
+            return policy.Frequency switch
+            {
+                ManagementFeeFrequency.Monthly => runDate.Day == 1,
+                ManagementFeeFrequency.Quarterly => runDate.Day == 1 && runDate.Month is 1 or 4 or 7 or 10,
+                ManagementFeeFrequency.Yearly => runDate.Day == 1 && runDate.Month == 1,
+                _ => false,
+            };
+        }
+
+        private static decimal ComputeDailyRate(ResolvedManagementFeePolicy policy, DateTime accrualDateUtc)
+        {
+            var annualRate = policy.AnnualRate / 100m;
+
+            if (policy.ProrataMethod == ManagementFeeProrataMethod.Actual365)
+            {
+                return annualRate / 365m;
+            }
+
+            var periodRate = policy.Frequency switch
+            {
+                ManagementFeeFrequency.Monthly => annualRate / 12m,
+                ManagementFeeFrequency.Quarterly => annualRate / 4m,
+                ManagementFeeFrequency.Yearly => annualRate,
+                _ => 0m,
+            };
+
+            var (periodStart, periodEnd) = GetPeriodBounds(policy.Frequency, accrualDateUtc.Date);
+            var periodDays = (periodEnd - periodStart).Days + 1;
+
+            return periodDays > 0 ? periodRate / periodDays : 0m;
+        }
+
+        private static (DateTime Start, DateTime End) GetPeriodBounds(ManagementFeeFrequency frequency, DateTime referenceDate)
+        {
+            return frequency switch
+            {
+                ManagementFeeFrequency.Monthly =>
+                    (new DateTime(referenceDate.Year, referenceDate.Month, 1),
+                     new DateTime(referenceDate.Year, referenceDate.Month, DateTime.DaysInMonth(referenceDate.Year, referenceDate.Month))),
+                ManagementFeeFrequency.Quarterly => GetQuarterBounds(referenceDate),
+                ManagementFeeFrequency.Yearly =>
+                    (new DateTime(referenceDate.Year, 1, 1), new DateTime(referenceDate.Year, 12, 31)),
+                _ => (referenceDate.Date, referenceDate.Date),
+            };
+        }
+
+        private static (DateTime Start, DateTime End) GetQuarterBounds(DateTime referenceDate)
+        {
+            var quarterStartMonth = ((referenceDate.Month - 1) / 3) * 3 + 1;
+            var start = new DateTime(referenceDate.Year, quarterStartMonth, 1);
+            var end = start.AddMonths(3).AddDays(-1);
+            return (start, end);
+        }
+
+        private static decimal GetSignedShares(OperationSupportAllocation allocation)
+        {
+            var shares = allocation.Shares ?? allocation.EstimatedShares ?? 0m;
+            if (shares <= 0m || allocation.Operation == null)
+                return 0m;
+
+            if (allocation.Operation.Type == OperationType.Arbitrage)
+            {
+                return allocation.Flow == OperationFlow.Target ? shares : -shares;
+            }
+
+            if (allocation.Operation.Type.IsPayment())
+                return shares;
+
+            if (allocation.Operation.Type.IsWithdrawal())
+                return -shares;
+
+            return 0m;
+        }
+
+        private static DateTime MaxDate(DateTime left, DateTime right)
+            => left >= right ? left : right;
+
+        private static DateTime MinDate(DateTime left, DateTime right)
+            => left <= right ? left : right;
+
         public async Task RebuildContractAsync(int contractId)
         {
             _logger.LogWarning("♻️ Démarrage REBUILD COMPLET du contrat {ContractId}", contractId);

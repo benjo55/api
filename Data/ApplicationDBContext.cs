@@ -21,6 +21,8 @@ namespace api.Data
         public DbSet<Notary> Notaries { get; set; }
         public DbSet<Contract> Contracts { get; set; }
         public DbSet<Product> Products { get; set; }
+        public DbSet<ProductManagementFeePolicy> ProductManagementFeePolicies { get; set; }
+        public DbSet<ContractManagementFeeAccrual> ContractManagementFeeAccruals { get; set; }
         public DbSet<Brand> Brands { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<Role> Roles { get; set; }
@@ -66,6 +68,10 @@ namespace api.Data
         public DbSet<ContractValuation> ContractValuations { get; set; }
 
         public DbSet<SupportLookthroughAsset> SupportLookthroughAssets { get; set; }
+        public DbSet<TaxProfile> TaxProfiles { get; set; }
+        public DbSet<TaxRuleVersion> TaxRuleVersions { get; set; }
+        public DbSet<TaxComputation> TaxComputations { get; set; }
+        public DbSet<FiscalEvent> FiscalEvents { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -85,6 +91,8 @@ namespace api.Data
             modelBuilder.Entity<Contract>().Property(c => c.ExitFeesRate).HasPrecision(5, 2);
             modelBuilder.Entity<Contract>().Property(c => c.ScheduledPayment).HasPrecision(20, 7);
             modelBuilder.Entity<Product>().ToTable("Products");
+            modelBuilder.Entity<ProductManagementFeePolicy>().ToTable("ProductManagementFeePolicies");
+            modelBuilder.Entity<ContractManagementFeeAccrual>().ToTable("ContractManagementFeeAccruals");
             modelBuilder.Entity<Brand>().ToTable("Brands");
             modelBuilder.Entity<User>().ToTable("Users");
             modelBuilder.Entity<Role>().ToTable("Roles");
@@ -95,7 +103,45 @@ namespace api.Data
             modelBuilder.Entity<BeneficiaryClause>().ToTable("BeneficiaryClauses");
             modelBuilder.Entity<BeneficiaryClausePerson>().ToTable("BeneficiaryClausePersons");
             modelBuilder.Entity<FieldDescription>().ToTable("FieldDescriptions");
+            modelBuilder.Entity<FieldDescription>()
+                .HasIndex(f => new { f.EntityName, f.FieldName })
+                .IsUnique();
             modelBuilder.Entity<FinancialSupport>().ToTable("FinancialSupports");
+            modelBuilder.Entity<ProductManagementFeePolicy>(entity =>
+            {
+                entity.HasOne(p => p.Product)
+                    .WithOne(p => p.ManagementFeePolicy)
+                    .HasForeignKey<ProductManagementFeePolicy>(p => p.ProductId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(p => p.ProductId)
+                    .IsUnique();
+
+                entity.Property(p => p.AnnualRate).HasPrecision(18, 5);
+            });
+            modelBuilder.Entity<ContractManagementFeeAccrual>(entity =>
+            {
+                entity.HasOne(a => a.Contract)
+                    .WithMany()
+                    .HasForeignKey(a => a.ContractId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(a => a.Support)
+                    .WithMany()
+                    .HasForeignKey(a => a.SupportId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(a => a.Compartment)
+                    .WithMany()
+                    .HasForeignKey(a => a.CompartmentId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.Property(a => a.AccruedAmount).HasPrecision(20, 7);
+
+                entity.HasIndex(a => new { a.ContractId, a.SupportId, a.CompartmentId })
+                    .IsUnique()
+                    .HasDatabaseName("UX_ContractManagementFeeAccrual_Contract_Support_Compartment");
+            });
             modelBuilder.Entity<SupportValuation>().ToTable("SupportValuations");
             modelBuilder.Entity<SupportRegulation>().ToTable("SupportRegulations");
             modelBuilder.Entity<SupportRiskProfile>().ToTable("SupportRiskProfiles");
@@ -115,7 +161,35 @@ namespace api.Data
             modelBuilder.Entity<SupportHistoricalData>().ToTable("SupportHistoricalDatas");
             modelBuilder.Entity<SupportFeeDetail>().ToTable("SupportFeeDetails");
             modelBuilder.Entity<SupportLookthroughAsset>().ToTable("SupportLookthroughAssets");
+            modelBuilder.Entity<TaxProfile>().ToTable("TaxProfiles");
+            modelBuilder.Entity<TaxRuleVersion>().ToTable("TaxRuleVersions");
+            modelBuilder.Entity<TaxComputation>().ToTable("TaxComputations");
+            modelBuilder.Entity<FiscalEvent>().ToTable("FiscalEvents");
             modelBuilder.Entity<Compartment>().ToTable("Compartments");
+
+            modelBuilder.Entity<TaxRuleVersion>()
+                .HasIndex(v => new { v.IsActive, v.EffectiveFrom });
+
+            modelBuilder.Entity<TaxComputation>()
+                .HasIndex(c => c.CreatedDate);
+
+            modelBuilder.Entity<TaxComputation>()
+                .HasOne(c => c.TaxProfile)
+                .WithMany()
+                .HasForeignKey(c => c.TaxProfileId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TaxComputation>()
+                .HasOne(c => c.TaxRuleVersion)
+                .WithMany()
+                .HasForeignKey(c => c.TaxRuleVersionId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<FiscalEvent>()
+                .HasOne(e => e.TaxComputation)
+                .WithMany()
+                .HasForeignKey(e => e.TaxComputationId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             // 🔹 Operations
             modelBuilder.Entity<Operation>().ToTable("Operations");
@@ -387,6 +461,10 @@ namespace api.Data
 
             // 📌 Seed du catalogue d’options
             Data.Seed.ContractOptionTypeSeeder.Seed(modelBuilder);
+            // 📌 Seed des profils fiscaux par famille de contrat
+            Data.Seed.TaxProfileSeeder.Seed(modelBuilder);
+            // 📌 Seed des versions de règles fiscales
+            Data.Seed.TaxRuleVersionSeeder.Seed(modelBuilder);
         }
 
         public override int SaveChanges()

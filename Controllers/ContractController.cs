@@ -7,6 +7,8 @@ using api.Mappers;
 using Microsoft.AspNetCore.Mvc;
 using api.Helpers;
 using api.Dtos.Operation;
+using api.Dtos.FinancialSupport;
+using api.Models;
 
 namespace api.Controllers
 {
@@ -19,19 +21,22 @@ namespace api.Controllers
         private readonly IOperationEngineService _operationEngineService;
         private readonly IContractValuationService _valuationService;
         private readonly IOperationRepository _operationRepository;
+        private readonly IManagementFeePolicyResolver _managementFeePolicyResolver;
 
         public ContractController(
             IContractRepository contractRepository,
             IProductRepository productRepository,
             IOperationEngineService operationEngineService,
             IOperationRepository operationRepository,
-            IContractValuationService valuationService)
+            IContractValuationService valuationService,
+            IManagementFeePolicyResolver managementFeePolicyResolver)
         {
             _contractRepository = contractRepository;
             _productRepository = productRepository;
             _operationEngineService = operationEngineService;
             _operationRepository = operationRepository;
             _valuationService = valuationService;
+            _managementFeePolicyResolver = managementFeePolicyResolver;
         }
 
         [HttpGet]
@@ -57,7 +62,10 @@ namespace api.Controllers
         {
             var contract = await _contractRepository.GetByIdAsync(id);
             if (contract == null) return NotFound();
-            return Ok(contract.ToContractDto());
+
+            var dto = contract.ToContractDto();
+            EnrichResolvedManagementFeePolicy(contract, dto);
+            return Ok(dto);
         }
 
         [HttpPost]
@@ -84,7 +92,9 @@ namespace api.Controllers
             }
 
             // Retourne un ContractDto enrichi
-            return CreatedAtAction(nameof(GetById), new { id = createdContract.Id }, createdContract.ToContractDto());
+            var dto = createdContract.ToContractDto();
+            EnrichResolvedManagementFeePolicy(createdContract, dto);
+            return CreatedAtAction(nameof(GetById), new { id = createdContract.Id }, dto);
         }
 
         [HttpPut("{id:int}")]
@@ -92,7 +102,10 @@ namespace api.Controllers
         {
             var contractModel = await _contractRepository.UpdateAsync(id, updateContractDto);
             if (contractModel == null) return NotFound("Contrat non trouvé");
-            return Ok(contractModel.ToContractDto());
+
+            var dto = contractModel.ToContractDto();
+            EnrichResolvedManagementFeePolicy(contractModel, dto);
+            return Ok(dto);
         }
 
         [HttpPatch("{id}/beneficiaryClauseId")]
@@ -259,6 +272,53 @@ namespace api.Controllers
                 contractId = id,
                 contract = contract?.ToContractDto()
             });
+        }
+
+        private void EnrichResolvedManagementFeePolicy(Contract contract, ContractDto dto)
+        {
+            ApplyResolvedPolicy(contract, dto.Supports, contract.Supports);
+
+            foreach (var compartmentDto in dto.Compartments)
+            {
+                var compartmentModel = contract.Compartments.FirstOrDefault(c => c.Id == compartmentDto.Id);
+                ApplyResolvedPolicy(contract, compartmentDto.Supports, compartmentModel?.Supports);
+            }
+        }
+
+        private void ApplyResolvedPolicy(
+            Contract contract,
+            IEnumerable<FinancialSupportAllocationDto>? dtoSupports,
+            IEnumerable<FinancialSupportAllocation>? modelSupports)
+        {
+            if (dtoSupports == null || modelSupports == null)
+                return;
+
+            var indexedModelSupports = modelSupports
+                .GroupBy(s => (s.SupportId, s.CompartmentId))
+                .ToDictionary(g => g.Key, g => g.First());
+
+            foreach (var dtoSupport in dtoSupports)
+            {
+                var compartmentId = dtoSupport.CompartmentId ?? 0;
+
+                if (!indexedModelSupports.TryGetValue((dtoSupport.SupportId, compartmentId), out var modelSupport) ||
+                    modelSupport.Support == null)
+                {
+                    continue;
+                }
+
+                var policy = _managementFeePolicyResolver.Resolve(contract, modelSupport.Support, DateTime.UtcNow);
+                if (policy == null)
+                    continue;
+
+                dtoSupport.ResolvedManagementFeeRate = policy.AnnualRate;
+                dtoSupport.ResolvedManagementFeeFrequency = policy.Frequency;
+                dtoSupport.ResolvedManagementFeeProrataMethod = policy.ProrataMethod;
+                dtoSupport.ResolvedManagementFeePostingMode = policy.PostingMode;
+                dtoSupport.ResolvedManagementFeeEffectiveDate = policy.EffectiveDate;
+                dtoSupport.ResolvedManagementFeeEndDate = policy.EndDate;
+                dtoSupport.ResolvedManagementFeeSource = policy.Source;
+            }
         }
     }
 }

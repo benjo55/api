@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Threading.Tasks;
+using api.Models.Enum;
 
 namespace api.Models
 {
@@ -18,5 +19,31 @@ namespace api.Models
         [ForeignKey("InsurerId")]
         public Insurer? Insurer { get; set; }
         public bool Locked { get; set; } = false;
+
+        /// <summary>Famille de contrats rattachée à ce produit</summary>
+        public ContractFamily? ContractFamily { get; set; }
+
+        public ProductManagementFeePolicy? ManagementFeePolicy { get; set; }
+
+        [NotMapped]
+        public decimal? DefaultManagementFeeRate { get; set; }
+
+        [NotMapped]
+        public string? DefaultManagementFeeFrequency { get; set; }
+
+        [NotMapped]
+        public string? DefaultManagementFeeProrataMethod { get; set; }
+
+        [NotMapped]
+        public string? DefaultManagementFeePostingMode { get; set; }
+
+        [NotMapped]
+        public DateTime? DefaultManagementFeeEffectiveDate { get; set; }
+
+        [NotMapped]
+        public DateTime? DefaultManagementFeeEndDate { get; set; }
+
+        [NotMapped]
+        public bool? DefaultManagementFeeIsEnabled { get; set; }
     }
 }

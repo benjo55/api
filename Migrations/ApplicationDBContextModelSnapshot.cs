@@ -670,6 +670,52 @@ namespace api.Migrations
                     b.ToTable("ContractInsuredPersons");
                 });
 
+            modelBuilder.Entity("api.Models.ContractManagementFeeAccrual", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("AccruedAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<int>("CompartmentId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ContractId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LastAccruedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LastPostedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SupportId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompartmentId");
+
+                    b.HasIndex("SupportId");
+
+                    b.HasIndex("ContractId", "SupportId", "CompartmentId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ContractManagementFeeAccrual_Contract_Support_Compartment");
+
+                    b.ToTable("ContractManagementFeeAccruals", (string)null);
+                });
+
             modelBuilder.Entity("api.Models.ContractOption", b =>
                 {
                     b.Property<int>("Id")
@@ -960,16 +1006,22 @@ namespace api.Migrations
 
                     b.Property<string>("EntityName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("FieldName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("Locked")
+                        .HasColumnType("bit");
 
                     b.Property<DateTime?>("UpdatedDate")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EntityName", "FieldName")
+                        .IsUnique();
 
                     b.ToTable("FieldDescriptions", (string)null);
                 });
@@ -1021,6 +1073,28 @@ namespace api.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("ContractManagementFeeOverrideEffectiveDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("ContractManagementFeeOverrideEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("ContractManagementFeeOverrideEndDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ContractManagementFeeOverrideFrequency")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ContractManagementFeeOverridePostingMode")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ContractManagementFeeOverrideProrataMethod")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("ContractManagementFeeOverrideRate")
+                        .HasPrecision(18, 5)
+                        .HasColumnType("decimal(18,5)");
 
                     b.Property<string>("CountryOfDistribution")
                         .HasMaxLength(100)
@@ -1077,6 +1151,11 @@ namespace api.Migrations
                     b.Property<DateTime?>("InceptionDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<decimal?>("InternalManagementFeeRate")
+                        .HasPrecision(18, 5)
+                        .HasColumnType("decimal(18,5)")
+                        .HasColumnName("ManagementFee");
+
                     b.Property<string>("InvestmentStrategy")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -1121,10 +1200,6 @@ namespace api.Migrations
                     b.Property<string>("LegalName")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
-
-                    b.Property<decimal?>("ManagementFee")
-                        .HasPrecision(18, 5)
-                        .HasColumnType("decimal(18,5)");
 
                     b.Property<string>("ManagementStyle")
                         .HasMaxLength(50)
@@ -1268,6 +1343,34 @@ namespace api.Migrations
                         .HasDatabaseName("UX_FSA_Contract_Compartment_Support");
 
                     b.ToTable("FinancialSupportAllocations");
+                });
+
+            modelBuilder.Entity("api.Models.FiscalEvent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("EventDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("EventType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TaxComputationId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TaxComputationId");
+
+                    b.ToTable("FiscalEvents", (string)null);
                 });
 
             modelBuilder.Entity("api.Models.FundLifeCycle", b =>
@@ -1748,6 +1851,9 @@ namespace api.Migrations
                     b.Property<int>("ContractCount")
                         .HasColumnType("int");
 
+                    b.Property<int?>("ContractFamily")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("datetime2");
 
@@ -1773,6 +1879,53 @@ namespace api.Migrations
                     b.HasIndex("InsurerId");
 
                     b.ToTable("Products", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.ProductManagementFeePolicy", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("AnnualRate")
+                        .HasPrecision(18, 5)
+                        .HasColumnType("decimal(18,5)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("EffectiveDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Frequency")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("PostingMode")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProrataMethod")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId")
+                        .IsUnique();
+
+                    b.ToTable("ProductManagementFeePolicies", (string)null);
                 });
 
             modelBuilder.Entity("api.Models.Role", b =>
@@ -2297,6 +2450,54 @@ namespace api.Migrations
                     b.ToTable("SupportValuations", (string)null);
                 });
 
+            modelBuilder.Entity("api.Models.TaxComputation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("EventType")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("GainAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("GrossWithdrawal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("RequestJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ResultJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TaxProfileId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("TaxRuleVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("TotalTax")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedDate");
+
+                    b.HasIndex("TaxProfileId");
+
+                    b.HasIndex("TaxRuleVersionId");
+
+                    b.ToTable("TaxComputations", (string)null);
+                });
+
             modelBuilder.Entity("api.Models.TaxData", b =>
                 {
                     b.Property<int>("Id")
@@ -2327,6 +2528,459 @@ namespace api.Migrations
                     b.HasIndex("FinancialSupportId");
 
                     b.ToTable("TaxDatas", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.TaxProfile", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("CanChooseBareme")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("ContractFamily")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("ContributionCapForReducedRate")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("Death757B_GlobalAllowance")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("Death990I_AllowancePerBeneficiary")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("Death990I_Rate1")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<decimal?>("Death990I_Rate1Threshold")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("Death990I_Rate2")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("DurationThresholdYears")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("EntryDeductible")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("EntryDeductionCap")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("ExitMode")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("GainAllowanceCouple")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("GainAllowanceSingle")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("HasDeathTaxArticle757B")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("HasDeathTaxArticle990I")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("HasSuccessionBenefit")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IrExemptAfterThreshold")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("IrRateAboveContributionCap")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<decimal>("IrRateAfterThreshold")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<decimal>("IrRateBeforeThreshold")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("Locked")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("RentePartImposable")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<bool>("RenteTaxedAsPension")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("SocialChargesExemptAfterThreshold")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("SocialChargesRate")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("TaxProfiles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            CanChooseBareme = true,
+                            ContractFamily = 0,
+                            ContributionCapForReducedRate = 150000m,
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Death757B_GlobalAllowance = 30500m,
+                            Death990I_AllowancePerBeneficiary = 152500m,
+                            Death990I_Rate1 = 20m,
+                            Death990I_Rate1Threshold = 700000m,
+                            Death990I_Rate2 = 31.25m,
+                            Description = "Contrat patrimonial individuel en fonds € et/ou UC. Avantage successoral Art. 990 I / 757 B.",
+                            DurationThresholdYears = 8,
+                            EntryDeductible = false,
+                            ExitMode = 2,
+                            GainAllowanceCouple = 9200m,
+                            GainAllowanceSingle = 4600m,
+                            HasDeathTaxArticle757B = true,
+                            HasDeathTaxArticle990I = true,
+                            HasSuccessionBenefit = true,
+                            IrExemptAfterThreshold = false,
+                            IrRateAboveContributionCap = 12.8m,
+                            IrRateAfterThreshold = 7.5m,
+                            IrRateBeforeThreshold = 12.8m,
+                            Label = "Assurance-vie individuelle",
+                            Locked = true,
+                            RenteTaxedAsPension = false,
+                            SocialChargesExemptAfterThreshold = false,
+                            SocialChargesRate = 17.2m
+                        },
+                        new
+                        {
+                            Id = 2,
+                            CanChooseBareme = true,
+                            ContractFamily = 1,
+                            ContributionCapForReducedRate = 150000m,
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Même fiscalité des rachats que l'AV. Pas d'avantage successoral spécifique. Détention possible par personnes morales.",
+                            DurationThresholdYears = 8,
+                            EntryDeductible = false,
+                            ExitMode = 2,
+                            GainAllowanceCouple = 9200m,
+                            GainAllowanceSingle = 4600m,
+                            HasDeathTaxArticle757B = false,
+                            HasDeathTaxArticle990I = false,
+                            HasSuccessionBenefit = false,
+                            IrExemptAfterThreshold = false,
+                            IrRateAboveContributionCap = 12.8m,
+                            IrRateAfterThreshold = 7.5m,
+                            IrRateBeforeThreshold = 12.8m,
+                            Label = "Contrat de capitalisation",
+                            Locked = true,
+                            RenteTaxedAsPension = false,
+                            SocialChargesExemptAfterThreshold = false,
+                            SocialChargesRate = 17.2m
+                        },
+                        new
+                        {
+                            Id = 3,
+                            CanChooseBareme = true,
+                            ContractFamily = 2,
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Death757B_GlobalAllowance = 30500m,
+                            Death990I_AllowancePerBeneficiary = 152500m,
+                            Death990I_Rate1 = 20m,
+                            Death990I_Rate1Threshold = 700000m,
+                            Death990I_Rate2 = 31.25m,
+                            Description = "Versements volontaires déductibles du revenu imposable. Sortie en capital (IR + PS sur gains) ou rente (pension).",
+                            DurationThresholdYears = 0,
+                            EntryDeductible = true,
+                            ExitMode = 2,
+                            HasDeathTaxArticle757B = true,
+                            HasDeathTaxArticle990I = true,
+                            HasSuccessionBenefit = false,
+                            IrExemptAfterThreshold = false,
+                            IrRateAboveContributionCap = 12.8m,
+                            IrRateAfterThreshold = 0m,
+                            IrRateBeforeThreshold = 0m,
+                            Label = "PER individuel (PERIN)",
+                            Locked = true,
+                            RenteTaxedAsPension = true,
+                            SocialChargesExemptAfterThreshold = false,
+                            SocialChargesRate = 17.2m
+                        },
+                        new
+                        {
+                            Id = 4,
+                            CanChooseBareme = false,
+                            ContractFamily = 3,
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Successeur du PERCO. Abondement exonéré, participation/intéressement sous conditions. Sortie capital souvent exonérée d'IR.",
+                            DurationThresholdYears = 0,
+                            EntryDeductible = true,
+                            ExitMode = 2,
+                            HasDeathTaxArticle757B = false,
+                            HasDeathTaxArticle990I = false,
+                            HasSuccessionBenefit = false,
+                            IrExemptAfterThreshold = true,
+                            IrRateAboveContributionCap = 12.8m,
+                            IrRateAfterThreshold = 0m,
+                            IrRateBeforeThreshold = 0m,
+                            Label = "PER collectif (PERCOL)",
+                            Locked = true,
+                            RenteTaxedAsPension = true,
+                            SocialChargesExemptAfterThreshold = false,
+                            SocialChargesRate = 17.2m
+                        },
+                        new
+                        {
+                            Id = 5,
+                            CanChooseBareme = false,
+                            ContractFamily = 4,
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Contrat collectif obligatoire. Sortie principalement en rente imposée comme pension.",
+                            DurationThresholdYears = 0,
+                            EntryDeductible = true,
+                            ExitMode = 1,
+                            HasDeathTaxArticle757B = false,
+                            HasDeathTaxArticle990I = false,
+                            HasSuccessionBenefit = false,
+                            IrExemptAfterThreshold = false,
+                            IrRateAboveContributionCap = 12.8m,
+                            IrRateAfterThreshold = 0m,
+                            IrRateBeforeThreshold = 0m,
+                            Label = "PER obligatoire (PERO)",
+                            Locked = true,
+                            RenteTaxedAsPension = true,
+                            SocialChargesExemptAfterThreshold = false,
+                            SocialChargesRate = 17.2m
+                        },
+                        new
+                        {
+                            Id = 6,
+                            CanChooseBareme = false,
+                            ContractFamily = 5,
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Retraite des travailleurs non-salariés. Cotisations déductibles. Sortie uniquement en rente imposée comme pension.",
+                            DurationThresholdYears = 0,
+                            EntryDeductible = true,
+                            ExitMode = 1,
+                            HasDeathTaxArticle757B = false,
+                            HasDeathTaxArticle990I = false,
+                            HasSuccessionBenefit = false,
+                            IrExemptAfterThreshold = false,
+                            IrRateAboveContributionCap = 0m,
+                            IrRateAfterThreshold = 0m,
+                            IrRateBeforeThreshold = 0m,
+                            Label = "Contrat Madelin",
+                            Locked = true,
+                            RenteTaxedAsPension = true,
+                            SocialChargesExemptAfterThreshold = false,
+                            SocialChargesRate = 17.2m
+                        },
+                        new
+                        {
+                            Id = 7,
+                            CanChooseBareme = false,
+                            ContractFamily = 6,
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Ancien régime retraite entreprise. Cotisations déductibles. Sortie principalement en rente imposée comme pension.",
+                            DurationThresholdYears = 0,
+                            EntryDeductible = true,
+                            ExitMode = 1,
+                            HasDeathTaxArticle757B = false,
+                            HasDeathTaxArticle990I = false,
+                            HasSuccessionBenefit = false,
+                            IrExemptAfterThreshold = false,
+                            IrRateAboveContributionCap = 0m,
+                            IrRateAfterThreshold = 0m,
+                            IrRateBeforeThreshold = 0m,
+                            Label = "Article 83",
+                            Locked = true,
+                            RenteTaxedAsPension = true,
+                            SocialChargesExemptAfterThreshold = false,
+                            SocialChargesRate = 17.2m
+                        },
+                        new
+                        {
+                            Id = 8,
+                            CanChooseBareme = false,
+                            ContractFamily = 7,
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Exonération d'IR après 5 ans. Prélèvements sociaux maintenus. PFU 30 % avant 5 ans.",
+                            DurationThresholdYears = 5,
+                            EntryDeductible = false,
+                            ExitMode = 0,
+                            HasDeathTaxArticle757B = false,
+                            HasDeathTaxArticle990I = false,
+                            HasSuccessionBenefit = false,
+                            IrExemptAfterThreshold = true,
+                            IrRateAboveContributionCap = 12.8m,
+                            IrRateAfterThreshold = 0m,
+                            IrRateBeforeThreshold = 12.8m,
+                            Label = "PEA (Plan d'Épargne en Actions)",
+                            Locked = true,
+                            RenteTaxedAsPension = false,
+                            SocialChargesExemptAfterThreshold = false,
+                            SocialChargesRate = 17.2m
+                        },
+                        new
+                        {
+                            Id = 9,
+                            CanChooseBareme = false,
+                            ContractFamily = 8,
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Couverture décès/invalidité/incapacité. Cotisations employeur exonérées sous plafonds.",
+                            DurationThresholdYears = 0,
+                            EntryDeductible = true,
+                            ExitMode = 2,
+                            HasDeathTaxArticle757B = false,
+                            HasDeathTaxArticle990I = false,
+                            HasSuccessionBenefit = false,
+                            IrExemptAfterThreshold = false,
+                            IrRateAboveContributionCap = 0m,
+                            IrRateAfterThreshold = 0m,
+                            IrRateBeforeThreshold = 0m,
+                            Label = "Prévoyance collective",
+                            Locked = true,
+                            RenteTaxedAsPension = true,
+                            SocialChargesExemptAfterThreshold = false,
+                            SocialChargesRate = 17.2m
+                        },
+                        new
+                        {
+                            Id = 10,
+                            CanChooseBareme = false,
+                            ContractFamily = 9,
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Rentes souvent exonérées d'IR selon la structure du contrat.",
+                            DurationThresholdYears = 0,
+                            EntryDeductible = false,
+                            ExitMode = 1,
+                            HasDeathTaxArticle757B = false,
+                            HasDeathTaxArticle990I = false,
+                            HasSuccessionBenefit = false,
+                            IrExemptAfterThreshold = true,
+                            IrRateAboveContributionCap = 0m,
+                            IrRateAfterThreshold = 0m,
+                            IrRateBeforeThreshold = 0m,
+                            Label = "Contrat dépendance",
+                            Locked = true,
+                            RenteTaxedAsPension = false,
+                            SocialChargesExemptAfterThreshold = false,
+                            SocialChargesRate = 17.2m
+                        },
+                        new
+                        {
+                            Id = 11,
+                            CanChooseBareme = false,
+                            ContractFamily = 10,
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Souscrit par une société sur un dirigeant ou salarié clé. Indemnité imposable à l'IS.",
+                            DurationThresholdYears = 8,
+                            EntryDeductible = false,
+                            ExitMode = 0,
+                            HasDeathTaxArticle757B = false,
+                            HasDeathTaxArticle990I = false,
+                            HasSuccessionBenefit = false,
+                            IrExemptAfterThreshold = false,
+                            IrRateAboveContributionCap = 12.8m,
+                            IrRateAfterThreshold = 12.8m,
+                            IrRateBeforeThreshold = 12.8m,
+                            Label = "Homme-clé / Assurance-vie entreprise",
+                            Locked = true,
+                            RenteTaxedAsPension = false,
+                            SocialChargesExemptAfterThreshold = false,
+                            SocialChargesRate = 0m
+                        },
+                        new
+                        {
+                            Id = 12,
+                            CanChooseBareme = false,
+                            ContractFamily = 11,
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Très encadrée. Forte fiscalité sociale. Sortie en rente imposée comme pension.",
+                            DurationThresholdYears = 0,
+                            EntryDeductible = true,
+                            ExitMode = 1,
+                            HasDeathTaxArticle757B = false,
+                            HasDeathTaxArticle990I = false,
+                            HasSuccessionBenefit = false,
+                            IrExemptAfterThreshold = false,
+                            IrRateAboveContributionCap = 0m,
+                            IrRateAfterThreshold = 0m,
+                            IrRateBeforeThreshold = 0m,
+                            Label = "Article 39 (retraite à prestations définies)",
+                            Locked = true,
+                            RenteTaxedAsPension = true,
+                            SocialChargesExemptAfterThreshold = false,
+                            SocialChargesRate = 17.2m
+                        });
+                });
+
+            modelBuilder.Entity("api.Models.TaxRuleVersion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsActive", "EffectiveFrom");
+
+                    b.ToTable("TaxRuleVersions", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Code = "FR-ASSURANCE-2024",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            EffectiveFrom = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Label = "Référentiel fiscal France Assurance 2024+",
+                            Notes = "Version initiale du moteur fiscal (PFU, seuil 8 ans AV, art. 990I/757B, PER)."
+                        });
                 });
 
             modelBuilder.Entity("api.Models.User", b =>
@@ -2496,6 +3150,33 @@ namespace api.Migrations
                     b.Navigation("Person");
                 });
 
+            modelBuilder.Entity("api.Models.ContractManagementFeeAccrual", b =>
+                {
+                    b.HasOne("api.Models.Compartment", "Compartment")
+                        .WithMany()
+                        .HasForeignKey("CompartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.Contract", "Contract")
+                        .WithMany()
+                        .HasForeignKey("ContractId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.FinancialSupport", "Support")
+                        .WithMany()
+                        .HasForeignKey("SupportId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Compartment");
+
+                    b.Navigation("Contract");
+
+                    b.Navigation("Support");
+                });
+
             modelBuilder.Entity("api.Models.ContractOption", b =>
                 {
                     b.HasOne("api.Models.Contract", "Contract")
@@ -2612,6 +3293,17 @@ namespace api.Migrations
                     b.Navigation("Support");
                 });
 
+            modelBuilder.Entity("api.Models.FiscalEvent", b =>
+                {
+                    b.HasOne("api.Models.TaxComputation", "TaxComputation")
+                        .WithMany()
+                        .HasForeignKey("TaxComputationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TaxComputation");
+                });
+
             modelBuilder.Entity("api.Models.FundLifeCycle", b =>
                 {
                     b.HasOne("api.Models.FinancialSupport", "FinancialSupport")
@@ -2712,6 +3404,17 @@ namespace api.Migrations
                         .HasForeignKey("InsurerId");
 
                     b.Navigation("Insurer");
+                });
+
+            modelBuilder.Entity("api.Models.ProductManagementFeePolicy", b =>
+                {
+                    b.HasOne("api.Models.Product", "Product")
+                        .WithOne("ManagementFeePolicy")
+                        .HasForeignKey("api.Models.ProductManagementFeePolicy", "ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("api.Models.RolePermission", b =>
@@ -2854,6 +3557,24 @@ namespace api.Migrations
                     b.Navigation("FinancialSupport");
                 });
 
+            modelBuilder.Entity("api.Models.TaxComputation", b =>
+                {
+                    b.HasOne("api.Models.TaxProfile", "TaxProfile")
+                        .WithMany()
+                        .HasForeignKey("TaxProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.TaxRuleVersion", "TaxRuleVersion")
+                        .WithMany()
+                        .HasForeignKey("TaxRuleVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("TaxProfile");
+
+                    b.Navigation("TaxRuleVersion");
+                });
+
             modelBuilder.Entity("api.Models.TaxData", b =>
                 {
                     b.HasOne("api.Models.FinancialSupport", "FinancialSupport")
@@ -2971,6 +3692,11 @@ namespace api.Migrations
                     b.Navigation("BeneficiaryClausePersons");
 
                     b.Navigation("Contracts");
+                });
+
+            modelBuilder.Entity("api.Models.Product", b =>
+                {
+                    b.Navigation("ManagementFeePolicy");
                 });
 
             modelBuilder.Entity("api.Models.Role", b =>

@@ -35,4 +35,10 @@
     <PackageReference Include="YahooFinanceApi" Version="2.3.3" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="api.Tests\**\*.cs" />
+    <EmbeddedResource Remove="api.Tests\**\*" />
+    <None Remove="api.Tests\**\*" />
+  </ItemGroup>
+
 </Project>

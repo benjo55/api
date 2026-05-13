@@ -89,8 +89,7 @@ namespace api.Repository
             var existing = await _context.FinancialSupports.FindAsync(id);
             if (existing == null) return null;
 
-            var original = new FinancialSupport();
-            existing.Adapt(original);
+            var original = (FinancialSupport)_context.Entry(existing).CurrentValues.ToObject();
 
             updateDto.Adapt(existing);
             existing.UpdatedDate = DateTime.UtcNow;

@@ -85,8 +85,7 @@ namespace api.Repository
             if (existingBrand == null) return null;
 
             // Sauvegarde de l'état initial pour l'historique
-            var originalBrand = new Brand();
-            existingBrand.Adapt(originalBrand);
+            var originalBrand = (Brand)_context.Entry(existingBrand).CurrentValues.ToObject();
 
             // Mise à jour avec Mapster
             updateBrandDto.Adapt(existingBrand);
@@ -105,8 +104,7 @@ namespace api.Repository
             if (brand == null)
                 return null;
 
-            var original = new Brand();
-            brand.Adapt(original);
+            var original = (Brand)_context.Entry(brand).CurrentValues.ToObject();
 
             brand.Locked = locked;
             brand.UpdatedDate = DateTime.UtcNow;

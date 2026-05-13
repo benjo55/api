@@ -212,8 +212,7 @@ namespace api.Repository
             if (existingPerson == null) return null;
 
             // Sauvegarde de l'état initial pour l'historique
-            var originalPerson = new Person();
-            existingPerson.Adapt(originalPerson);
+            var originalPerson = (Person)_context.Entry(existingPerson).CurrentValues.ToObject();
 
             // Mise à jour des champs avec Mapster
             updatePersonDto.Adapt(existingPerson);
@@ -269,8 +268,7 @@ namespace api.Repository
             if (person == null)
                 return null;
 
-            var original = new Person();
-            person.Adapt(original);
+            var original = (Person)_context.Entry(person).CurrentValues.ToObject();
 
             person.Locked = locked;
             person.UpdatedDate = DateTime.UtcNow;

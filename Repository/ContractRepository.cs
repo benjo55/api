@@ -323,6 +323,7 @@ namespace api.Repository
                 .Where(c => c.Id == id)
                 .Include(c => c.Person)
                 .Include(c => c.Product)
+                    .ThenInclude(p => p!.ManagementFeePolicy)
                 .Include(c => c.BeneficiaryClause)
                 .Include(c => c.Options).ThenInclude(o => o.ContractOptionType)
                 .Include(c => c.Documents)

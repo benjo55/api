@@ -1,4 +1,5 @@
 using System;
+using api.Models.Enum;
 
 namespace api.Dtos.FinancialSupport
 {
@@ -21,6 +22,14 @@ namespace api.Dtos.FinancialSupport
 
         public DateTime CreatedDate { get; set; }
         public DateTime UpdatedDate { get; set; }
+
+        public decimal? ResolvedManagementFeeRate { get; set; }
+        public ManagementFeeFrequency? ResolvedManagementFeeFrequency { get; set; }
+        public ManagementFeeProrataMethod? ResolvedManagementFeeProrataMethod { get; set; }
+        public ManagementFeePostingMode? ResolvedManagementFeePostingMode { get; set; }
+        public DateTime? ResolvedManagementFeeEffectiveDate { get; set; }
+        public DateTime? ResolvedManagementFeeEndDate { get; set; }
+        public string? ResolvedManagementFeeSource { get; set; }
 
         // 🔹 Détail du support
         public FinancialSupportDto? Support { get; set; }

@@ -65,6 +65,13 @@ namespace api.Repository
 
         public async Task<FieldDescription> CreateAsync(FieldDescription fieldDescription)
         {
+            var duplicate = await _context.FieldDescriptions
+                .AnyAsync(f => f.EntityName == fieldDescription.EntityName &&
+                               f.FieldName == fieldDescription.FieldName);
+            if (duplicate)
+                throw new InvalidOperationException(
+                    $"Une description existe déjà pour {fieldDescription.EntityName}.{fieldDescription.FieldName}.");
+
             _context.FieldDescriptions.Add(fieldDescription);
             await _context.SaveChangesAsync();
             return fieldDescription;

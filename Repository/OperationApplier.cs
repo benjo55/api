@@ -17,6 +17,7 @@ namespace api.Repository
     /// - Le PRU est recalculé uniquement sur versement
     /// - Le PRU ne change jamais sur rachat
     /// - TotalInvested diminue proportionnellement lors d’un rachat
+    /// - Les frais retirent des parts sans diminuer l'investi client
     /// - Aucune valorisation (CurrentAmount) n’est gérée ici
     /// </summary>
     public sealed class OperationApplier : IOperationApplier
@@ -54,6 +55,11 @@ namespace api.Repository
                 case OperationType.TotalWithdrawal:
                 case OperationType.ScheduledWithdrawal:
                     await ApplyWithdrawalAsync(operation, allocations, context, cancellationToken);
+                    break;
+
+                case OperationType.ManagementFee:
+                case OperationType.OperationFee:
+                    await ApplyFeeAsync(operation, allocations, context, cancellationToken);
                     break;
 
                 case OperationType.Arbitrage:
@@ -166,6 +172,59 @@ namespace api.Repository
                 // 🔹 (Optionnel mais recommandé) éviter dérives décimales
                 fsa.InvestedAmount = Math.Round(fsa.InvestedAmount, 2);
                 holding.TotalInvested = Math.Round(holding.TotalInvested, 2);
+            }
+        }
+
+        // ============================================================
+        // FRAIS
+        // ============================================================
+
+        private static async Task ApplyFeeAsync(
+            Operation operation,
+            List<OperationSupportAllocation> allocations,
+            DbContext context,
+            CancellationToken ct)
+        {
+            foreach (var alloc in allocations)
+            {
+                if (alloc.CompartmentId == null)
+                    throw new InvalidOperationException(
+                        $"CompartmentId manquant dans opération {operation.Id}");
+
+                var shares = alloc.Shares ?? 0m;
+                var amount = alloc.Amount ?? 0m;
+
+                if (shares <= 0 || amount <= 0)
+                    throw new InvalidOperationException(
+                        $"Frais invalides (shares={shares}, amount={amount})");
+
+                var fsa = await context.Set<FinancialSupportAllocation>()
+                    .SingleOrDefaultAsync(f =>
+                        f.ContractId == operation.ContractId &&
+                        f.SupportId == alloc.SupportId &&
+                        f.CompartmentId == alloc.CompartmentId, ct)
+                    ?? throw new InvalidOperationException("FSA introuvable");
+
+                var holding = await context.Set<ContractSupportHolding>()
+                    .SingleOrDefaultAsync(h =>
+                        h.ContractId == operation.ContractId &&
+                        h.SupportId == alloc.SupportId &&
+                        h.CompartmentId == alloc.CompartmentId, ct)
+                    ?? throw new InvalidOperationException("Holding introuvable");
+
+                if (shares > holding.TotalShares)
+                    throw new InvalidOperationException("Frais > parts détenues");
+
+                fsa.CurrentShares = Math.Max(0m, fsa.CurrentShares - shares);
+                holding.TotalShares = Math.Max(0m, holding.TotalShares - shares);
+
+                if (holding.TotalShares == 0)
+                {
+                    fsa.CurrentShares = 0m;
+                    holding.TotalShares = 0m;
+                }
+
+                holding.LastUpdated = DateTime.UtcNow;
             }
         }
 

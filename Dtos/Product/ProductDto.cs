@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using api.Models.Enum;
 
 namespace api.Dtos.Product
 {
@@ -13,6 +14,14 @@ namespace api.Dtos.Product
         public DateTime CreatedDate { get; set; } = DateTime.Now;
         public int? InsurerId { get; set; }
         public DateTime? UpdatedDate { get; set; }
-
+        public ContractFamily? ContractFamily { get; set; }
+        public string? ContractFamilyLabel { get; set; }
+        public decimal? DefaultManagementFeeRate { get; set; }
+        public ManagementFeeFrequency? DefaultManagementFeeFrequency { get; set; }
+        public ManagementFeeProrataMethod? DefaultManagementFeeProrataMethod { get; set; }
+        public ManagementFeePostingMode? DefaultManagementFeePostingMode { get; set; }
+        public DateTime? DefaultManagementFeeEffectiveDate { get; set; }
+        public DateTime? DefaultManagementFeeEndDate { get; set; }
+        public bool? DefaultManagementFeeIsEnabled { get; set; }
     }
 }

@@ -1,0 +1,366 @@
+using api.Models;
+using api.Models.Enum;
+using Microsoft.EntityFrameworkCore;
+
+namespace api.Data.Seed
+{
+    /// <summary>
+    /// Seed des profils fiscaux par défaut pour chaque famille de contrat.
+    /// Ces profils reflètent la législation française en vigueur (2024).
+    /// Ils sont verrouillés (Locked = true) pour ne pas être supprimés accidentellement.
+    /// </summary>
+    public static class TaxProfileSeeder
+    {
+        public static void Seed(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<TaxProfile>().HasData(
+
+                // ── 1. Assurance-vie ──────────────────────────────────────────────
+                new TaxProfile
+                {
+                    Id = 1,
+                    ContractFamily = ContractFamily.AssuranceVie,
+                    Label = "Assurance-vie individuelle",
+                    Description = "Contrat patrimonial individuel en fonds € et/ou UC. Avantage successoral Art. 990 I / 757 B.",
+                    EntryDeductible = false,
+                    DurationThresholdYears = 8,
+                    IrRateBeforeThreshold = 12.8m,
+                    IrRateAfterThreshold = 7.5m,
+                    ContributionCapForReducedRate = 150_000m,
+                    IrRateAboveContributionCap = 12.8m,
+                    SocialChargesRate = 17.2m,
+                    GainAllowanceSingle = 4_600m,
+                    GainAllowanceCouple = 9_200m,
+                    IrExemptAfterThreshold = false,
+                    SocialChargesExemptAfterThreshold = false,
+                    HasDeathTaxArticle990I = true,
+                    Death990I_AllowancePerBeneficiary = 152_500m,
+                    Death990I_Rate1 = 20m,
+                    Death990I_Rate1Threshold = 700_000m,
+                    Death990I_Rate2 = 31.25m,
+                    HasDeathTaxArticle757B = true,
+                    Death757B_GlobalAllowance = 30_500m,
+                    ExitMode = ExitMode.Both,
+                    RenteTaxedAsPension = false,
+                    CanChooseBareme = true,
+                    HasSuccessionBenefit = true,
+                    Locked = true,
+                    CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                },
+
+                // ── 2. Capitalisation ─────────────────────────────────────────────
+                new TaxProfile
+                {
+                    Id = 2,
+                    ContractFamily = ContractFamily.Capitalisation,
+                    Label = "Contrat de capitalisation",
+                    Description = "Même fiscalité des rachats que l'AV. Pas d'avantage successoral spécifique. Détention possible par personnes morales.",
+                    EntryDeductible = false,
+                    DurationThresholdYears = 8,
+                    IrRateBeforeThreshold = 12.8m,
+                    IrRateAfterThreshold = 7.5m,
+                    ContributionCapForReducedRate = 150_000m,
+                    IrRateAboveContributionCap = 12.8m,
+                    SocialChargesRate = 17.2m,
+                    GainAllowanceSingle = 4_600m,
+                    GainAllowanceCouple = 9_200m,
+                    IrExemptAfterThreshold = false,
+                    SocialChargesExemptAfterThreshold = false,
+                    HasDeathTaxArticle990I = false,
+                    HasDeathTaxArticle757B = false,
+                    ExitMode = ExitMode.Both,
+                    RenteTaxedAsPension = false,
+                    CanChooseBareme = true,
+                    HasSuccessionBenefit = false,
+                    Locked = true,
+                    CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                },
+
+                // ── 3. PER individuel (PERIN) ─────────────────────────────────────
+                new TaxProfile
+                {
+                    Id = 3,
+                    ContractFamily = ContractFamily.PERIndividuel,
+                    Label = "PER individuel (PERIN)",
+                    Description = "Versements volontaires déductibles du revenu imposable. Sortie en capital (IR + PS sur gains) ou rente (pension).",
+                    EntryDeductible = true,
+                    DurationThresholdYears = 0,
+                    IrRateBeforeThreshold = 0m,
+                    IrRateAfterThreshold = 0m,   // Sortie au barème IR
+                    ContributionCapForReducedRate = null,
+                    IrRateAboveContributionCap = 12.8m,
+                    SocialChargesRate = 17.2m,
+                    GainAllowanceSingle = null,
+                    GainAllowanceCouple = null,
+                    IrExemptAfterThreshold = false,
+                    SocialChargesExemptAfterThreshold = false,
+                    HasDeathTaxArticle990I = true,
+                    Death990I_AllowancePerBeneficiary = 152_500m,
+                    Death990I_Rate1 = 20m,
+                    Death990I_Rate1Threshold = 700_000m,
+                    Death990I_Rate2 = 31.25m,
+                    HasDeathTaxArticle757B = true,
+                    Death757B_GlobalAllowance = 30_500m,
+                    ExitMode = ExitMode.Both,
+                    RenteTaxedAsPension = true,
+                    CanChooseBareme = true,
+                    HasSuccessionBenefit = false,
+                    Locked = true,
+                    CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                },
+
+                // ── 4. PER collectif (PERCOL) ─────────────────────────────────────
+                new TaxProfile
+                {
+                    Id = 4,
+                    ContractFamily = ContractFamily.PERCollectif,
+                    Label = "PER collectif (PERCOL)",
+                    Description = "Successeur du PERCO. Abondement exonéré, participation/intéressement sous conditions. Sortie capital souvent exonérée d'IR.",
+                    EntryDeductible = true,
+                    DurationThresholdYears = 0,
+                    IrRateBeforeThreshold = 0m,
+                    IrRateAfterThreshold = 0m,
+                    ContributionCapForReducedRate = null,
+                    IrRateAboveContributionCap = 12.8m,
+                    SocialChargesRate = 17.2m,
+                    GainAllowanceSingle = null,
+                    GainAllowanceCouple = null,
+                    IrExemptAfterThreshold = true,   // capital exonéré d'IR (compartiment participation)
+                    SocialChargesExemptAfterThreshold = false,
+                    HasDeathTaxArticle990I = false,
+                    HasDeathTaxArticle757B = false,
+                    ExitMode = ExitMode.Both,
+                    RenteTaxedAsPension = true,
+                    CanChooseBareme = false,
+                    HasSuccessionBenefit = false,
+                    Locked = true,
+                    CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                },
+
+                // ── 5. PER obligatoire (PERO) ─────────────────────────────────────
+                new TaxProfile
+                {
+                    Id = 5,
+                    ContractFamily = ContractFamily.PERObligatoire,
+                    Label = "PER obligatoire (PERO)",
+                    Description = "Contrat collectif obligatoire. Sortie principalement en rente imposée comme pension.",
+                    EntryDeductible = true,
+                    DurationThresholdYears = 0,
+                    IrRateBeforeThreshold = 0m,
+                    IrRateAfterThreshold = 0m,
+                    ContributionCapForReducedRate = null,
+                    IrRateAboveContributionCap = 12.8m,
+                    SocialChargesRate = 17.2m,
+                    GainAllowanceSingle = null,
+                    GainAllowanceCouple = null,
+                    IrExemptAfterThreshold = false,
+                    SocialChargesExemptAfterThreshold = false,
+                    HasDeathTaxArticle990I = false,
+                    HasDeathTaxArticle757B = false,
+                    ExitMode = ExitMode.Rente,
+                    RenteTaxedAsPension = true,
+                    CanChooseBareme = false,
+                    HasSuccessionBenefit = false,
+                    Locked = true,
+                    CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                },
+
+                // ── 6. Madelin ────────────────────────────────────────────────────
+                new TaxProfile
+                {
+                    Id = 6,
+                    ContractFamily = ContractFamily.Madelin,
+                    Label = "Contrat Madelin",
+                    Description = "Retraite des travailleurs non-salariés. Cotisations déductibles. Sortie uniquement en rente imposée comme pension.",
+                    EntryDeductible = true,
+                    DurationThresholdYears = 0,
+                    IrRateBeforeThreshold = 0m,
+                    IrRateAfterThreshold = 0m,
+                    ContributionCapForReducedRate = null,
+                    IrRateAboveContributionCap = 0m,
+                    SocialChargesRate = 17.2m,
+                    GainAllowanceSingle = null,
+                    GainAllowanceCouple = null,
+                    IrExemptAfterThreshold = false,
+                    SocialChargesExemptAfterThreshold = false,
+                    HasDeathTaxArticle990I = false,
+                    HasDeathTaxArticle757B = false,
+                    ExitMode = ExitMode.Rente,
+                    RenteTaxedAsPension = true,
+                    CanChooseBareme = false,
+                    HasSuccessionBenefit = false,
+                    Locked = true,
+                    CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                },
+
+                // ── 7. Article 83 ─────────────────────────────────────────────────
+                new TaxProfile
+                {
+                    Id = 7,
+                    ContractFamily = ContractFamily.Article83,
+                    Label = "Article 83",
+                    Description = "Ancien régime retraite entreprise. Cotisations déductibles. Sortie principalement en rente imposée comme pension.",
+                    EntryDeductible = true,
+                    DurationThresholdYears = 0,
+                    IrRateBeforeThreshold = 0m,
+                    IrRateAfterThreshold = 0m,
+                    ContributionCapForReducedRate = null,
+                    IrRateAboveContributionCap = 0m,
+                    SocialChargesRate = 17.2m,
+                    GainAllowanceSingle = null,
+                    GainAllowanceCouple = null,
+                    IrExemptAfterThreshold = false,
+                    SocialChargesExemptAfterThreshold = false,
+                    HasDeathTaxArticle990I = false,
+                    HasDeathTaxArticle757B = false,
+                    ExitMode = ExitMode.Rente,
+                    RenteTaxedAsPension = true,
+                    CanChooseBareme = false,
+                    HasSuccessionBenefit = false,
+                    Locked = true,
+                    CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                },
+
+                // ── 8. PEA ────────────────────────────────────────────────────────
+                new TaxProfile
+                {
+                    Id = 8,
+                    ContractFamily = ContractFamily.PEA,
+                    Label = "PEA (Plan d'Épargne en Actions)",
+                    Description = "Exonération d'IR après 5 ans. Prélèvements sociaux maintenus. PFU 30 % avant 5 ans.",
+                    EntryDeductible = false,
+                    DurationThresholdYears = 5,
+                    IrRateBeforeThreshold = 12.8m,
+                    IrRateAfterThreshold = 0m,
+                    ContributionCapForReducedRate = null,
+                    IrRateAboveContributionCap = 12.8m,
+                    SocialChargesRate = 17.2m,
+                    GainAllowanceSingle = null,
+                    GainAllowanceCouple = null,
+                    IrExemptAfterThreshold = true,
+                    SocialChargesExemptAfterThreshold = false,
+                    HasDeathTaxArticle990I = false,
+                    HasDeathTaxArticle757B = false,
+                    ExitMode = ExitMode.Capital,
+                    RenteTaxedAsPension = false,
+                    CanChooseBareme = false,
+                    HasSuccessionBenefit = false,
+                    Locked = true,
+                    CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                },
+
+                // ── 9. Prévoyance collective ──────────────────────────────────────
+                new TaxProfile
+                {
+                    Id = 9,
+                    ContractFamily = ContractFamily.PrevoyanceCollective,
+                    Label = "Prévoyance collective",
+                    Description = "Couverture décès/invalidité/incapacité. Cotisations employeur exonérées sous plafonds.",
+                    EntryDeductible = true,
+                    DurationThresholdYears = 0,
+                    IrRateBeforeThreshold = 0m,
+                    IrRateAfterThreshold = 0m,
+                    ContributionCapForReducedRate = null,
+                    IrRateAboveContributionCap = 0m,
+                    SocialChargesRate = 17.2m,
+                    GainAllowanceSingle = null,
+                    GainAllowanceCouple = null,
+                    IrExemptAfterThreshold = false,
+                    SocialChargesExemptAfterThreshold = false,
+                    HasDeathTaxArticle990I = false,
+                    HasDeathTaxArticle757B = false,
+                    ExitMode = ExitMode.Both,
+                    RenteTaxedAsPension = true,
+                    CanChooseBareme = false,
+                    HasSuccessionBenefit = false,
+                    Locked = true,
+                    CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                },
+
+                // ── 10. Dépendance ────────────────────────────────────────────────
+                new TaxProfile
+                {
+                    Id = 10,
+                    ContractFamily = ContractFamily.Dependance,
+                    Label = "Contrat dépendance",
+                    Description = "Rentes souvent exonérées d'IR selon la structure du contrat.",
+                    EntryDeductible = false,
+                    DurationThresholdYears = 0,
+                    IrRateBeforeThreshold = 0m,
+                    IrRateAfterThreshold = 0m,
+                    ContributionCapForReducedRate = null,
+                    IrRateAboveContributionCap = 0m,
+                    SocialChargesRate = 17.2m,
+                    GainAllowanceSingle = null,
+                    GainAllowanceCouple = null,
+                    IrExemptAfterThreshold = true,
+                    SocialChargesExemptAfterThreshold = false,
+                    HasDeathTaxArticle990I = false,
+                    HasDeathTaxArticle757B = false,
+                    ExitMode = ExitMode.Rente,
+                    RenteTaxedAsPension = false,
+                    CanChooseBareme = false,
+                    HasSuccessionBenefit = false,
+                    Locked = true,
+                    CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                },
+
+                // ── 11. Homme-clé ─────────────────────────────────────────────────
+                new TaxProfile
+                {
+                    Id = 11,
+                    ContractFamily = ContractFamily.HommeClé,
+                    Label = "Homme-clé / Assurance-vie entreprise",
+                    Description = "Souscrit par une société sur un dirigeant ou salarié clé. Indemnité imposable à l'IS.",
+                    EntryDeductible = false,
+                    DurationThresholdYears = 8,
+                    IrRateBeforeThreshold = 12.8m,
+                    IrRateAfterThreshold = 12.8m,
+                    ContributionCapForReducedRate = null,
+                    IrRateAboveContributionCap = 12.8m,
+                    SocialChargesRate = 0m,  // personne morale, pas de PS
+                    GainAllowanceSingle = null,
+                    GainAllowanceCouple = null,
+                    IrExemptAfterThreshold = false,
+                    SocialChargesExemptAfterThreshold = false,
+                    HasDeathTaxArticle990I = false,
+                    HasDeathTaxArticle757B = false,
+                    ExitMode = ExitMode.Capital,
+                    RenteTaxedAsPension = false,
+                    CanChooseBareme = false,
+                    HasSuccessionBenefit = false,
+                    Locked = true,
+                    CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                },
+
+                // ── 12. Article 39 ────────────────────────────────────────────────
+                new TaxProfile
+                {
+                    Id = 12,
+                    ContractFamily = ContractFamily.Article39,
+                    Label = "Article 39 (retraite à prestations définies)",
+                    Description = "Très encadrée. Forte fiscalité sociale. Sortie en rente imposée comme pension.",
+                    EntryDeductible = true,
+                    DurationThresholdYears = 0,
+                    IrRateBeforeThreshold = 0m,
+                    IrRateAfterThreshold = 0m,
+                    ContributionCapForReducedRate = null,
+                    IrRateAboveContributionCap = 0m,
+                    SocialChargesRate = 17.2m,
+                    GainAllowanceSingle = null,
+                    GainAllowanceCouple = null,
+                    IrExemptAfterThreshold = false,
+                    SocialChargesExemptAfterThreshold = false,
+                    HasDeathTaxArticle990I = false,
+                    HasDeathTaxArticle757B = false,
+                    ExitMode = ExitMode.Rente,
+                    RenteTaxedAsPension = true,
+                    CanChooseBareme = false,
+                    HasSuccessionBenefit = false,
+                    Locked = true,
+                    CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                }
+            );
+        }
+    }
+}

@@ -40,8 +40,15 @@ namespace api.Controllers
         [HttpPost]
         public async Task<IActionResult> Create(FieldDescription fieldDescription)
         {
-            var created = await _repository.CreateAsync(fieldDescription);
-            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+            try
+            {
+                var created = await _repository.CreateAsync(fieldDescription);
+                return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { message = ex.Message });
+            }
         }
 
         [HttpGet("{id}")]

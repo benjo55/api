@@ -136,8 +136,7 @@ namespace api.Repository
             if (existingBeneficiaryClause == null) return null;
 
             // Sauvegarde de l'état initial pour l'historique
-            var originalBeneficiaryClause = new BeneficiaryClause();
-            existingBeneficiaryClause.Adapt(originalBeneficiaryClause);
+            var originalBeneficiaryClause = (BeneficiaryClause)_context.Entry(existingBeneficiaryClause).CurrentValues.ToObject();
 
             // Mise à jour avec Mapster
             updateBeneficiaryClauseDto.Adapt(existingBeneficiaryClause);

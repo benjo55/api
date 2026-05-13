@@ -161,6 +161,7 @@ namespace api.Extensions
             services.AddHttpClient<IEodDataProvider, EodDataProvider>();
             services.AddHttpClient<ITwelveDataProvider, TwelveDataProvider>();
             services.AddScoped<IContractValuationService, ContractValuationService>();
+            services.AddScoped<IManagementFeePolicyResolver, ManagementFeePolicyResolver>();
             services.AddScoped<RuleFactory>();
             services.AddScoped<BusinessRuleValidator>();
             services.AddScoped<IOperationEngineService, OperationEngineService>();
@@ -170,6 +171,8 @@ namespace api.Extensions
             services.AddScoped<IJob, EodBulkImportJob>();
             services.AddScoped<UpdateValuationsJob>();
             services.AddScoped<IOperationApplier, OperationApplier>();
+            services.AddScoped<ITaxProfileRepository, TaxProfileRepository>();
+            services.AddScoped<ITaxEngineService, TaxEngineService>();
 
             // Hosted services
             services.AddHostedService<ContractValuationCronService>();
@@ -245,7 +248,7 @@ namespace api.Extensions
                 q.AddTrigger(opts => opts
                     .ForJob(feesKey)
                     .WithIdentity("ApplyManagementFeesTrigger")
-                    .WithCronSchedule("0 0 2 1 * ?")); // 1er du mois 2h00
+                    .WithCronSchedule("0 0 4 * * ?")); // 4h00 quotidien pour accrual journalier
             });
 
             services.AddQuartzHostedService(opt =>

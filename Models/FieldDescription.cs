@@ -6,6 +6,7 @@ namespace api.Models
         public string EntityName { get; set; } = string.Empty;    // ex: "BeneficiaryClause"
         public string FieldName { get; set; } = string.Empty;  // ex: "clauseType"
         public string Description { get; set; } = string.Empty;  // HTML ou texte enrichi
+        public bool Locked { get; set; } = false;
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedDate { get; set; }
     }
