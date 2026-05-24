@@ -12,7 +12,7 @@ namespace api.Controllers
 {
     [ApiController]
     [Route("api/roles")]
-    //[Authorize(Roles = "Admin")] / Seuls les admins peuvent gérer les rôles
+    [Authorize(Roles = "Admin")]
     public class RoleController : ControllerBase
     {
         private readonly ApplicationDBContext _context;

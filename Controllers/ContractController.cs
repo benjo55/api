@@ -100,12 +100,19 @@ namespace api.Controllers
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update([FromRoute] int id, [FromBody] UpdateContractRequestDto updateContractDto)
         {
-            var contractModel = await _contractRepository.UpdateAsync(id, updateContractDto);
-            if (contractModel == null) return NotFound("Contrat non trouvé");
+            try
+            {
+                var contractModel = await _contractRepository.UpdateAsync(id, updateContractDto);
+                if (contractModel == null) return NotFound("Contrat non trouvé");
 
-            var dto = contractModel.ToContractDto();
-            EnrichResolvedManagementFeePolicy(contractModel, dto);
-            return Ok(dto);
+                var dto = contractModel.ToContractDto();
+                EnrichResolvedManagementFeePolicy(contractModel, dto);
+                return Ok(dto);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [HttpPatch("{id}/beneficiaryClauseId")]

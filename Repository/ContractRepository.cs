@@ -201,70 +201,190 @@ namespace api.Repository
             var original = new Contract();
             original = existingContract;
 
-            var updatedContract = updateContractDto.ToContractFromUpdateDto();
+            var hasOperations = await _context.Operations.AnyAsync(o => o.ContractId == id);
+            var isRestrictedUpdate = existingContract.Locked && hasOperations;
 
-            // ✅ Mise à jour des champs scalaires
-            existingContract.ContractNumber = updatedContract.ContractNumber;
-            existingContract.ContractLabel = updatedContract.ContractLabel;
-            existingContract.ContractType = updatedContract.ContractType;
-            existingContract.Status = updatedContract.Status;
-            existingContract.DateSign = updatedContract.DateSign;
-            existingContract.DateEffect = updatedContract.DateEffect;
-            existingContract.DateMaturity = updatedContract.DateMaturity;
-            existingContract.PostalAddress = updatedContract.PostalAddress;
-            existingContract.TaxAddress = updatedContract.TaxAddress;
-            existingContract.Currency = updatedContract.Currency;
-            existingContract.PersonId = updatedContract.PersonId;
-            existingContract.InitialPremium = updatedContract.InitialPremium;
-            existingContract.TotalPaidPremiums = updatedContract.TotalPaidPremiums;
-            existingContract.RedemptionValue = updatedContract.RedemptionValue;
-            existingContract.PaymentMode = updatedContract.PaymentMode;
-            existingContract.ScheduledPayment = updatedContract.ScheduledPayment;
-            existingContract.BeneficiaryClauseId = updatedContract.BeneficiaryClauseId;
-            existingContract.EntryFeesRate = updatedContract.EntryFeesRate;
-            existingContract.ManagementFeesRate = updatedContract.ManagementFeesRate;
-            existingContract.ExitFeesRate = updatedContract.ExitFeesRate;
-            existingContract.AdvisorComment = updatedContract.AdvisorComment;
-            existingContract.HasAlert = updatedContract.HasAlert;
-            existingContract.ExternalReference = updatedContract.ExternalReference;
-            existingContract.LastModifiedByUserId = updatedContract.LastModifiedByUserId;
+            if (!isRestrictedUpdate)
+            {
+                var updatedContract = updateContractDto.ToContractFromUpdateDto();
+
+                existingContract.ContractNumber = updatedContract.ContractNumber;
+                existingContract.ContractLabel = updatedContract.ContractLabel;
+                existingContract.ContractType = updatedContract.ContractType;
+                existingContract.Status = updatedContract.Status;
+                existingContract.DateSign = updatedContract.DateSign;
+                existingContract.DateEffect = updatedContract.DateEffect;
+                existingContract.DateMaturity = updatedContract.DateMaturity;
+                existingContract.PostalAddress = updatedContract.PostalAddress;
+                existingContract.TaxAddress = updatedContract.TaxAddress;
+                existingContract.Currency = updatedContract.Currency;
+                existingContract.PersonId = updatedContract.PersonId;
+                existingContract.InitialPremium = updatedContract.InitialPremium;
+                existingContract.TotalPaidPremiums = updatedContract.TotalPaidPremiums;
+                existingContract.RedemptionValue = updatedContract.RedemptionValue;
+                existingContract.PaymentMode = updatedContract.PaymentMode;
+                existingContract.ScheduledPayment = updatedContract.ScheduledPayment;
+                existingContract.BeneficiaryClauseId = updatedContract.BeneficiaryClauseId;
+                existingContract.EntryFeesRate = updatedContract.EntryFeesRate;
+                existingContract.ManagementFeesRate = updatedContract.ManagementFeesRate;
+                existingContract.ExitFeesRate = updatedContract.ExitFeesRate;
+                existingContract.AdvisorComment = updatedContract.AdvisorComment;
+                existingContract.HasAlert = updatedContract.HasAlert;
+                existingContract.ExternalReference = updatedContract.ExternalReference;
+                existingContract.LastModifiedByUserId = updatedContract.LastModifiedByUserId;
+
+                _context.ContractInsuredPersons.RemoveRange(existingContract.InsuredLinks);
+                _context.Documents.RemoveRange(existingContract.Documents);
+
+                existingContract.InsuredLinks = updateContractDto.InsuredPersonIds
+                    .Select(pid => new ContractInsuredPerson { Contract = existingContract, PersonId = pid })
+                    .ToList();
+
+                existingContract.Documents = updateContractDto.Documents
+                    .Select(d => new Document
+                    {
+                        Contract = existingContract,
+                        FileName = d.FileName,
+                        FileType = d.FileType,
+                        Url = d.Url,
+                        UploadedAt = d.UploadedAt
+                    }).ToList();
+            }
+
+            await SyncContractCompartmentsAsync(existingContract, updateContractDto.Compartments, isRestrictedUpdate);
+            SyncContractOptions(existingContract, updateContractDto.Options);
+
             existingContract.UpdatedDate = DateTime.UtcNow;
-
-            // 🚫 Ne pas supprimer les compartiments ou FSA : ils sont gérés par les opérations
-            _context.ContractInsuredPersons.RemoveRange(existingContract.InsuredLinks);
-            _context.ContractOptions.RemoveRange(existingContract.Options);
-            _context.Documents.RemoveRange(existingContract.Documents);
-            await _context.SaveChangesAsync();
-
-            // Réinsertion des enfants simples
-            existingContract.InsuredLinks = updateContractDto.InsuredPersonIds
-                .Select(pid => new ContractInsuredPerson { Contract = existingContract, PersonId = pid })
-                .ToList();
-
-            existingContract.Options = updateContractDto.Options
-                .Select(opt => new ContractOption
-                {
-                    Contract = existingContract,
-                    ContractOptionTypeId = opt.ContractOptionTypeId,
-                    Description = opt.Description,
-                    IsActive = opt.IsActive,
-                    CustomParameters = opt.CustomParameters
-                }).ToList();
-
-            existingContract.Documents = updateContractDto.Documents
-                .Select(d => new Document
-                {
-                    Contract = existingContract,
-                    FileName = d.FileName,
-                    FileType = d.FileType,
-                    Url = d.Url,
-                    UploadedAt = d.UploadedAt
-                }).ToList();
-
             await _entityHistoryService.TrackChangesAsync(original, existingContract, "Admin");
             await _context.SaveChangesAsync();
 
             return await LoadContractById(id);
+        }
+
+        private async Task SyncContractCompartmentsAsync(
+            Contract existingContract,
+            List<Dtos.Compartment.UpdateCompartmentRequestDto>? compartmentDtos,
+            bool restricted)
+        {
+            var incomingCompartments = compartmentDtos ?? new List<Dtos.Compartment.UpdateCompartmentRequestDto>();
+            var existingCompartmentIds = existingContract.Compartments
+                .Where(c => c.Id > 0)
+                .Select(c => c.Id)
+                .ToHashSet();
+            var existingById = existingContract.Compartments.ToDictionary(c => c.Id);
+
+            foreach (var dto in incomingCompartments)
+            {
+                if (dto.Id > 0 && existingById.TryGetValue(dto.Id, out var existingComp))
+                {
+                    if (!existingComp.IsDefault)
+                    {
+                        existingComp.Label = string.IsNullOrWhiteSpace(dto.Label)
+                            ? existingComp.Label
+                            : dto.Label.Trim();
+                    }
+
+                    if (!restricted)
+                    {
+                        existingComp.Description = dto.Description ?? string.Empty;
+                        existingComp.ManagementMode = dto.ManagementMode;
+                        existingComp.Notes = dto.Notes;
+                    }
+
+                    existingComp.UpdatedDate = DateTime.UtcNow;
+                    continue;
+                }
+
+                if (restricted && string.IsNullOrWhiteSpace(dto.Label))
+                    throw new InvalidOperationException("Le libellé du nouveau compartiment est obligatoire.");
+
+                var isGlobalLabel = string.Equals(dto.Label?.Trim(), "global", StringComparison.OrdinalIgnoreCase);
+                if (isGlobalLabel && existingContract.Compartments.Any(c => c.IsDefault))
+                    continue;
+
+                existingContract.Compartments.Add(new Compartment
+                {
+                    ContractId = existingContract.Id,
+                    Label = string.IsNullOrWhiteSpace(dto.Label) ? "Compartiment" : dto.Label.Trim(),
+                    Description = dto.Description ?? string.Empty,
+                    ManagementMode = dto.ManagementMode ?? "Libre",
+                    Notes = dto.Notes,
+                    IsDefault = false,
+                    CreatedDate = DateTime.UtcNow,
+                    UpdatedDate = DateTime.UtcNow
+                });
+            }
+
+            var requestedIds = incomingCompartments
+                .Where(c => c.Id > 0)
+                .Select(c => c.Id)
+                .ToHashSet();
+
+            var compartmentsToDelete = existingContract.Compartments
+                .Where(c =>
+                    c.Id > 0 &&
+                    existingCompartmentIds.Contains(c.Id) &&
+                    !c.IsDefault &&
+                    !requestedIds.Contains(c.Id))
+                .ToList();
+
+            foreach (var compartment in compartmentsToDelete)
+            {
+                if (restricted)
+                {
+                    var isInvested = await IsCompartmentInvestedAsync(existingContract.Id, compartment.Id);
+                    if (isInvested)
+                    {
+                        throw new InvalidOperationException(
+                            $"Le compartiment '{compartment.Label}' ne peut pas être supprimé car il est investi.");
+                    }
+                }
+
+                _context.Compartments.Remove(compartment);
+            }
+        }
+
+        private void SyncContractOptions(Contract existingContract, List<ContractOptionDto>? optionDtos)
+        {
+            var incomingOptions = optionDtos ?? new List<ContractOptionDto>();
+            var existingOptions = existingContract.Options.ToList();
+            _context.ContractOptions.RemoveRange(existingOptions);
+
+            var mappedOptions = incomingOptions
+                .GroupBy(opt => opt.ContractOptionTypeId)
+                .Select(g => g.First())
+                .Select(opt => new ContractOption
+                {
+                    ContractId = existingContract.Id,
+                    ContractOptionTypeId = opt.ContractOptionTypeId,
+                    Description = opt.Description,
+                    IsActive = opt.IsActive,
+                    CustomParameters = opt.CustomParameters
+                })
+                .ToList();
+
+            existingContract.Options = mappedOptions;
+
+            if (mappedOptions.Count > 0)
+            {
+                _context.ContractOptions.AddRange(mappedOptions);
+            }
+        }
+
+        private async Task<bool> IsCompartmentInvestedAsync(int contractId, int compartmentId)
+        {
+            var hasHoldings = await _context.ContractSupportHoldings.AnyAsync(h =>
+                h.ContractId == contractId &&
+                h.CompartmentId == compartmentId &&
+                (h.TotalShares > 0m || h.TotalInvested > 0m || (h.CurrentAmount ?? 0m) > 0m));
+
+            if (hasHoldings)
+                return true;
+
+            return await _context.FinancialSupportAllocations.AnyAsync(a =>
+                a.ContractId == contractId &&
+                a.CompartmentId == compartmentId &&
+                (a.CurrentShares > 0m || a.InvestedAmount > 0m || a.CurrentAmount > 0m));
         }
 
         // -------------------- DELETE --------------------
@@ -415,13 +535,27 @@ namespace api.Repository
             contract.WithdrawnExecuted = contract.Operations
                 .Where(o => o.Status == OperationStatus.Executed &&
                             (o.Type == OperationType.PartialWithdrawal ||
-                             o.Type == OperationType.TotalWithdrawal))
+                             o.Type == OperationType.TotalWithdrawal ||
+                             o.Type == OperationType.ScheduledWithdrawal))
                 .Sum(o => o.Amount ?? 0m);
 
             contract.WithdrawnPending = contract.Operations
                 .Where(o => o.Status == OperationStatus.Pending &&
                             (o.Type == OperationType.PartialWithdrawal ||
-                             o.Type == OperationType.TotalWithdrawal))
+                             o.Type == OperationType.TotalWithdrawal ||
+                             o.Type == OperationType.ScheduledWithdrawal))
+                .Sum(o => o.Amount ?? 0m);
+
+            contract.FeeExecuted = contract.Operations
+                .Where(o => o.Status == OperationStatus.Executed &&
+                            (o.Type == OperationType.ManagementFee ||
+                             o.Type == OperationType.OperationFee))
+                .Sum(o => o.Amount ?? 0m);
+
+            contract.FeePending = contract.Operations
+                .Where(o => o.Status == OperationStatus.Pending &&
+                            (o.Type == OperationType.ManagementFee ||
+                             o.Type == OperationType.OperationFee))
                 .Sum(o => o.Amount ?? 0m);
 
             contract.PaidExecuted = contract.Operations

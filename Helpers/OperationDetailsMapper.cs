@@ -31,6 +31,11 @@ namespace api.Helpers
                     Mode = mode,
                     SourceOfFunds = pd.SourceOfFunds,
                     Frequency = pd.Frequency,
+                    StartDate = pd.StartDate,
+                    ScheduleStatus = pd.ScheduleStatus?.ToString().ToLowerInvariant(),
+                    ScheduleGroupId = pd.ScheduleGroupId,
+                    SuspendedAt = pd.SuspendedAt,
+                    StoppedAt = pd.StoppedAt,
                 };
             }
 
@@ -67,8 +72,8 @@ namespace api.Helpers
             var method = pd.Mode switch
             {
                 "check" => "Chèque",
-                "sepa"  => "Prélèvement",
-                _       => "Virement"
+                "sepa" => "Prélèvement",
+                _ => "Virement"
             };
 
             return new PaymentDetail
@@ -76,6 +81,14 @@ namespace api.Helpers
                 PaymentMethod = method,
                 SourceOfFunds = pd.SourceOfFunds,
                 Frequency = pd.Frequency,
+                StartDate = pd.StartDate,
+                ScheduleStatus = pd.ScheduleStatus?.ToLowerInvariant() switch
+                {
+                    "suspended" => OperationScheduleStatus.Suspended,
+                    "stopped" => OperationScheduleStatus.Stopped,
+                    _ => OperationScheduleStatus.Active,
+                },
+                ScheduleGroupId = pd.ScheduleGroupId,
                 Amount = 0, // Amount est sur Operation.Amount
             };
         }

@@ -117,5 +117,11 @@ namespace api.Models
         [NotMapped]
         public decimal PaidPending { get; set; }
 
+        [NotMapped]
+        public decimal FeeExecuted { get; set; }
+
+        [NotMapped]
+        public decimal FeePending { get; set; }
+
     }
 }

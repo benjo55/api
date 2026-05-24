@@ -21,6 +21,9 @@ namespace api.Data
         public DbSet<Notary> Notaries { get; set; }
         public DbSet<Contract> Contracts { get; set; }
         public DbSet<Product> Products { get; set; }
+        public DbSet<ProductType> ProductTypes { get; set; }
+        public DbSet<ProductFeature> ProductFeatures { get; set; }
+        public DbSet<ProductTaxOverride> ProductTaxOverrides { get; set; }
         public DbSet<ProductManagementFeePolicy> ProductManagementFeePolicies { get; set; }
         public DbSet<ContractManagementFeeAccrual> ContractManagementFeeAccruals { get; set; }
         public DbSet<Brand> Brands { get; set; }
@@ -72,6 +75,14 @@ namespace api.Data
         public DbSet<TaxRuleVersion> TaxRuleVersions { get; set; }
         public DbSet<TaxComputation> TaxComputations { get; set; }
         public DbSet<FiscalEvent> FiscalEvents { get; set; }
+        public DbSet<TaxLaw> TaxLaws { get; set; }
+        public DbSet<TaxGeneration> TaxGenerations { get; set; }
+        public DbSet<ContractTaxState> ContractTaxStates { get; set; }
+        public DbSet<PremiumLot> PremiumLots { get; set; }
+        public DbSet<GainLot> GainLots { get; set; }
+        public DbSet<PsHistory> PsHistoryItems { get; set; }
+        public DbSet<TaxEvent> TaxEvents { get; set; }
+        public DbSet<TaxCalculationAudit> TaxCalculationAudits { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -91,6 +102,9 @@ namespace api.Data
             modelBuilder.Entity<Contract>().Property(c => c.ExitFeesRate).HasPrecision(5, 2);
             modelBuilder.Entity<Contract>().Property(c => c.ScheduledPayment).HasPrecision(20, 7);
             modelBuilder.Entity<Product>().ToTable("Products");
+            modelBuilder.Entity<ProductType>().ToTable("ProductTypes");
+            modelBuilder.Entity<ProductFeature>().ToTable("ProductFeatures");
+            modelBuilder.Entity<ProductTaxOverride>().ToTable("ProductTaxOverrides");
             modelBuilder.Entity<ProductManagementFeePolicy>().ToTable("ProductManagementFeePolicies");
             modelBuilder.Entity<ContractManagementFeeAccrual>().ToTable("ContractManagementFeeAccruals");
             modelBuilder.Entity<Brand>().ToTable("Brands");
@@ -118,6 +132,49 @@ namespace api.Data
                     .IsUnique();
 
                 entity.Property(p => p.AnnualRate).HasPrecision(18, 5);
+            });
+
+            modelBuilder.Entity<ProductType>(entity =>
+            {
+                entity.HasIndex(t => t.Code).IsUnique();
+
+                entity.HasOne(t => t.DefaultTaxProfile)
+                    .WithMany()
+                    .HasForeignKey(t => t.DefaultTaxProfileId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<Product>(entity =>
+            {
+                entity.HasOne(p => p.ProductType)
+                    .WithMany(t => t.Products)
+                    .HasForeignKey(p => p.ProductTypeId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(p => p.TaxProfile)
+                    .WithMany()
+                    .HasForeignKey(p => p.TaxProfileId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ProductFeature>(entity =>
+            {
+                entity.HasIndex(f => new { f.ProductId, f.FeatureKey, f.ValidFrom });
+
+                entity.HasOne(f => f.Product)
+                    .WithMany(p => p.Features)
+                    .HasForeignKey(f => f.ProductId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<ProductTaxOverride>(entity =>
+            {
+                entity.HasIndex(o => new { o.ProductId, o.ParameterKey, o.ValidFrom });
+
+                entity.HasOne(o => o.Product)
+                    .WithMany(p => p.TaxOverrides)
+                    .HasForeignKey(o => o.ProductId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
             modelBuilder.Entity<ContractManagementFeeAccrual>(entity =>
             {
@@ -165,6 +222,14 @@ namespace api.Data
             modelBuilder.Entity<TaxRuleVersion>().ToTable("TaxRuleVersions");
             modelBuilder.Entity<TaxComputation>().ToTable("TaxComputations");
             modelBuilder.Entity<FiscalEvent>().ToTable("FiscalEvents");
+            modelBuilder.Entity<TaxLaw>().ToTable("TaxLaws");
+            modelBuilder.Entity<TaxGeneration>().ToTable("TaxGenerations");
+            modelBuilder.Entity<ContractTaxState>().ToTable("ContractTaxStates");
+            modelBuilder.Entity<PremiumLot>().ToTable("PremiumLots");
+            modelBuilder.Entity<GainLot>().ToTable("GainLots");
+            modelBuilder.Entity<PsHistory>().ToTable("PsHistory");
+            modelBuilder.Entity<TaxEvent>().ToTable("TaxEvents");
+            modelBuilder.Entity<TaxCalculationAudit>().ToTable("TaxCalculationAudits");
             modelBuilder.Entity<Compartment>().ToTable("Compartments");
 
             modelBuilder.Entity<TaxRuleVersion>()
@@ -190,6 +255,115 @@ namespace api.Data
                 .WithMany()
                 .HasForeignKey(e => e.TaxComputationId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<TaxLaw>()
+                .HasIndex(x => new { x.CountryCode, x.EffectiveDateStart, x.EffectiveDateEnd });
+
+            modelBuilder.Entity<TaxGeneration>()
+                .HasIndex(x => new { x.ProductType, x.TaxRuleType, x.EffectiveDateStart, x.EffectiveDateEnd });
+
+            modelBuilder.Entity<TaxGeneration>()
+                .HasOne(x => x.TaxLaw)
+                .WithMany()
+                .HasForeignKey(x => x.TaxLawId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ContractTaxState>()
+                .HasIndex(x => x.ContractId)
+                .IsUnique();
+
+            modelBuilder.Entity<ContractTaxState>()
+                .HasOne(x => x.Contract)
+                .WithMany()
+                .HasForeignKey(x => x.ContractId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PremiumLot>()
+                .HasIndex(x => new { x.ContractTaxStateId, x.PaymentDate });
+
+            modelBuilder.Entity<PremiumLot>()
+                .HasOne(x => x.ContractTaxState)
+                .WithMany(x => x.PremiumLots)
+                .HasForeignKey(x => x.ContractTaxStateId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PremiumLot>()
+                .HasOne(x => x.TaxGeneration)
+                .WithMany()
+                .HasForeignKey(x => x.TaxGenerationId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<GainLot>()
+                .HasIndex(x => new { x.ContractTaxStateId, x.GainDate });
+
+            modelBuilder.Entity<GainLot>()
+                .HasOne(x => x.ContractTaxState)
+                .WithMany(x => x.GainLots)
+                .HasForeignKey(x => x.ContractTaxStateId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<GainLot>()
+                .HasOne(x => x.TaxGeneration)
+                .WithMany()
+                .HasForeignKey(x => x.TaxGenerationId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PsHistory>()
+                .HasIndex(x => new { x.ContractTaxStateId, x.LevyDate });
+
+            modelBuilder.Entity<PsHistory>()
+                .HasOne(x => x.ContractTaxState)
+                .WithMany(x => x.PsHistoryItems)
+                .HasForeignKey(x => x.ContractTaxStateId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PsHistory>()
+                .HasOne(x => x.GainLot)
+                .WithMany()
+                .HasForeignKey(x => x.GainLotId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TaxEvent>()
+                .HasIndex(x => new { x.ContractTaxStateId, x.EventDate });
+
+            modelBuilder.Entity<TaxEvent>()
+                .HasOne(x => x.ContractTaxState)
+                .WithMany()
+                .HasForeignKey(x => x.ContractTaxStateId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<TaxEvent>()
+                .HasOne(x => x.Operation)
+                .WithMany()
+                .HasForeignKey(x => x.OperationId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TaxEvent>()
+                .HasOne(x => x.TaxComputation)
+                .WithMany()
+                .HasForeignKey(x => x.TaxComputationId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<TaxCalculationAudit>()
+                .HasIndex(x => new { x.TaxComputationId, x.CreatedDate });
+
+            modelBuilder.Entity<TaxCalculationAudit>()
+                .HasOne(x => x.TaxComputation)
+                .WithMany()
+                .HasForeignKey(x => x.TaxComputationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<TaxCalculationAudit>()
+                .HasOne(x => x.ContractTaxState)
+                .WithMany()
+                .HasForeignKey(x => x.ContractTaxStateId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<TaxCalculationAudit>()
+                .HasOne(x => x.TaxGeneration)
+                .WithMany()
+                .HasForeignKey(x => x.TaxGenerationId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             // 🔹 Operations
             modelBuilder.Entity<Operation>().ToTable("Operations");
@@ -333,6 +507,7 @@ namespace api.Data
             // 🔹 PaymentDetail
             modelBuilder.Entity<PaymentDetail>().ToTable("PaymentDetails");
             modelBuilder.Entity<PaymentDetail>().Property(p => p.Amount).HasPrecision(20, 7);
+            modelBuilder.Entity<PaymentDetail>().Property(p => p.ScheduleGroupId).HasMaxLength(64);
             modelBuilder.Entity<PaymentDetail>()
                 .HasOne(d => d.Operation)
                 .WithOne(o => o.PaymentDetail)
@@ -465,6 +640,12 @@ namespace api.Data
             Data.Seed.TaxProfileSeeder.Seed(modelBuilder);
             // 📌 Seed des versions de règles fiscales
             Data.Seed.TaxRuleVersionSeeder.Seed(modelBuilder);
+            // 📌 Seed des lois fiscales temporelles
+            Data.Seed.TaxLawSeeder.Seed(modelBuilder);
+            // 📌 Seed des générations fiscales temporelles
+            Data.Seed.TaxGenerationSeeder.Seed(modelBuilder);
+            // 📌 Seed des types de produit (AV, CAPI, PERIN, PERCOL, PERO, Madelin, Art83, PEA…)
+            Data.Seed.ProductTypeSeeder.Seed(modelBuilder);
         }
 
         public override int SaveChanges()

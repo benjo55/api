@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using api.Data;
 
@@ -11,9 +12,11 @@ using api.Data;
 namespace api.Migrations
 {
     [DbContext(typeof(ApplicationDBContext))]
-    partial class ApplicationDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260513111307_AddTemporalTaxEngineFoundation")]
+    partial class AddTemporalTaxEngineFoundation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1818,24 +1821,8 @@ namespace api.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("ScheduleGroupId")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<int?>("ScheduleStatus")
-                        .HasColumnType("int");
-
                     b.Property<string>("SourceOfFunds")
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("StartDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("StoppedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SuspendedAt")
-                        .HasColumnType("datetime2");
 
                     b.HasKey("OperationId");
 
@@ -2027,12 +2014,6 @@ namespace api.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int?>("ProductTypeId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("TaxProfileId")
-                        .HasColumnType("int");
-
                     b.Property<DateTime?>("UpdatedDate")
                         .HasColumnType("datetime2");
 
@@ -2040,54 +2021,7 @@ namespace api.Migrations
 
                     b.HasIndex("InsurerId");
 
-                    b.HasIndex("ProductTypeId");
-
-                    b.HasIndex("TaxProfileId");
-
                     b.ToTable("Products", (string)null);
-                });
-
-            modelBuilder.Entity("api.Models.ProductFeature", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("FeatureKey")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("FeatureValue")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("ProductId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("ValidFrom")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("ValidTo")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ValueType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProductId", "FeatureKey", "ValidFrom");
-
-                    b.ToTable("ProductFeatures", (string)null);
                 });
 
             modelBuilder.Entity("api.Models.ProductManagementFeePolicy", b =>
@@ -2135,210 +2069,6 @@ namespace api.Migrations
                         .IsUnique();
 
                     b.ToTable("ProductManagementFeePolicies", (string)null);
-                });
-
-            modelBuilder.Entity("api.Models.ProductTaxOverride", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("JsonValue")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<string>("Justification")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<decimal?>("NumericValue")
-                        .HasPrecision(10, 4)
-                        .HasColumnType("decimal(10,4)");
-
-                    b.Property<string>("ParameterKey")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("nvarchar(80)");
-
-                    b.Property<int>("ProductId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("ValidFrom")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("ValidTo")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProductId", "ParameterKey", "ValidFrom");
-
-                    b.ToTable("ProductTaxOverrides", (string)null);
-                });
-
-            modelBuilder.Entity("api.Models.ProductType", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<DateTime>("CreatedDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("DefaultTaxProfileId")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Label")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime?>("UpdatedDate")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Code")
-                        .IsUnique();
-
-                    b.HasIndex("DefaultTaxProfileId");
-
-                    b.ToTable("ProductTypes", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Category = "Insurance",
-                            Code = "AV",
-                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DefaultTaxProfileId = 1,
-                            IsActive = true,
-                            Label = "Assurance-vie"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Category = "Insurance",
-                            Code = "CAPI",
-                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DefaultTaxProfileId = 2,
-                            IsActive = true,
-                            Label = "Capitalisation"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Category = "Insurance",
-                            Code = "PERIN",
-                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DefaultTaxProfileId = 3,
-                            IsActive = true,
-                            Label = "PER individuel"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Category = "Insurance",
-                            Code = "PERCOL",
-                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DefaultTaxProfileId = 4,
-                            IsActive = true,
-                            Label = "PER collectif"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Category = "Insurance",
-                            Code = "PERO",
-                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DefaultTaxProfileId = 5,
-                            IsActive = true,
-                            Label = "PER obligatoire"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            Category = "Insurance",
-                            Code = "MADELIN",
-                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DefaultTaxProfileId = 6,
-                            IsActive = true,
-                            Label = "Contrat Madelin"
-                        },
-                        new
-                        {
-                            Id = 7,
-                            Category = "Insurance",
-                            Code = "ART83",
-                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DefaultTaxProfileId = 7,
-                            IsActive = true,
-                            Label = "Article 83"
-                        },
-                        new
-                        {
-                            Id = 8,
-                            Category = "Banking",
-                            Code = "PEA",
-                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DefaultTaxProfileId = 8,
-                            IsActive = true,
-                            Label = "PEA"
-                        },
-                        new
-                        {
-                            Id = 9,
-                            Category = "Insurance",
-                            Code = "PREV",
-                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DefaultTaxProfileId = 9,
-                            IsActive = true,
-                            Label = "Prévoyance collective"
-                        },
-                        new
-                        {
-                            Id = 10,
-                            Category = "Insurance",
-                            Code = "DEP",
-                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DefaultTaxProfileId = 10,
-                            IsActive = true,
-                            Label = "Dépendance"
-                        },
-                        new
-                        {
-                            Id = 11,
-                            Category = "Insurance",
-                            Code = "HCL",
-                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DefaultTaxProfileId = 11,
-                            IsActive = true,
-                            Label = "Homme-clé"
-                        });
                 });
 
             modelBuilder.Entity("api.Models.PsHistory", b =>
@@ -4229,32 +3959,7 @@ namespace api.Migrations
                         .WithMany()
                         .HasForeignKey("InsurerId");
 
-                    b.HasOne("api.Models.ProductType", "ProductType")
-                        .WithMany("Products")
-                        .HasForeignKey("ProductTypeId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("api.Models.TaxProfile", "TaxProfile")
-                        .WithMany()
-                        .HasForeignKey("TaxProfileId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("Insurer");
-
-                    b.Navigation("ProductType");
-
-                    b.Navigation("TaxProfile");
-                });
-
-            modelBuilder.Entity("api.Models.ProductFeature", b =>
-                {
-                    b.HasOne("api.Models.Product", "Product")
-                        .WithMany("Features")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("api.Models.ProductManagementFeePolicy", b =>
@@ -4266,27 +3971,6 @@ namespace api.Migrations
                         .IsRequired();
 
                     b.Navigation("Product");
-                });
-
-            modelBuilder.Entity("api.Models.ProductTaxOverride", b =>
-                {
-                    b.HasOne("api.Models.Product", "Product")
-                        .WithMany("TaxOverrides")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Product");
-                });
-
-            modelBuilder.Entity("api.Models.ProductType", b =>
-                {
-                    b.HasOne("api.Models.TaxProfile", "DefaultTaxProfile")
-                        .WithMany()
-                        .HasForeignKey("DefaultTaxProfileId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("DefaultTaxProfile");
                 });
 
             modelBuilder.Entity("api.Models.PsHistory", b =>
@@ -4654,16 +4338,7 @@ namespace api.Migrations
 
             modelBuilder.Entity("api.Models.Product", b =>
                 {
-                    b.Navigation("Features");
-
                     b.Navigation("ManagementFeePolicy");
-
-                    b.Navigation("TaxOverrides");
-                });
-
-            modelBuilder.Entity("api.Models.ProductType", b =>
-                {
-                    b.Navigation("Products");
                 });
 
             modelBuilder.Entity("api.Models.Role", b =>

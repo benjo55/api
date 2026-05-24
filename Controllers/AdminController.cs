@@ -5,11 +5,13 @@ using api.Interfaces;
 using api.Helpers;
 using api.Data;
 using api.Services;
+using Microsoft.AspNetCore.Authorization;
 
 namespace api.Controllers
 {
     [ApiController]
     [Route("api/admin")]
+    [Authorize(Roles = "Admin")]
     public class AdminController : ControllerBase
     {
         private readonly IFinancialSupportImportService _importService;

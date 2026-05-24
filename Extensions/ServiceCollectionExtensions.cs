@@ -9,6 +9,7 @@ using api.Middleware;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using Quartz;
 using System.Text;
@@ -101,12 +102,64 @@ namespace api.Extensions
                         ValidateIssuerSigningKey = true,
                         ValidIssuer = config["Jwt:Issuer"],
                         ValidAudience = config["Jwt:Audience"],
+                        NameClaimType = "username",
+                        RoleClaimType = "role",
                         IssuerSigningKey = new SymmetricSecurityKey(
                             Encoding.UTF8.GetBytes(config["Jwt:Key"]
                                 ?? throw new ArgumentNullException("Jwt:Key")))
                     };
+
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnAuthenticationFailed = context =>
+                        {
+                            var logger = context.HttpContext.RequestServices
+                                .GetRequiredService<ILoggerFactory>()
+                                .CreateLogger("JwtAuth");
+
+                            logger.LogWarning(
+                                context.Exception,
+                                "🔐 JWT AuthenticationFailed | Path={Path} | Message={Message}",
+                                context.HttpContext.Request.Path,
+                                context.Exception.Message);
+
+                            return Task.CompletedTask;
+                        },
+                        OnChallenge = context =>
+                        {
+                            var logger = context.HttpContext.RequestServices
+                                .GetRequiredService<ILoggerFactory>()
+                                .CreateLogger("JwtAuth");
+
+                            logger.LogWarning(
+                                "🔐 JWT Challenge | Path={Path} | Error={Error} | Description={Description}",
+                                context.HttpContext.Request.Path,
+                                context.Error,
+                                context.ErrorDescription);
+
+                            return Task.CompletedTask;
+                        },
+                        OnForbidden = context =>
+                        {
+                            var logger = context.HttpContext.RequestServices
+                                .GetRequiredService<ILoggerFactory>()
+                                .CreateLogger("JwtAuth");
+
+                            logger.LogWarning(
+                                "🔐 JWT Forbidden | Path={Path} | User={User}",
+                                context.HttpContext.Request.Path,
+                                context.HttpContext.User?.Identity?.Name ?? "anonymous");
+
+                            return Task.CompletedTask;
+                        }
+                    };
                 });
-            services.AddAuthorization();
+            services.AddAuthorization(options =>
+            {
+                options.FallbackPolicy = new AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .Build();
+            });
             return services;
         }
 

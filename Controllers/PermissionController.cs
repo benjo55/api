@@ -10,7 +10,7 @@ namespace api.Controllers
 {
     [ApiController]
     [Route("api/permissions")]
-    //[Authorize(Roles = "Admin")]  Seuls les admins peuvent gérer les permissions
+    [Authorize(Roles = "Admin")]
     public class PermissionController : ControllerBase
     {
         private readonly IPermissionRepository _permissionRepository;

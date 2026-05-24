@@ -14,6 +14,8 @@ namespace api.Dtos.Product
         public DateTime CreatedDate { get; set; } = DateTime.Now;
         public DateTime? UpdatedDate { get; set; }
         public ContractFamily? ContractFamily { get; set; }
+        public int? ProductTypeId { get; set; }
+        public int? TaxProfileId { get; set; }
         public decimal? DefaultManagementFeeRate { get; set; }
         public ManagementFeeFrequency? DefaultManagementFeeFrequency { get; set; }
         public ManagementFeeProrataMethod? DefaultManagementFeeProrataMethod { get; set; }

@@ -25,6 +25,34 @@ var app = builder.Build();
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 logger.LogQuartzConfig(builder.Configuration);
 
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value ?? string.Empty;
+    var isProcessPending = path.Contains("/process-pending", StringComparison.OrdinalIgnoreCase);
+
+    if (isProcessPending)
+    {
+        var hasAuthorizationHeader = context.Request.Headers.ContainsKey("Authorization");
+        logger.LogInformation(
+            "➡️ Requête {Method} {Path} | AuthHeader={HasAuthHeader} | IsAuthenticated={IsAuthenticated}",
+            context.Request.Method,
+            path,
+            hasAuthorizationHeader,
+            context.User?.Identity?.IsAuthenticated ?? false);
+    }
+
+    await next();
+
+    if (isProcessPending)
+    {
+        logger.LogInformation(
+            "⬅️ Réponse {Method} {Path} | StatusCode={StatusCode}",
+            context.Request.Method,
+            path,
+            context.Response.StatusCode);
+    }
+});
+
 app.UseMiddleware<ExceptionMiddleware>();
 
 if (app.Environment.IsDevelopment())

@@ -61,7 +61,7 @@ public class OperationController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
-        var entity = dto.Adapt<Operation>();
+        var entity = MapDtoToEntity(dto);
         var created = await _repository.AddAsync(entity);
 
         if (created == null || created.Id <= 0)
@@ -98,9 +98,50 @@ public class OperationController : ControllerBase
     {
         if (id != dto.Id) return BadRequest();
 
-        var entity = dto.Adapt<Operation>();
+        var entity = MapDtoToEntity(dto);
         var updated = await _repository.UpdateAsync(entity);
         return Ok(updated.Adapt<OperationDto>());
+    }
+
+    private static Operation MapDtoToEntity(OperationDto dto)
+    {
+        var allocations = (dto.Allocations ?? new List<OperationSupportAllocationDto>())
+            .Select(a => new OperationSupportAllocation
+            {
+                SupportId = a.SupportId,
+                Amount = a.Amount,
+                Percentage = a.Percentage,
+                Shares = a.Shares,
+                NavAtOperation = a.NavAtOperation,
+                NavDateAtOperation = a.NavDateAtOperation,
+                CompartmentId = a.CompartmentId,
+                Flow = a.Flow,
+            })
+            .ToList();
+
+        return new Operation
+        {
+            Id = dto.Id,
+            ContractId = dto.ContractId,
+            Type = dto.Type,
+            Status = dto.Status,
+            OperationDate = dto.OperationDate,
+            ExecutionDate = dto.ExecutionDate,
+            Amount = dto.Amount,
+            Currency = string.IsNullOrWhiteSpace(dto.Currency) ? "EUR" : dto.Currency,
+            PaymentDetail = OperationDetailsMapper.ToPaymentModel(dto.Details),
+            WithdrawalDetail = OperationDetailsMapper.ToWithdrawalModel(dto.Details),
+            ArbitrageDetail = OperationDetailsMapper.ToArbitrageModel(dto.Details),
+            AdvanceDetail = dto.AdvanceDetail is null
+                ? null
+                : new AdvanceDetail
+                {
+                    Amount = dto.AdvanceDetail.Amount,
+                    InterestRate = dto.AdvanceDetail.InterestRate,
+                    MaturityDate = dto.AdvanceDetail.MaturityDate,
+                },
+            Allocations = allocations,
+        };
     }
 
     [HttpDelete("{id}")]
@@ -115,6 +156,43 @@ public class OperationController : ControllerBase
     {
         await _operationEngineService.UpdateValuationsAsync();
         return Ok(new { message = "UpdateValuationsAsync exécuté avec succès" });
+    }
+
+    [HttpPost("process-pending")]
+    public async Task<IActionResult> ProcessPending()
+    {
+        await _operationEngineService.ProcessPendingOperationsAsync();
+        return Ok(new { message = "ProcessPendingOperationsAsync exécuté avec succès" });
+    }
+
+    [HttpPost("{id}/schedule/suspend")]
+    public async Task<IActionResult> SuspendSchedule(int id)
+    {
+        var updated = await _repository.SuspendScheduleAsync(id);
+        if (updated == null)
+            return NotFound();
+
+        return Ok(updated.Adapt<OperationDto>());
+    }
+
+    [HttpPost("{id}/schedule/resume")]
+    public async Task<IActionResult> ResumeSchedule(int id)
+    {
+        var updated = await _repository.ResumeScheduleAsync(id);
+        if (updated == null)
+            return NotFound();
+
+        return Ok(updated.Adapt<OperationDto>());
+    }
+
+    [HttpPost("{id}/schedule/stop")]
+    public async Task<IActionResult> StopSchedule(int id)
+    {
+        var updated = await _repository.StopScheduleAsync(id);
+        if (updated == null)
+            return NotFound();
+
+        return Ok(updated.Adapt<OperationDto>());
     }
 
 }

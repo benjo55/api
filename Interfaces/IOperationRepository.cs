@@ -17,6 +17,9 @@ public interface IOperationRepository
     Task<Operation> AddAsync(Operation operation);
     Task<Operation> UpdateAsync(Operation operation);
     Task DeleteAsync(int id);
+    Task<Operation?> SuspendScheduleAsync(int operationId);
+    Task<Operation?> ResumeScheduleAsync(int operationId);
+    Task<Operation?> StopScheduleAsync(int operationId);
 
     /// <summary>
     /// (Optionnel) Redistribue un retrait global entre compartiments.

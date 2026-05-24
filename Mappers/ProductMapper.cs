@@ -25,6 +25,8 @@ namespace api.Mappers
                 ContractFamilyLabel = productModel.ContractFamily.HasValue
                     ? productModel.ContractFamily.Value.ToLabel()
                     : null,
+                ProductTypeId = productModel.ProductTypeId,
+                TaxProfileId = productModel.TaxProfileId,
                 DefaultManagementFeeRate = productModel.DefaultManagementFeeRate,
                 DefaultManagementFeeFrequency = Enum.TryParse<ManagementFeeFrequency>(productModel.DefaultManagementFeeFrequency, out var frequency)
                     ? frequency
@@ -50,6 +52,8 @@ namespace api.Mappers
                 CreatedDate = productDto.CreatedDate,
                 UpdatedDate = productDto.UpdatedDate,
                 ContractFamily = productDto.ContractFamily,
+                ProductTypeId = productDto.ProductTypeId,
+                TaxProfileId = productDto.TaxProfileId,
                 DefaultManagementFeeRate = productDto.DefaultManagementFeeRate,
                 DefaultManagementFeeFrequency = productDto.DefaultManagementFeeFrequency?.ToString(),
                 DefaultManagementFeeProrataMethod = productDto.DefaultManagementFeeProrataMethod?.ToString(),
@@ -69,6 +73,8 @@ namespace api.Mappers
                 CreatedDate = productDto.CreatedDate,
                 UpdatedDate = productDto.UpdatedDate,
                 ContractFamily = productDto.ContractFamily,
+                ProductTypeId = productDto.ProductTypeId,
+                TaxProfileId = productDto.TaxProfileId,
                 DefaultManagementFeeRate = productDto.DefaultManagementFeeRate,
                 DefaultManagementFeeFrequency = productDto.DefaultManagementFeeFrequency?.ToString(),
                 DefaultManagementFeeProrataMethod = productDto.DefaultManagementFeeProrataMethod?.ToString(),
@@ -88,6 +94,8 @@ namespace api.Mappers
                 CreatedDate = product.CreatedDate,
                 UpdatedDate = product.UpdatedDate,
                 ContractFamily = product.ContractFamily,
+                ProductTypeId = product.ProductTypeId,
+                TaxProfileId = product.TaxProfileId,
                 DefaultManagementFeeRate = product.DefaultManagementFeeRate,
                 DefaultManagementFeeFrequency = Enum.TryParse<ManagementFeeFrequency>(product.DefaultManagementFeeFrequency, out var frequency)
                     ? frequency

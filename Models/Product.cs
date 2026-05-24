@@ -23,7 +23,18 @@ namespace api.Models
         /// <summary>Famille de contrats rattachée à ce produit</summary>
         public ContractFamily? ContractFamily { get; set; }
 
+        public int? ProductTypeId { get; set; }
+        [ForeignKey("ProductTypeId")]
+        public ProductType? ProductType { get; set; }
+
+        public int? TaxProfileId { get; set; }
+        [ForeignKey("TaxProfileId")]
+        public TaxProfile? TaxProfile { get; set; }
+
         public ProductManagementFeePolicy? ManagementFeePolicy { get; set; }
+
+        public List<ProductFeature> Features { get; set; } = [];
+        public List<ProductTaxOverride> TaxOverrides { get; set; } = [];
 
         [NotMapped]
         public decimal? DefaultManagementFeeRate { get; set; }

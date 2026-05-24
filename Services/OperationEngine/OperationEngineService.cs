@@ -135,6 +135,7 @@ namespace api.Services
             _logger.LogInformation("▶️ Début ProcessPendingOperationsAsync");
 
             var pendingOps = await _context.Operations
+                .Include(o => o.PaymentDetail)
                 .Include(o => o.Allocations)
                     .ThenInclude(a => a.Support)
                 .Where(o => o.Status == OperationStatus.Pending)
@@ -152,6 +153,20 @@ namespace api.Services
 
             foreach (var op in pendingOps)
             {
+                if (op.Type == OperationType.ScheduledPayment)
+                {
+                    var payment = op.PaymentDetail;
+                    if (payment == null || payment.ScheduleStatus == OperationScheduleStatus.Suspended || payment.ScheduleStatus == OperationScheduleStatus.Stopped)
+                    {
+                        continue;
+                    }
+
+                    if (payment.StartDate.HasValue && payment.StartDate.Value.Date > DateTime.UtcNow.Date)
+                    {
+                        continue;
+                    }
+                }
+
                 await using var transaction = await _context.Database.BeginTransactionAsync();
 
                 try
@@ -329,6 +344,47 @@ namespace api.Services
                     op.UpdatedDate = DateTime.UtcNow;
 
                     await _operationApplier.ApplyAsync(op, _context);
+
+                    if (op.Type == OperationType.ScheduledPayment &&
+                        op.PaymentDetail != null &&
+                        op.PaymentDetail.ScheduleStatus == OperationScheduleStatus.Active)
+                    {
+                        var nextOperationDate = ComputeNextScheduleDate(op.OperationDate, op.PaymentDetail.Frequency);
+                        if (nextOperationDate.HasValue)
+                        {
+                            var nextOperation = new Operation
+                            {
+                                ContractId = op.ContractId,
+                                Type = OperationType.ScheduledPayment,
+                                Status = OperationStatus.Pending,
+                                OperationDate = nextOperationDate.Value,
+                                Amount = op.Amount,
+                                Currency = op.Currency,
+                                CreatedDate = DateTime.UtcNow,
+                                UpdatedDate = DateTime.UtcNow,
+                                PaymentDetail = new PaymentDetail
+                                {
+                                    PaymentMethod = op.PaymentDetail.PaymentMethod,
+                                    Frequency = op.PaymentDetail.Frequency,
+                                    StartDate = op.PaymentDetail.StartDate,
+                                    ScheduleStatus = op.PaymentDetail.ScheduleStatus,
+                                    ScheduleGroupId = op.PaymentDetail.ScheduleGroupId,
+                                    SourceOfFunds = op.PaymentDetail.SourceOfFunds,
+                                    Amount = op.PaymentDetail.Amount,
+                                },
+                                Allocations = op.Allocations.Select(a => new OperationSupportAllocation
+                                {
+                                    SupportId = a.SupportId,
+                                    CompartmentId = a.CompartmentId,
+                                    Amount = a.Amount,
+                                    Percentage = a.Percentage,
+                                    Flow = a.Flow,
+                                }).ToList()
+                            };
+
+                            _context.Operations.Add(nextOperation);
+                        }
+                    }
 
                     await _context.SaveChangesAsync();
                     await transaction.CommitAsync();
@@ -697,6 +753,17 @@ namespace api.Services
             var periodDays = (periodEnd - periodStart).Days + 1;
 
             return periodDays > 0 ? periodRate / periodDays : 0m;
+        }
+
+        private static DateTime? ComputeNextScheduleDate(DateTime currentDate, string? frequency)
+        {
+            return frequency?.ToLowerInvariant() switch
+            {
+                "monthly" => currentDate.AddMonths(1),
+                "quarterly" => currentDate.AddMonths(3),
+                "yearly" => currentDate.AddYears(1),
+                _ => null,
+            };
         }
 
         private static (DateTime Start, DateTime End) GetPeriodBounds(ManagementFeeFrequency frequency, DateTime referenceDate)

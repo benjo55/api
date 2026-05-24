@@ -20,6 +20,7 @@ namespace api.Services
         public string GenerateJwtToken(List<Claim> claims)
         {
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"] ?? throw new ArgumentNullException("Jwt:Key")));
+            var durationInMinutes = int.TryParse(_config["Jwt:DurationInMinutes"], out var d) ? d : 120;
 
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
@@ -27,14 +28,11 @@ namespace api.Services
                 issuer: _config["Jwt:Issuer"], // ⚠️ Doit correspondre à `Program.cs`
                 audience: _config["Jwt:Audience"], // ⚠️ Doit correspondre à `Program.cs`
                 claims: claims,
-                expires: DateTime.UtcNow.AddHours(2),
+                expires: DateTime.UtcNow.AddMinutes(durationInMinutes),
                 signingCredentials: credentials
             );
 
-            var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
-
-            Console.WriteLine("🔑 Token généré :", tokenString); // ✅ Vérification
-            return tokenString;
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
 

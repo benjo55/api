@@ -24,6 +24,7 @@ namespace api.Mappers
                 ContractType = contractModel.ContractType,
                 Status = contractModel.Status,
                 Locked = contractModel.Locked,
+                OperationCount = contractModel.Operations?.Count ?? 0,
 
                 DateSign = contractModel.DateSign,
                 DateEffect = contractModel.DateEffect,
@@ -46,6 +47,9 @@ namespace api.Mappers
                 WithdrawnExecuted = contractModel.WithdrawnExecuted,
                 WithdrawnPending = contractModel.WithdrawnPending,
                 TotalWithdrawals = contractModel.WithdrawnExecuted + contractModel.WithdrawnPending,
+                FeeExecuted = contractModel.FeeExecuted,
+                FeePending = contractModel.FeePending,
+                TotalFees = contractModel.FeeExecuted + contractModel.FeePending,
                 TotalSwitches = contractModel.TotalSwitches,
                 TotalSwitchesAmount = contractModel.TotalSwitchesAmount,
 

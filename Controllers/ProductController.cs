@@ -79,5 +79,70 @@ namespace api.Controllers
 
             return Ok(updatedProduct);
         }
+
+        [HttpGet("{id:int}/tax")]
+        public async Task<IActionResult> GetTaxView([FromRoute] int id, [FromQuery] DateTime? asOfDate = null)
+        {
+            var taxView = await _productRepository.GetTaxViewByProductIdAsync(id, asOfDate);
+            if (taxView == null) return NotFound();
+            return Ok(taxView);
+        }
+
+        [HttpGet("{id:int}/features")]
+        public async Task<IActionResult> GetFeatures([FromRoute] int id, [FromQuery] DateTime? asOfDate = null)
+        {
+            var features = await _productRepository.GetFeaturesByProductIdAsync(id, asOfDate);
+            return Ok(features);
+        }
+
+        [HttpPost("{id:int}/features")]
+        public async Task<IActionResult> AddFeature([FromRoute] int id, [FromBody] CreateProductFeatureDto dto)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+            var created = await _productRepository.AddFeatureAsync(id, dto);
+            if (created == null) return NotFound();
+            return Ok(created);
+        }
+
+        [HttpPut("{id:int}/features/{featureId:int}")]
+        public async Task<IActionResult> UpdateFeature([FromRoute] int id, [FromRoute] int featureId, [FromBody] UpdateProductFeatureDto dto)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+            var updated = await _productRepository.UpdateFeatureAsync(id, featureId, dto);
+            if (updated == null) return NotFound();
+            return Ok(updated);
+        }
+
+        [HttpGet("{id:int}/tax-overrides")]
+        public async Task<IActionResult> GetTaxOverrides([FromRoute] int id, [FromQuery] DateTime? asOfDate = null)
+        {
+            var overrides = await _productRepository.GetTaxOverridesByProductIdAsync(id, asOfDate);
+            return Ok(overrides);
+        }
+
+        [HttpPost("{id:int}/tax-overrides")]
+        public async Task<IActionResult> AddTaxOverride([FromRoute] int id, [FromBody] CreateProductTaxOverrideDto dto)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+            var created = await _productRepository.AddTaxOverrideAsync(id, dto);
+            if (created == null) return NotFound();
+            return Ok(created);
+        }
+
+        [HttpPut("{id:int}/tax-overrides/{taxOverrideId:int}")]
+        public async Task<IActionResult> UpdateTaxOverride([FromRoute] int id, [FromRoute] int taxOverrideId, [FromBody] UpdateProductTaxOverrideDto dto)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+            var updated = await _productRepository.UpdateTaxOverrideAsync(id, taxOverrideId, dto);
+            if (updated == null) return NotFound();
+            return Ok(updated);
+        }
+
+        [HttpGet("types")]
+        public async Task<IActionResult> GetProductTypes()
+        {
+            var productTypes = await _productRepository.GetProductTypesAsync();
+            return Ok(productTypes);
+        }
     }
 }

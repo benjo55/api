@@ -135,11 +135,23 @@ namespace api.Dtos.TaxProfile
         /// <summary>Id du profil fiscal à utiliser</summary>
         public int TaxProfileId { get; set; }
 
+        /// <summary>Contrat ciblé pour charger l'état fiscal historisé en base</summary>
+        public int? ContractId { get; set; }
+
+        /// <summary>Date de calcul/rejeu fiscal</summary>
+        public DateTime? CalculationDate { get; set; }
+
         /// <summary>Durée de détention du contrat en années</summary>
         public int ContractDurationYears { get; set; }
 
         /// <summary>Montant brut du rachat / capital</summary>
         public decimal GrossWithdrawal { get; set; }
+
+        /// <summary>Valeur contrat au jour du calcul (si absente, valeur issue de l'état historisé)</summary>
+        public decimal? ContractValue { get; set; }
+
+        /// <summary>Primes nettes cumulées (si absentes, valeur issue de l'état historisé)</summary>
+        public decimal? NetPremiums { get; set; }
 
         /// <summary>Gains inclus dans le rachat (plusvalue)</summary>
         public decimal GainAmount { get; set; }
@@ -177,6 +189,9 @@ namespace api.Dtos.TaxProfile
         /// <summary>PS déjà prélevés en amont (ex : fonds euros) à neutraliser du calcul du retrait</summary>
         public decimal AlreadyPaidSocialCharges { get; set; } = 0m;
 
+        /// <summary>Active explicitement le calcul par strates temporelles</summary>
+        public bool UseTemporalLots { get; set; } = false;
+
         /// <summary>Rente viagère à titre onéreux : âge au premier versement pour la fraction imposable</summary>
         public int? AgeAtFirstAnnuityPayment { get; set; }
 
@@ -207,6 +222,42 @@ namespace api.Dtos.TaxProfile
 
         /// <summary>Âge de l'usufruitier au décès pour barème fiscal simplifié</summary>
         public int? UsufructuaryAgeAtDeath { get; set; }
+
+        /// <summary>Lots de primes injectés côté requête (simulation hors base)</summary>
+        public List<PremiumLotInput> PremiumLots { get; set; } = [];
+
+        /// <summary>Lots de gains injectés côté requête (simulation hors base)</summary>
+        public List<GainLotInput> GainLots { get; set; } = [];
+
+        /// <summary>Historique de PS déjà payés injecté côté requête (simulation hors base)</summary>
+        public List<PsPaidInput> PsPaidHistory { get; set; } = [];
+    }
+
+    public class PremiumLotInput
+    {
+        public DateTime PaymentDate { get; set; }
+        public decimal GrossPremium { get; set; }
+        public decimal NetPremium { get; set; }
+        public decimal RemainingNetPremium { get; set; }
+        public int? TaxGenerationId { get; set; }
+        public decimal? TaxedGainShareRate { get; set; }
+    }
+
+    public class GainLotInput
+    {
+        public DateTime GainDate { get; set; }
+        public decimal GainAmount { get; set; }
+        public decimal RemainingGainAmount { get; set; }
+        public decimal SocialChargesAlreadyPaid { get; set; }
+        public decimal ApplicableSocialRate { get; set; }
+        public int? TaxGenerationId { get; set; }
+    }
+
+    public class PsPaidInput
+    {
+        public DateTime LevyDate { get; set; }
+        public decimal PaidAmount { get; set; }
+        public decimal AppliedRate { get; set; }
     }
 
     public class PerCompartmentInput
@@ -281,6 +332,21 @@ namespace api.Dtos.TaxProfile
 
         public string[] Breakdown { get; set; } = [];
         public PerCompartmentTaxDetail[] PerCompartmentTaxes { get; set; } = [];
+        public TaxGenerationBreakdown[] TaxGenerationBreakdowns { get; set; } = [];
+    }
+
+    public class TaxGenerationBreakdown
+    {
+        public int? TaxGenerationId { get; set; }
+        public string GenerationCode { get; set; } = string.Empty;
+        public decimal AllocatedTaxableGain { get; set; }
+        public decimal IrRate { get; set; }
+        public decimal IrAmount { get; set; }
+        public decimal SocialRate { get; set; }
+        public decimal SocialAmount { get; set; }
+        public decimal SocialAlreadyPaid { get; set; }
+        public decimal SocialRemainingDue { get; set; }
+        public string[] Notes { get; set; } = [];
     }
 
     public class PerCompartmentTaxDetail

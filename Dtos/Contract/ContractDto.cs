@@ -20,6 +20,7 @@ namespace api.Dtos.Contract
         public string ContractType { get; set; } = "Assurance Vie";
         public string Status { get; set; } = "En cours";
         public bool Locked { get; set; }
+        public int OperationCount { get; set; }
 
         public DateTime DateSign { get; set; } = DateTime.Now;
         public DateTime DateEffect { get; set; }
@@ -40,6 +41,9 @@ namespace api.Dtos.Contract
         public decimal WithdrawnExecuted { get; set; }
         public decimal WithdrawnPending { get; set; }
         public decimal TotalWithdrawals { get; set; }
+        public decimal FeeExecuted { get; set; }
+        public decimal FeePending { get; set; }
+        public decimal TotalFees { get; set; }
         public int TotalSwitches { get; set; }
         public decimal TotalSwitchesAmount { get; set; }
         public decimal NetInvested { get; set; }

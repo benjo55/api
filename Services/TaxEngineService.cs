@@ -27,6 +27,9 @@ namespace api.Services
             var profile = await _context.TaxProfiles.FindAsync(req.TaxProfileId)
                 ?? throw new KeyNotFoundException($"Profil fiscal {req.TaxProfileId} introuvable.");
 
+            var auditDrafts = new List<TaxAuditDraft>();
+            int? contractTaxStateId = null;
+
             TaxRuleVersion? activeRuleVersion = null;
             try
             {
@@ -102,7 +105,13 @@ namespace api.Services
                 // ─── Rachat en capital ────────────────────────────────────────────
                 if (req.ExitMode == ExitMode.Capital || req.ExitMode == ExitMode.Both)
                 {
-                    if (IsPerFamily(profile.ContractFamily) && req.PerCompartments.Count > 0)
+                    var temporalContext = await TryBuildTemporalContextAsync(req, warnings);
+                    if (temporalContext is not null)
+                    {
+                        contractTaxStateId = temporalContext.ContractTaxStateId;
+                        result.WithdrawalTax = ComputeTemporalWithdrawalTax(profile, req, afterThreshold, temporalContext, notes, warnings, auditDrafts);
+                    }
+                    else if (IsPerFamily(profile.ContractFamily) && req.PerCompartments.Count > 0)
                     {
                         result.WithdrawalTax = ComputePerCompartmentWithdrawalTax(profile, req, notes, warnings);
                     }
@@ -130,7 +139,7 @@ namespace api.Services
 
             try
             {
-                var persisted = await PersistComputationAsync(req, result, activeRuleVersion?.Id);
+                var persisted = await PersistComputationAsync(req, result, activeRuleVersion?.Id, contractTaxStateId, auditDrafts);
                 result.TaxComputationId = persisted.Id;
             }
             catch (SqlException ex) when (ex.Number == 208)
@@ -283,6 +292,320 @@ namespace api.Services
                 EffectiveTaxRate = effectiveRate,
                 Breakdown = [.. breakdown],
             };
+        }
+
+        private async Task<TemporalTaxContext?> TryBuildTemporalContextAsync(TaxSimulationRequest req, List<string> warnings)
+        {
+            var hasRequestLots = req.PremiumLots.Count > 0 || req.GainLots.Count > 0 || req.UseTemporalLots;
+            var asOfDate = req.CalculationDate?.Date ?? DateTime.UtcNow.Date;
+            var context = new TemporalTaxContext
+            {
+                AsOfDate = asOfDate,
+                ContractValue = req.ContractValue,
+                NetPremiums = req.NetPremiums,
+                AdditionalAlreadyPaidSocialCharges = req.AlreadyPaidSocialCharges + req.PsPaidHistory.Sum(x => Math.Max(0m, x.PaidAmount)),
+            };
+
+            if (req.ContractId.HasValue)
+            {
+                try
+                {
+                    var state = await _context.ContractTaxStates
+                        .AsNoTracking()
+                        .Include(x => x.PremiumLots)
+                        .ThenInclude(x => x.TaxGeneration)
+                        .Include(x => x.GainLots)
+                        .ThenInclude(x => x.TaxGeneration)
+                        .FirstOrDefaultAsync(x => x.ContractId == req.ContractId.Value);
+
+                    if (state is not null)
+                    {
+                        context.ContractTaxStateId = state.Id;
+                        context.ContractValue ??= state.CurrentValue;
+                        context.NetPremiums ??= state.NetPremiums;
+
+                        if (!hasRequestLots)
+                        {
+                            context.PremiumLots = state.PremiumLots
+                                .OrderBy(x => x.PaymentDate)
+                                .Select(x => new TemporalPremiumLot
+                                {
+                                    TaxGenerationId = x.TaxGenerationId,
+                                    GenerationCode = x.TaxGeneration?.Code ?? "UNKNOWN",
+                                    PaymentDate = x.PaymentDate,
+                                    RemainingNetPremium = x.RemainingNetPremium,
+                                })
+                                .ToList();
+
+                            context.GainLots = state.GainLots
+                                .OrderBy(x => x.GainDate)
+                                .Select(x => new TemporalGainLot
+                                {
+                                    TaxGenerationId = x.TaxGenerationId,
+                                    GenerationCode = x.TaxGeneration?.Code ?? "UNKNOWN",
+                                    GainDate = x.GainDate,
+                                    RemainingGainAmount = x.RemainingGainAmount,
+                                    SocialChargesAlreadyPaid = x.SocialChargesAlreadyPaid,
+                                    ApplicableSocialRate = x.ApplicableSocialRate,
+                                })
+                                .ToList();
+                        }
+                    }
+                }
+                catch (SqlException ex) when (ex.Number == 208)
+                {
+                    warnings.Add("Tables de fiscalité temporelle non migrées: fallback sur moteur classique.");
+                    return null;
+                }
+            }
+
+            if (hasRequestLots)
+            {
+                context.PremiumLots = req.PremiumLots
+                    .OrderBy(x => x.PaymentDate)
+                    .Select(x => new TemporalPremiumLot
+                    {
+                        TaxGenerationId = x.TaxGenerationId,
+                        GenerationCode = ResolveGenerationCodeByDate(x.TaxGenerationId, x.PaymentDate),
+                        PaymentDate = x.PaymentDate,
+                        RemainingNetPremium = x.RemainingNetPremium > 0 ? x.RemainingNetPremium : x.NetPremium,
+                    })
+                    .ToList();
+
+                context.GainLots = req.GainLots
+                    .OrderBy(x => x.GainDate)
+                    .Select(x => new TemporalGainLot
+                    {
+                        TaxGenerationId = x.TaxGenerationId,
+                        GenerationCode = ResolveGenerationCodeByDate(x.TaxGenerationId, x.GainDate),
+                        GainDate = x.GainDate,
+                        RemainingGainAmount = x.RemainingGainAmount > 0 ? x.RemainingGainAmount : x.GainAmount,
+                        SocialChargesAlreadyPaid = x.SocialChargesAlreadyPaid,
+                        ApplicableSocialRate = x.ApplicableSocialRate,
+                    })
+                    .ToList();
+            }
+
+            var hasTemporalState = context.PremiumLots.Count > 0 || context.GainLots.Count > 0 || req.UseTemporalLots;
+            if (!hasTemporalState)
+            {
+                return null;
+            }
+
+            if (context.GainLots.Count == 0 && req.GainAmount > 0)
+            {
+                context.GainLots =
+                [
+                    new TemporalGainLot
+                    {
+                        TaxGenerationId = null,
+                        GenerationCode = "SYNTHETIC",
+                        GainDate = asOfDate,
+                        RemainingGainAmount = req.GainAmount,
+                        SocialChargesAlreadyPaid = 0m,
+                        ApplicableSocialRate = 0m,
+                    }
+                ];
+            }
+
+            return context;
+        }
+
+        private static WithdrawalTaxDetail ComputeTemporalWithdrawalTax(
+            TaxProfile profile,
+            TaxSimulationRequest req,
+            bool afterThreshold,
+            TemporalTaxContext temporal,
+            List<string> notes,
+            List<string> warnings,
+            List<TaxAuditDraft> audits)
+        {
+            var breakdown = new List<string>();
+            var generationBreakdowns = new List<TaxGenerationBreakdown>();
+
+            var contractValue = req.ContractValue ?? temporal.ContractValue ?? 0m;
+            var netPremiums = req.NetPremiums ?? temporal.NetPremiums ?? temporal.PremiumLots.Sum(x => x.RemainingNetPremium);
+
+            decimal gainFromFrenchFormula = 0m;
+            if (contractValue > 0)
+            {
+                gainFromFrenchFormula = Round2(req.GrossWithdrawal * Math.Max(0m, contractValue - netPremiums) / contractValue);
+            }
+
+            var grossGain = req.GainAmount > 0 ? req.GainAmount : gainFromFrenchFormula;
+            breakdown.Add($"Quote-part de gain (formule française) : {grossGain:N2} €.");
+
+            decimal allowance = 0m;
+            if (afterThreshold && (profile.GainAllowanceSingle.HasValue || profile.GainAllowanceCouple.HasValue))
+            {
+                allowance = req.IsCouple
+                    ? (profile.GainAllowanceCouple ?? 0m)
+                    : (profile.GainAllowanceSingle ?? 0m);
+                allowance = Math.Min(allowance, grossGain);
+            }
+
+            var netTaxableGain = Math.Max(0m, grossGain - allowance);
+
+            if (allowance > 0)
+            {
+                breakdown.Add($"Abattement appliqué : {allowance:N2} €.");
+                audits.Add(new TaxAuditDraft
+                {
+                    StepCode = "ALLOWANCE",
+                    Label = "Application de l'abattement après seuil",
+                    BaseAmount = grossGain,
+                    ComputedAmount = allowance,
+                    DetailsJson = JsonSerializer.Serialize(new { req.IsCouple, afterThreshold }),
+                });
+            }
+
+            var gainLots = temporal.GainLots
+                .Where(x => x.RemainingGainAmount > 0)
+                .ToList();
+
+            if (gainLots.Count == 0 && netTaxableGain > 0)
+            {
+                gainLots.Add(new TemporalGainLot
+                {
+                    TaxGenerationId = null,
+                    GenerationCode = "SYNTHETIC",
+                    GainDate = temporal.AsOfDate,
+                    RemainingGainAmount = netTaxableGain,
+                    ApplicableSocialRate = profile.SocialChargesRate,
+                });
+                warnings.Add("Aucun lot de gain historisé trouvé: ventilation synthétique utilisée.");
+            }
+
+            var totalGainStock = gainLots.Sum(x => x.RemainingGainAmount);
+            decimal totalIr = 0m;
+            decimal totalSocial = 0m;
+
+            for (var i = 0; i < gainLots.Count; i++)
+            {
+                var lot = gainLots[i];
+                var isLast = i == gainLots.Count - 1;
+                var allocatedGain = isLast
+                    ? Math.Max(0m, netTaxableGain - generationBreakdowns.Sum(x => x.AllocatedTaxableGain))
+                    : (totalGainStock <= 0 ? 0m : Round2(netTaxableGain * lot.RemainingGainAmount / totalGainStock));
+
+                var irRate = ResolveIrRateByGeneration(profile, req, afterThreshold, lot.GenerationCode);
+                var irAmount = Round2(allocatedGain * irRate / 100m);
+
+                var socialRate = lot.ApplicableSocialRate > 0m ? lot.ApplicableSocialRate : profile.SocialChargesRate;
+                var socialGross = Round2(allocatedGain * socialRate / 100m);
+                var socialAlreadyPaid = Math.Min(socialGross, lot.SocialChargesAlreadyPaid);
+                var socialRemaining = Math.Max(0m, socialGross - socialAlreadyPaid);
+
+                generationBreakdowns.Add(new TaxGenerationBreakdown
+                {
+                    TaxGenerationId = lot.TaxGenerationId,
+                    GenerationCode = lot.GenerationCode,
+                    AllocatedTaxableGain = allocatedGain,
+                    IrRate = irRate,
+                    IrAmount = irAmount,
+                    SocialRate = socialRate,
+                    SocialAmount = socialGross,
+                    SocialAlreadyPaid = socialAlreadyPaid,
+                    SocialRemainingDue = socialRemaining,
+                    Notes = socialAlreadyPaid > 0m
+                        ? ["Lot avec PS déjà acquittés (neutralisation partielle appliquée)."]
+                        : [],
+                });
+
+                audits.Add(new TaxAuditDraft
+                {
+                    TaxGenerationId = lot.TaxGenerationId,
+                    StepCode = "GENERATION_SPLIT",
+                    Label = $"Ventilation génération {lot.GenerationCode}",
+                    BaseAmount = allocatedGain,
+                    Rate = irRate,
+                    ComputedAmount = irAmount,
+                    DetailsJson = JsonSerializer.Serialize(new { socialRate, socialGross, socialAlreadyPaid, socialRemaining }),
+                });
+
+                totalIr += irAmount;
+                totalSocial += socialRemaining;
+            }
+
+            if (temporal.AdditionalAlreadyPaidSocialCharges > 0)
+            {
+                var before = totalSocial;
+                totalSocial = Math.Max(0m, totalSocial - temporal.AdditionalAlreadyPaidSocialCharges);
+                breakdown.Add($"PS déjà acquittés (historique contrat/requête) : -{Math.Min(before, temporal.AdditionalAlreadyPaidSocialCharges):N2} €.");
+            }
+
+            var totalTax = totalIr + totalSocial;
+            var netWithdrawal = req.GrossWithdrawal - totalTax;
+            var effectiveRate = req.GrossWithdrawal > 0 ? Round2(totalTax / req.GrossWithdrawal * 100m) : 0m;
+
+            notes.Add("Calcul temporel activé: ventilation des gains par génération fiscale historisée.");
+
+            return new WithdrawalTaxDetail
+            {
+                GrossGain = grossGain,
+                GainAllowanceApplied = allowance,
+                NetTaxableGain = netTaxableGain,
+                IrRate = netTaxableGain > 0 ? Round2(totalIr / netTaxableGain * 100m) : 0m,
+                IrAmount = totalIr,
+                SocialChargesRate = profile.SocialChargesRate,
+                SocialChargesAmount = totalSocial,
+                TotalTax = totalTax,
+                NetWithdrawal = netWithdrawal,
+                EffectiveTaxRate = effectiveRate,
+                Breakdown = [.. breakdown],
+                TaxGenerationBreakdowns = [.. generationBreakdowns],
+            };
+        }
+
+        private static string ResolveGenerationCodeByDate(int? taxGenerationId, DateTime date)
+        {
+            if (taxGenerationId.HasValue)
+            {
+                return $"GEN-{taxGenerationId.Value}";
+            }
+
+            if (date.Date <= new DateTime(1997, 9, 25))
+            {
+                return "AV-PRE-1997";
+            }
+
+            if (date.Date <= new DateTime(2017, 9, 26))
+            {
+                return "AV-1997-2017";
+            }
+
+            return "AV-PFU-2017";
+        }
+
+        private static decimal ResolveIrRateByGeneration(
+            TaxProfile profile,
+            TaxSimulationRequest req,
+            bool afterThreshold,
+            string generationCode)
+        {
+            if (afterThreshold && profile.IrExemptAfterThreshold)
+            {
+                return 0m;
+            }
+
+            if (req.ApplyProgressiveScale && profile.CanChooseBareme)
+            {
+                return Math.Max(0m, req.ProgressiveScaleRate ?? profile.IrRateBeforeThreshold);
+            }
+
+            if (!afterThreshold)
+            {
+                return profile.IrRateBeforeThreshold;
+            }
+
+            if (generationCode == "AV-PFU-2017" && profile.ContributionCapForReducedRate.HasValue && profile.ContributionCapForReducedRate > 0)
+            {
+                return req.TotalContributionsAllContracts <= profile.ContributionCapForReducedRate
+                    ? profile.IrRateAfterThreshold
+                    : profile.IrRateAboveContributionCap;
+            }
+
+            return profile.IrRateAfterThreshold;
         }
 
         // ═════════════════════════════════════════════════════════════════════
@@ -697,7 +1020,9 @@ namespace api.Services
         private async Task<TaxComputation> PersistComputationAsync(
             TaxSimulationRequest request,
             TaxSimulationResult result,
-            int? taxRuleVersionId)
+            int? taxRuleVersionId,
+            int? contractTaxStateId,
+            List<TaxAuditDraft> auditDrafts)
         {
             var computation = new TaxComputation
             {
@@ -724,7 +1049,101 @@ namespace api.Services
             });
             await _context.SaveChangesAsync();
 
+            if (contractTaxStateId.HasValue)
+            {
+                _context.TaxEvents.Add(new TaxEvent
+                {
+                    ContractTaxStateId = contractTaxStateId.Value,
+                    TaxComputationId = computation.Id,
+                    EventKind = MapTaxEventKind(request.EventType),
+                    EventDate = request.CalculationDate ?? DateTime.UtcNow,
+                    Amount = request.GrossWithdrawal,
+                    Source = "TaxEngineService",
+                    PayloadJson = JsonSerializer.Serialize(new
+                    {
+                        request.ContractId,
+                        request.GrossWithdrawal,
+                        request.GainAmount,
+                        request.ExitMode,
+                    }),
+                    CreatedDate = DateTime.UtcNow,
+                });
+            }
+
+            if (auditDrafts.Count > 0)
+            {
+                var rows = auditDrafts.Select(x => new TaxCalculationAudit
+                {
+                    TaxComputationId = computation.Id,
+                    ContractTaxStateId = contractTaxStateId,
+                    TaxGenerationId = x.TaxGenerationId,
+                    StepCode = x.StepCode,
+                    Label = x.Label,
+                    BaseAmount = x.BaseAmount,
+                    Rate = x.Rate,
+                    ComputedAmount = x.ComputedAmount,
+                    DetailsJson = x.DetailsJson,
+                    CreatedDate = DateTime.UtcNow,
+                });
+
+                _context.TaxCalculationAudits.AddRange(rows);
+            }
+
+            await _context.SaveChangesAsync();
+
             return computation;
+        }
+
+        private static TaxEventKind MapTaxEventKind(FiscalEventType eventType)
+            => eventType switch
+            {
+                FiscalEventType.PartialWithdrawal or FiscalEventType.ProgrammedWithdrawal => TaxEventKind.PartialWithdrawal,
+                FiscalEventType.FullWithdrawal => TaxEventKind.FullWithdrawal,
+                FiscalEventType.Arbitrage => TaxEventKind.Arbitrage,
+                FiscalEventType.Advance => TaxEventKind.Correction,
+                FiscalEventType.AnnuityConversion => TaxEventKind.AnnuityConversion,
+                FiscalEventType.Death => TaxEventKind.Death,
+                _ => TaxEventKind.Correction,
+            };
+
+        private sealed class TemporalTaxContext
+        {
+            public int? ContractTaxStateId { get; set; }
+            public DateTime AsOfDate { get; set; }
+            public decimal? ContractValue { get; set; }
+            public decimal? NetPremiums { get; set; }
+            public decimal AdditionalAlreadyPaidSocialCharges { get; set; }
+            public List<TemporalPremiumLot> PremiumLots { get; set; } = [];
+            public List<TemporalGainLot> GainLots { get; set; } = [];
+        }
+
+        private sealed class TemporalPremiumLot
+        {
+            public int? TaxGenerationId { get; set; }
+            public string GenerationCode { get; set; } = "UNKNOWN";
+            public DateTime PaymentDate { get; set; }
+            public decimal RemainingNetPremium { get; set; }
+        }
+
+        private sealed class TemporalGainLot
+        {
+            public int? TaxGenerationId { get; set; }
+            public string GenerationCode { get; set; } = "UNKNOWN";
+            public DateTime GainDate { get; set; }
+            public decimal RemainingGainAmount { get; set; }
+            public decimal SocialChargesAlreadyPaid { get; set; }
+            public decimal ApplicableSocialRate { get; set; }
+        }
+
+        private sealed class TaxAuditDraft
+        {
+            public int? TaxGenerationId { get; set; }
+            public string StepCode { get; set; } = string.Empty;
+            public string Label { get; set; } = string.Empty;
+            public decimal? BaseAmount { get; set; }
+            public decimal? Rate { get; set; }
+            public decimal? ComputedAmount { get; set; }
+            public string DetailsJson { get; set; } = "{}";
         }
 
         private static decimal Round2(decimal value) => Math.Round(value, 2, MidpointRounding.AwayFromZero);

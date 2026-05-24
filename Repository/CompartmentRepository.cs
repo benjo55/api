@@ -56,6 +56,7 @@ namespace api.Repository
             model.Supports = new List<FinancialSupportAllocation>();
             model.CreatedDate = DateTime.UtcNow;
             model.UpdatedDate = DateTime.UtcNow;
+            model.Label = string.IsNullOrWhiteSpace(model.Label) ? "Compartiment" : model.Label.Trim();
 
             await _context.Compartments.AddAsync(model);
             await _context.SaveChangesAsync();
@@ -69,7 +70,9 @@ namespace api.Repository
         // ==========================================================
         public async Task<Compartment?> UpdateAsync(int id, UpdateCompartmentRequestDto dto)
         {
-            var existing = await _context.Compartments.FirstOrDefaultAsync(c => c.Id == id);
+            var existing = await _context.Compartments
+                .Include(c => c.Contract)
+                .FirstOrDefaultAsync(c => c.Id == id);
 
             if (existing == null)
             {
@@ -81,9 +84,29 @@ namespace api.Repository
             if (existing.IsDefault)
                 throw new InvalidOperationException("Le compartiment global ne peut pas être modifié.");
 
+            var restricted = await IsLockedContractWithOperationsAsync(existing.ContractId);
+
+            if (restricted)
+            {
+                var managementChanged = !string.Equals(existing.ManagementMode ?? string.Empty, dto.ManagementMode ?? string.Empty, StringComparison.Ordinal);
+                var notesChanged = !string.Equals(existing.Notes ?? string.Empty, dto.Notes ?? string.Empty, StringComparison.Ordinal);
+                var descriptionChanged = !string.Equals(existing.Description ?? string.Empty, dto.Description ?? string.Empty, StringComparison.Ordinal);
+
+                if (managementChanged || notesChanged || descriptionChanged)
+                {
+                    throw new InvalidOperationException("Ce contrat est verrouillé avec opérations: seul le renommage des compartiments est autorisé.");
+                }
+            }
+
             existing.Label = dto.Label;
-            existing.ManagementMode = dto.ManagementMode;
-            existing.Notes = dto.Notes;
+
+            if (!restricted)
+            {
+                existing.ManagementMode = dto.ManagementMode;
+                existing.Notes = dto.Notes;
+                existing.Description = dto.Description;
+            }
+
             existing.UpdatedDate = DateTime.UtcNow;
 
             // 🚫 On ne touche pas aux allocations FSA (gérées par les opérations)
@@ -104,7 +127,7 @@ namespace api.Repository
             if (existing.IsDefault)
                 throw new InvalidOperationException("Impossible de renommer le compartiment global.");
 
-            existing.Label = newLabel;
+            existing.Label = string.IsNullOrWhiteSpace(newLabel) ? existing.Label : newLabel.Trim();
             existing.UpdatedDate = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -125,12 +148,51 @@ namespace api.Repository
             if (comp.IsDefault)
                 throw new InvalidOperationException("Le compartiment global ne peut pas être supprimé.");
 
+            var restricted = await IsLockedContractWithOperationsAsync(comp.ContractId);
+            if (restricted)
+            {
+                var invested = await IsCompartmentInvestedAsync(comp.ContractId, comp.Id);
+                if (invested)
+                {
+                    throw new InvalidOperationException($"Le compartiment '{comp.Label}' est investi et ne peut pas être supprimé.");
+                }
+            }
+
             // 🚫 On ne supprime pas directement les FSA liées : elles seront nettoyées par le recalcul global
             _context.Compartments.Remove(comp);
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("🗑️ Compartiment {Id} supprimé pour le contrat {ContractId}", comp.Id, comp.ContractId);
             return true;
+        }
+
+        private async Task<bool> IsLockedContractWithOperationsAsync(int contractId)
+        {
+            var isLocked = await _context.Contracts
+                .Where(c => c.Id == contractId)
+                .Select(c => c.Locked)
+                .FirstOrDefaultAsync();
+
+            if (!isLocked)
+                return false;
+
+            return await _context.Operations.AnyAsync(o => o.ContractId == contractId);
+        }
+
+        private async Task<bool> IsCompartmentInvestedAsync(int contractId, int compartmentId)
+        {
+            var hasHoldings = await _context.ContractSupportHoldings.AnyAsync(h =>
+                h.ContractId == contractId &&
+                h.CompartmentId == compartmentId &&
+                (h.TotalShares > 0m || h.TotalInvested > 0m || (h.CurrentAmount ?? 0m) > 0m));
+
+            if (hasHoldings)
+                return true;
+
+            return await _context.FinancialSupportAllocations.AnyAsync(a =>
+                a.ContractId == contractId &&
+                a.CompartmentId == compartmentId &&
+                (a.CurrentShares > 0m || a.InvestedAmount > 0m || a.CurrentAmount > 0m));
         }
     }
 }

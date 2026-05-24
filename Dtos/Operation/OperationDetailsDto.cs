@@ -41,6 +41,13 @@ namespace api.Dtos.Operation
         // --- transfer + sepa ---
         public string? Frequency { get; set; }
         public DateTime? StartDate { get; set; }
+
+        // --- scheduled lifecycle ---
+        /// <summary>active | suspended | stopped</summary>
+        public string? ScheduleStatus { get; set; }
+        public string? ScheduleGroupId { get; set; }
+        public DateTime? SuspendedAt { get; set; }
+        public DateTime? StoppedAt { get; set; }
     }
 
     /* =========================================================

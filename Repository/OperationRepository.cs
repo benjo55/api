@@ -88,6 +88,15 @@ public class OperationRepository : IOperationRepository
 
         try
         {
+            if (operation.Type == OperationType.ScheduledPayment && operation.PaymentDetail != null)
+            {
+                operation.PaymentDetail.ScheduleStatus ??= OperationScheduleStatus.Active;
+                operation.PaymentDetail.ScheduleGroupId ??= Guid.NewGuid().ToString("N");
+                operation.PaymentDetail.StoppedAt = null;
+            }
+
+            ValidateScheduledPaymentDefinition(operation);
+
             // ==========================================================
             // 1️⃣ Validation métier
             // ==========================================================
@@ -195,6 +204,7 @@ public class OperationRepository : IOperationRepository
     {
         var existing = await _context.Operations
             .Include(o => o.Allocations)
+            .Include(o => o.PaymentDetail)
             .FirstOrDefaultAsync(o => o.Id == operation.Id);
 
         if (existing == null)
@@ -219,6 +229,26 @@ public class OperationRepository : IOperationRepository
         existing.Amount = operation.Amount;
         existing.Currency = operation.Currency;
         existing.UpdatedDate = DateTime.UtcNow;
+
+        if (operation.PaymentDetail != null)
+        {
+            if (existing.PaymentDetail == null)
+            {
+                existing.PaymentDetail = new PaymentDetail
+                {
+                    OperationId = existing.Id,
+                };
+            }
+
+            existing.PaymentDetail.PaymentMethod = operation.PaymentDetail.PaymentMethod;
+            existing.PaymentDetail.SourceOfFunds = operation.PaymentDetail.SourceOfFunds;
+            existing.PaymentDetail.Frequency = operation.PaymentDetail.Frequency;
+            existing.PaymentDetail.StartDate = operation.PaymentDetail.StartDate;
+            existing.PaymentDetail.ScheduleStatus = operation.PaymentDetail.ScheduleStatus;
+            existing.PaymentDetail.ScheduleGroupId = operation.PaymentDetail.ScheduleGroupId ?? existing.PaymentDetail.ScheduleGroupId;
+            existing.PaymentDetail.SuspendedAt = operation.PaymentDetail.SuspendedAt;
+            existing.PaymentDetail.StoppedAt = operation.PaymentDetail.StoppedAt;
+        }
 
         // ==========================================================
         // 2️⃣ Réécriture des allocations *uniquement en mode estimation*
@@ -336,6 +366,113 @@ public class OperationRepository : IOperationRepository
             .ToListAsync();
     }
 
+    public async Task<Operation?> SuspendScheduleAsync(int operationId)
+    {
+        var operation = await _context.Operations
+            .Include(o => o.PaymentDetail)
+            .FirstOrDefaultAsync(o => o.Id == operationId);
+
+        if (operation == null)
+            return null;
+
+        EnsureScheduledPayment(operation);
+
+        var groupId = operation.PaymentDetail!.ScheduleGroupId;
+        if (string.IsNullOrWhiteSpace(groupId))
+            throw new InvalidOperationException("Aucun groupe de planification n'est défini pour cette opération.");
+
+        var pendingInGroup = await _context.Operations
+            .Include(o => o.PaymentDetail)
+            .Where(o => o.Type == OperationType.ScheduledPayment &&
+                        o.Status == OperationStatus.Pending &&
+                        o.PaymentDetail != null &&
+                        o.PaymentDetail.ScheduleGroupId == groupId)
+            .ToListAsync();
+
+        var now = DateTime.UtcNow;
+        foreach (var op in pendingInGroup)
+        {
+            op.PaymentDetail!.ScheduleStatus = OperationScheduleStatus.Suspended;
+            op.PaymentDetail.SuspendedAt = now;
+            op.UpdatedDate = now;
+        }
+
+        await _context.SaveChangesAsync();
+        return operation;
+    }
+
+    public async Task<Operation?> ResumeScheduleAsync(int operationId)
+    {
+        var operation = await _context.Operations
+            .Include(o => o.PaymentDetail)
+            .FirstOrDefaultAsync(o => o.Id == operationId);
+
+        if (operation == null)
+            return null;
+
+        EnsureScheduledPayment(operation);
+
+        var groupId = operation.PaymentDetail!.ScheduleGroupId;
+        if (string.IsNullOrWhiteSpace(groupId))
+            throw new InvalidOperationException("Aucun groupe de planification n'est défini pour cette opération.");
+
+        var pendingInGroup = await _context.Operations
+            .Include(o => o.PaymentDetail)
+            .Where(o => o.Type == OperationType.ScheduledPayment &&
+                        o.Status == OperationStatus.Pending &&
+                        o.PaymentDetail != null &&
+                        o.PaymentDetail.ScheduleGroupId == groupId)
+            .ToListAsync();
+
+        var now = DateTime.UtcNow;
+        foreach (var op in pendingInGroup)
+        {
+            op.PaymentDetail!.ScheduleStatus = OperationScheduleStatus.Active;
+            op.PaymentDetail.SuspendedAt = null;
+            op.PaymentDetail.StoppedAt = null;
+            op.UpdatedDate = now;
+        }
+
+        await _context.SaveChangesAsync();
+        return operation;
+    }
+
+    public async Task<Operation?> StopScheduleAsync(int operationId)
+    {
+        var operation = await _context.Operations
+            .Include(o => o.PaymentDetail)
+            .FirstOrDefaultAsync(o => o.Id == operationId);
+
+        if (operation == null)
+            return null;
+
+        EnsureScheduledPayment(operation);
+
+        var groupId = operation.PaymentDetail!.ScheduleGroupId;
+        if (string.IsNullOrWhiteSpace(groupId))
+            throw new InvalidOperationException("Aucun groupe de planification n'est défini pour cette opération.");
+
+        var pendingInGroup = await _context.Operations
+            .Include(o => o.PaymentDetail)
+            .Where(o => o.Type == OperationType.ScheduledPayment &&
+                        o.Status == OperationStatus.Pending &&
+                        o.PaymentDetail != null &&
+                        o.PaymentDetail.ScheduleGroupId == groupId)
+            .ToListAsync();
+
+        var now = DateTime.UtcNow;
+        foreach (var op in pendingInGroup)
+        {
+            op.PaymentDetail!.ScheduleStatus = OperationScheduleStatus.Stopped;
+            op.PaymentDetail.StoppedAt = now;
+            op.Status = OperationStatus.Cancelled;
+            op.UpdatedDate = now;
+        }
+
+        await _context.SaveChangesAsync();
+        return operation;
+    }
+
     private List<OperationSupportAllocation> NormalizeAllocations(
         OperationType operationType,
         IEnumerable<OperationSupportAllocation> allocations)
@@ -387,6 +524,30 @@ public class OperationRepository : IOperationRepository
         }
 
         return grouped;
+    }
+
+    private static void EnsureScheduledPayment(Operation operation)
+    {
+        if (operation.Type != OperationType.ScheduledPayment || operation.PaymentDetail == null)
+        {
+            throw new InvalidOperationException("Cette action est réservée aux versements programmés.");
+        }
+    }
+
+    private static void ValidateScheduledPaymentDefinition(Operation operation)
+    {
+        if (operation.Type != OperationType.ScheduledPayment)
+            return;
+
+        if (operation.PaymentDetail == null)
+            throw new InvalidOperationException("Les détails de versement programmé sont obligatoires.");
+
+        var frequency = operation.PaymentDetail.Frequency?.ToLowerInvariant();
+        if (frequency is not ("monthly" or "quarterly" or "yearly"))
+            throw new InvalidOperationException("La fréquence doit être monthly, quarterly ou yearly pour un versement programmé.");
+
+        if (!operation.PaymentDetail.StartDate.HasValue)
+            throw new InvalidOperationException("La date de début est obligatoire pour un versement programmé.");
     }
 
 

@@ -18,6 +18,14 @@ namespace api.Interfaces
         Task<Product?> DeleteAsync(int id);
         Task<int> CountContractsByProductIdAsync(int productId);
         Task<Product?> PatchLockedAsync(int id, bool locked);
+        Task<ProductTaxViewDto?> GetTaxViewByProductIdAsync(int productId, DateTime? asOfDate = null);
+        Task<List<ProductFeatureDto>> GetFeaturesByProductIdAsync(int productId, DateTime? asOfDate = null);
+        Task<ProductFeatureDto?> AddFeatureAsync(int productId, CreateProductFeatureDto dto);
+        Task<ProductFeatureDto?> UpdateFeatureAsync(int productId, int featureId, UpdateProductFeatureDto dto);
+        Task<List<ProductTaxOverrideDto>> GetTaxOverridesByProductIdAsync(int productId, DateTime? asOfDate = null);
+        Task<ProductTaxOverrideDto?> AddTaxOverrideAsync(int productId, CreateProductTaxOverrideDto dto);
+        Task<ProductTaxOverrideDto?> UpdateTaxOverrideAsync(int productId, int taxOverrideId, UpdateProductTaxOverrideDto dto);
+        Task<List<ProductTypeDto>> GetProductTypesAsync();
     }
 
     public class ProductWithContractCount
