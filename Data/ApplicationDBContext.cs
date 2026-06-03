@@ -482,6 +482,7 @@ namespace api.Data
             // WithdrawalDetail
             modelBuilder.Entity<WithdrawalDetail>().ToTable("WithdrawalDetails");
             modelBuilder.Entity<WithdrawalDetail>().Property(w => w.GrossAmount).HasPrecision(20, 7);
+            modelBuilder.Entity<WithdrawalDetail>().Property(w => w.ScheduleGroupId).HasMaxLength(64);
             modelBuilder.Entity<WithdrawalDetail>()
                 .HasOne(d => d.Operation)
                 .WithOne(o => o.WithdrawalDetail)
@@ -490,6 +491,7 @@ namespace api.Data
             // ArbitrageDetail
             modelBuilder.Entity<ArbitrageDetail>().ToTable("ArbitrageDetails");
             modelBuilder.Entity<ArbitrageDetail>().Property(a => a.Percentage).HasPrecision(18, 4);
+            modelBuilder.Entity<ArbitrageDetail>().Property(a => a.ScheduleGroupId).HasMaxLength(64);
             modelBuilder.Entity<ArbitrageDetail>()
                 .HasOne(d => d.Operation)
                 .WithOne(o => o.ArbitrageDetail)

@@ -13,5 +13,6 @@ namespace api.Models
         public decimal GrossAmount { get; set; }
         public bool IsScheduled { get; set; }
         public string? Frequency { get; set; }
+        public string? ScheduleGroupId { get; set; }
     }
 }

@@ -9,6 +9,7 @@ using api.Helpers;
 using api.Interfaces;
 using api.Models;
 using api.Services;
+using api.Exceptions;
 using Mapster;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
@@ -46,6 +47,10 @@ namespace api.Repository
                 _context.Persons.Remove(personModel);
                 await _context.SaveChangesAsync();
                 return personModel;
+            }
+            catch (BusinessException)
+            {
+                throw;
             }
             catch (DbUpdateException ex) when ((ex.InnerException as SqlException)?.Number == 547)
             {

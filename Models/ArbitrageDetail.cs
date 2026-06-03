@@ -13,5 +13,6 @@ namespace api.Models
         public int ToSupportId { get; set; }
         [Column(TypeName = "decimal(18,4)")]
         public decimal Percentage { get; set; }
+        public string? ScheduleGroupId { get; set; }
     }
 }

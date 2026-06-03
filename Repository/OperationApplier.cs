@@ -63,6 +63,7 @@ namespace api.Repository
                     break;
 
                 case OperationType.Arbitrage:
+                case OperationType.ScheduledArbitrage:
                     await ApplyArbitrageAsync(operation, allocations, context, cancellationToken);
                     break;
                 default:

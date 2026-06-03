@@ -21,6 +21,12 @@ namespace api.Dtos.Operation
         /// <summary>transfer | check | sepa</summary>
         public string Mode { get; set; } = "transfer";
 
+        /// <summary>recurring | manual</summary>
+        public string? PlanningMode { get; set; }
+
+        /// <summary>Liste de dates fixes en mode manuel</summary>
+        public List<DateTime>? FixedDates { get; set; }
+
         // --- transfer ---
         public string? SourceOfFunds { get; set; }
         public string? BankReference { get; set; }
@@ -59,6 +65,14 @@ namespace api.Dtos.Operation
         /// <summary>oneShot | scheduled</summary>
         public string Mode { get; set; } = "oneShot";
 
+        /// <summary>recurring | manual</summary>
+        public string? PlanningMode { get; set; }
+
+        /// <summary>Liste de dates fixes en mode manuel</summary>
+        public List<DateTime>? FixedDates { get; set; }
+
+        public string? ScheduleGroupId { get; set; }
+
         public decimal? GrossAmount { get; set; }
 
         /// <summary>PFU | IR</summary>
@@ -85,6 +99,19 @@ namespace api.Dtos.Operation
     {
         /// <summary>manual | auto</summary>
         public string? Mode { get; set; }
+
+        /// <summary>recurring | manual</summary>
+        public string? PlanningMode { get; set; }
+
+        /// <summary>Liste de dates fixes en mode manuel</summary>
+        public List<DateTime>? FixedDates { get; set; }
+
+        public string? ScheduleGroupId { get; set; }
+
+        /// <summary>monthly | quarterly | yearly | manual</summary>
+        public string? Frequency { get; set; }
+
+        public DateTime? StartDate { get; set; }
 
         public string? Motive { get; set; }
 

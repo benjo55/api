@@ -17,6 +17,7 @@ public enum OperationType
 
     // Gestion financière
     Arbitrage,
+    ScheduledArbitrage,
     Advance,
 
     // Transmission

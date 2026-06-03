@@ -205,6 +205,8 @@ public class OperationRepository : IOperationRepository
         var existing = await _context.Operations
             .Include(o => o.Allocations)
             .Include(o => o.PaymentDetail)
+            .Include(o => o.WithdrawalDetail)
+            .Include(o => o.ArbitrageDetail)
             .FirstOrDefaultAsync(o => o.Id == operation.Id);
 
         if (existing == null)
@@ -248,6 +250,40 @@ public class OperationRepository : IOperationRepository
             existing.PaymentDetail.ScheduleGroupId = operation.PaymentDetail.ScheduleGroupId ?? existing.PaymentDetail.ScheduleGroupId;
             existing.PaymentDetail.SuspendedAt = operation.PaymentDetail.SuspendedAt;
             existing.PaymentDetail.StoppedAt = operation.PaymentDetail.StoppedAt;
+        }
+
+        if (operation.WithdrawalDetail != null)
+        {
+            if (existing.WithdrawalDetail == null)
+            {
+                existing.WithdrawalDetail = new WithdrawalDetail
+                {
+                    OperationId = existing.Id,
+                };
+            }
+
+            existing.WithdrawalDetail.GrossAmount = operation.WithdrawalDetail.GrossAmount;
+            existing.WithdrawalDetail.IsScheduled = operation.WithdrawalDetail.IsScheduled;
+            existing.WithdrawalDetail.Frequency = operation.WithdrawalDetail.Frequency;
+            existing.WithdrawalDetail.ScheduleGroupId =
+                operation.WithdrawalDetail.ScheduleGroupId ?? existing.WithdrawalDetail.ScheduleGroupId;
+        }
+
+        if (operation.ArbitrageDetail != null)
+        {
+            if (existing.ArbitrageDetail == null)
+            {
+                existing.ArbitrageDetail = new ArbitrageDetail
+                {
+                    OperationId = existing.Id,
+                };
+            }
+
+            existing.ArbitrageDetail.FromSupportId = operation.ArbitrageDetail.FromSupportId;
+            existing.ArbitrageDetail.ToSupportId = operation.ArbitrageDetail.ToSupportId;
+            existing.ArbitrageDetail.Percentage = operation.ArbitrageDetail.Percentage;
+            existing.ArbitrageDetail.ScheduleGroupId =
+                operation.ArbitrageDetail.ScheduleGroupId ?? existing.ArbitrageDetail.ScheduleGroupId;
         }
 
         // ==========================================================
@@ -489,7 +525,7 @@ public class OperationRepository : IOperationRepository
                     $"CompartmentId obligatoire dans les allocations (support {a.SupportId})");
             }
 
-            if (operationType == OperationType.Arbitrage && a.Flow == null)
+            if ((operationType == OperationType.Arbitrage || operationType == OperationType.ScheduledArbitrage) && a.Flow == null)
             {
                 throw new InvalidOperationException(
                     $"Flow obligatoire pour arbitrage (support {a.SupportId})");
@@ -501,7 +537,7 @@ public class OperationRepository : IOperationRepository
             {
                 a.SupportId,
                 a.CompartmentId,
-                Flow = operationType == OperationType.Arbitrage ? a.Flow : null,
+                Flow = (operationType == OperationType.Arbitrage || operationType == OperationType.ScheduledArbitrage) ? a.Flow : null,
             })
             .Select(g => new OperationSupportAllocation
             {
@@ -543,8 +579,8 @@ public class OperationRepository : IOperationRepository
             throw new InvalidOperationException("Les détails de versement programmé sont obligatoires.");
 
         var frequency = operation.PaymentDetail.Frequency?.ToLowerInvariant();
-        if (frequency is not ("monthly" or "quarterly" or "yearly"))
-            throw new InvalidOperationException("La fréquence doit être monthly, quarterly ou yearly pour un versement programmé.");
+        if (frequency is not ("monthly" or "quarterly" or "yearly" or "manual"))
+            throw new InvalidOperationException("La fréquence doit être monthly, quarterly, yearly ou manual pour un versement programmé.");
 
         if (!operation.PaymentDetail.StartDate.HasValue)
             throw new InvalidOperationException("La date de début est obligatoire pour un versement programmé.");

@@ -6,13 +6,26 @@ using System.Reflection;
 var builder = WebApplication.CreateBuilder(args);
 
 // --- CONFIGURATION DES SERVICES ---
+
 builder.Services.AddApiCors()
-                .AddApiControllers()
-                .AddApiSwagger()
-                .AddApiAuthentication(builder.Configuration)
-                .AddApiDbContext(builder.Configuration)
-                .AddApiDependencies(builder.Configuration)
-                .AddQuartzJobs(builder.Configuration);
+    .AddApiControllers()
+    .AddApiSwagger()
+    .AddApiAuthentication(builder.Configuration)
+    .AddApiDbContext(builder.Configuration)
+    .AddApiDependencies(builder.Configuration)
+    .AddQuartzJobs(builder.Configuration);
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("DevCors", policy =>
+    {
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+        // Pas de AllowCredentials avec AllowAnyOrigin !
+    });
+});
 
 // Mapster : scan des configs IRegister dans l'assembly
 TypeAdapterConfig.GlobalSettings.Scan(Assembly.GetExecutingAssembly());
@@ -64,7 +77,8 @@ if (app.Environment.IsDevelopment())
 Console.WriteLine("✅ JWT Issuer: " + builder.Configuration["Jwt:Issuer"]);
 Console.WriteLine("✅ JWT Audience: " + builder.Configuration["Jwt:Audience"]);
 
-app.UseCors("AllowAllHeaders");
+// Applique la policy CORS ultra permissive pour debug
+app.UseCors("DevCors");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

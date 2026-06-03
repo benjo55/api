@@ -17,13 +17,15 @@ namespace api.Repository
         private readonly EntityHistoryService _entityHistoryService;
         private readonly IContractValuationService _valuationService;
         private readonly IOperationEngineService _operationEngineService;
+        private readonly BusinessRuleValidator _validator;
         private readonly ILogger<ContractRepository>? _logger;
-        public ContractRepository(ApplicationDBContext context, EntityHistoryService entityHistoryService, IContractValuationService valuationService, IOperationEngineService operationEngineService, ILogger<ContractRepository>? logger = null)
+        public ContractRepository(ApplicationDBContext context, EntityHistoryService entityHistoryService, IContractValuationService valuationService, IOperationEngineService operationEngineService, BusinessRuleValidator validator, ILogger<ContractRepository>? logger = null)
         {
             _context = context;
             _entityHistoryService = entityHistoryService;
             _valuationService = valuationService;
             _operationEngineService = operationEngineService;
+            _validator = validator;
             _logger = logger;
         }
 
@@ -394,6 +396,8 @@ namespace api.Repository
             {
                 var contract = await _context.Contracts.FirstOrDefaultAsync(c => c.Id == id);
                 if (contract == null) return null;
+
+                _validator.Validate(contract);
 
                 _context.Contracts.Remove(contract);
                 await _context.SaveChangesAsync();

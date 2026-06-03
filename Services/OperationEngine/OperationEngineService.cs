@@ -208,7 +208,7 @@ namespace api.Services
                         continue;
                     }
 
-                    if (op.Type == OperationType.Arbitrage)
+                    if (op.Type == OperationType.Arbitrage || op.Type == OperationType.ScheduledArbitrage)
                     {
                         var sourceHoldingMap = await _context.ContractSupportHoldings
                             .Where(h => h.ContractId == op.ContractId)
@@ -794,7 +794,7 @@ namespace api.Services
             if (shares <= 0m || allocation.Operation == null)
                 return 0m;
 
-            if (allocation.Operation.Type == OperationType.Arbitrage)
+            if (allocation.Operation.Type == OperationType.Arbitrage || allocation.Operation.Type == OperationType.ScheduledArbitrage)
             {
                 return allocation.Flow == OperationFlow.Target ? shares : -shares;
             }

@@ -9,6 +9,7 @@ using api.Dtos.FinancialSupport;
 using api.Dtos.Operation;
 using api.Dtos.Person;
 using api.Models;
+using api.Models.Enum;
 
 namespace api.Dtos.Contract
 {
@@ -32,6 +33,10 @@ namespace api.Dtos.Contract
 
         public int? PersonId { get; set; }
         public int? ProductId { get; set; }
+        public string? ProductCode { get; set; }
+        public string? ProductName { get; set; }
+        public ContractFamily? ContractFamily { get; set; }
+        public string? ContractFamilyLabel { get; set; }
 
         public decimal InitialPremium { get; set; }
         public decimal TotalPaidPremiums { get; set; }

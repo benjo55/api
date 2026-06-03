@@ -4,6 +4,7 @@ using api.Helpers;
 using api.Interfaces;
 using api.Mappers;
 using api.Models;
+using api.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -85,31 +86,15 @@ namespace api.Controllers
         {
             try
             {
-                var personModel = await _personRepository.GetByIdAsync(id);
-                if (personModel == null)
+                var deletedPerson = await _personRepository.DeleteAsync(id);
+                if (deletedPerson == null)
                     return NotFound();
 
-                var isBeneficiary = await _personRepository.IsPersonBeneficiary(id);
-
-                if (isBeneficiary)
-                {
-                    return BadRequest(new
-                    {
-                        message = "Impossible de supprimer cette personne car elle est bénéficiaire nominative sur au moins un contrat."
-                    });
-                }
-
-                var hasContracts = await _personRepository.HasContracts(id);
-                if (hasContracts)
-                {
-                    return BadRequest(new
-                    {
-                        message = "Impossible de supprimer cette personne car elle est titulaire d’au moins un contrat."
-                    });
-                }
-
-                var deletedPerson = await _personRepository.DeleteAsync(id);
                 return NoContent();
+            }
+            catch (BusinessException ex)
+            {
+                return BadRequest(new { message = ex.Message });
             }
             catch (InvalidOperationException ex)
             {

@@ -161,7 +161,8 @@ public class ContractValuationService : IContractValuationService
                 .Sum(o => o.Amount ?? 0m);
 
             var arbitrageOps = executedOps
-                .Where(o => o.Type == OperationType.Arbitrage)
+                .Where(o => o.Type == OperationType.Arbitrage ||
+                            o.Type == OperationType.ScheduledArbitrage)
                 .ToList();
             int totalSwitches = arbitrageOps.Count;
             decimal totalSwitchesAmount = arbitrageOps.Sum(o => o.Amount ?? 0m);

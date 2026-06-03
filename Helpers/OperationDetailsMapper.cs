@@ -29,6 +29,7 @@ namespace api.Helpers
                 return new PaymentDetailsDto
                 {
                     Mode = mode,
+                    PlanningMode = string.Equals(pd.Frequency, "manual", StringComparison.OrdinalIgnoreCase) ? "manual" : "recurring",
                     SourceOfFunds = pd.SourceOfFunds,
                     Frequency = pd.Frequency,
                     StartDate = pd.StartDate,
@@ -45,16 +46,21 @@ namespace api.Helpers
                 return new WithdrawalDetailsDto
                 {
                     Mode = wd.IsScheduled ? "scheduled" : "oneShot",
+                    PlanningMode = string.Equals(wd.Frequency, "manual", StringComparison.OrdinalIgnoreCase) ? "manual" : "recurring",
                     GrossAmount = wd.GrossAmount,
                     Frequency = wd.Frequency,
+                    ScheduleGroupId = wd.ScheduleGroupId,
                 };
             }
 
             if (op.ArbitrageDetail != null)
             {
+                var ad = op.ArbitrageDetail;
                 return new ArbitrageDetailsDto
                 {
                     Mode = "manual",
+                    PlanningMode = !string.IsNullOrWhiteSpace(ad.ScheduleGroupId) ? "manual" : null,
+                    ScheduleGroupId = ad.ScheduleGroupId,
                 };
             }
 
@@ -80,8 +86,10 @@ namespace api.Helpers
             {
                 PaymentMethod = method,
                 SourceOfFunds = pd.SourceOfFunds,
-                Frequency = pd.Frequency,
-                StartDate = pd.StartDate,
+                Frequency = string.Equals(pd.PlanningMode, "manual", StringComparison.OrdinalIgnoreCase) ? "manual" : pd.Frequency,
+                StartDate = string.Equals(pd.PlanningMode, "manual", StringComparison.OrdinalIgnoreCase)
+                    ? pd.FixedDates?.OrderBy(d => d).FirstOrDefault() ?? pd.StartDate
+                    : pd.StartDate,
                 ScheduleStatus = pd.ScheduleStatus?.ToLowerInvariant() switch
                 {
                     "suspended" => OperationScheduleStatus.Suspended,
@@ -102,12 +110,13 @@ namespace api.Helpers
                 GrossAmount = wd.GrossAmount ?? 0,
                 IsScheduled = wd.Mode == "scheduled",
                 Frequency = wd.Frequency,
+                ScheduleGroupId = wd.ScheduleGroupId,
             };
         }
 
         public static ArbitrageDetail? ToArbitrageModel(OperationDetailsDto? dto)
         {
-            if (dto is not ArbitrageDetailsDto) return null;
+            if (dto is not ArbitrageDetailsDto ad) return null;
 
             // FromSupportId/ToSupportId/Percentage sont obsolètes — les allocations
             // portent désormais les supports. On garde des valeurs par défaut.
@@ -116,6 +125,7 @@ namespace api.Helpers
                 FromSupportId = 0,
                 ToSupportId = 0,
                 Percentage = 0,
+                ScheduleGroupId = ad.ScheduleGroupId,
             };
         }
     }

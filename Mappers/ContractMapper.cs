@@ -7,6 +7,7 @@ using api.Dtos.FinancialSupport;
 using api.Dtos.Person;
 using api.Dtos.Compartment;
 using api.Models;
+using api.Models.Enum;
 using Contract = api.Models.Contract;
 
 namespace api.Mappers
@@ -35,6 +36,12 @@ namespace api.Mappers
                 Currency = contractModel.Currency,
                 PersonId = contractModel.PersonId,
                 ProductId = contractModel.ProductId,
+                ProductCode = contractModel.Product?.ProductCode,
+                ProductName = contractModel.Product?.ProductName,
+                ContractFamily = contractModel.Product?.ContractFamily,
+                ContractFamilyLabel = contractModel.Product?.ContractFamily.HasValue == true
+                    ? contractModel.Product.ContractFamily.Value.ToLabel()
+                    : null,
 
                 BeneficiaryClauseId = contractModel.BeneficiaryClauseId,
                 InitialPremium = contractModel.InitialPremium,
