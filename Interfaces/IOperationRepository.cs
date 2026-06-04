@@ -22,7 +22,7 @@ public interface IOperationRepository
     Task<Operation?> StopScheduleAsync(int operationId);
 
     /// <summary>
-    /// (Optionnel) Redistribue un retrait global entre compartiments.
+    /// (Optionnel) Redistribue un retrait global entre poches.
     /// Conservée pour un usage futur.
     /// </summary>
     Task<IEnumerable<Operation>> GetByContractIdAsync(int contractId);

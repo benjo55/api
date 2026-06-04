@@ -38,7 +38,7 @@ namespace api.Controllers
         {
             var model = await _repo.GetByIdAsync(id);
             if (model == null)
-                return NotFound(new { message = $"Compartiment {id} introuvable." });
+                return NotFound(new { message = $"Poche {id} introuvable." });
 
             return Ok(model.ToCompartmentDto());
         }
@@ -75,13 +75,13 @@ namespace api.Controllers
             {
                 var model = await _repo.UpdateAsync(id, dto);
                 if (model == null)
-                    return NotFound(new { message = $"Compartiment {id} introuvable." });
+                    return NotFound(new { message = $"Poche {id} introuvable." });
 
                 return Ok(model.ToCompartmentDto());
             }
             catch (InvalidOperationException ex)
             {
-                // ⚠️ Cas typique : tentative de modification du compartiment global
+                // ⚠️ Cas typique : tentative de modification de la poche globale
                 return BadRequest(new { message = ex.Message });
             }
             catch (Exception ex)
@@ -102,16 +102,16 @@ namespace api.Controllers
                 var ok = await _repo.DeleteAsync(id);
                 return ok
                     ? NoContent()
-                    : NotFound(new { message = $"Compartiment {id} introuvable ou déjà supprimé." });
+                    : NotFound(new { message = $"Poche {id} introuvable ou déjà supprimé." });
             }
             catch (InvalidOperationException ex)
             {
-                // ⚠️ Cas typique : suppression du compartiment global interdite
+                // ⚠️ Cas typique : suppression de la poche globale interdite
                 return BadRequest(new { message = ex.Message });
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"🔥 Erreur suppression compartiment : {ex.Message}");
+                Console.WriteLine($"🔥 Erreur suppression poche : {ex.Message}");
                 return StatusCode(500, new { message = "Erreur interne du serveur.", details = ex.Message });
             }
         }
@@ -126,10 +126,10 @@ namespace api.Controllers
             {
                 var updated = await _repo.PatchLabelAsync(id, newLabel);
                 if (updated == null)
-                    return NotFound(new { message = $"Compartiment {id} introuvable." });
+                    return NotFound(new { message = $"Poche {id} introuvable." });
 
                 if (updated.IsDefault)
-                    return BadRequest(new { message = "Impossible de renommer le compartiment global." });
+                    return BadRequest(new { message = "Impossible de renommer la poche globale." });
 
                 return Ok(updated.ToCompartmentDto());
             }

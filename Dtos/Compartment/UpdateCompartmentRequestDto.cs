@@ -7,7 +7,7 @@ namespace api.Dtos.Compartment
         public int Id { get; set; }   // utile si plus tard tu veux update partiel
         public int ContractId { get; set; }
 
-        public string Label { get; set; } = "Compartiment";
+        public string Label { get; set; } = "Poche";
         public string? Description { get; set; }
         public string? ManagementMode { get; set; }
         public string? Notes { get; set; }

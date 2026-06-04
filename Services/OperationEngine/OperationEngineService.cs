@@ -269,7 +269,7 @@ namespace api.Services
                             finalized[i] = (alloc, item.nav, item.date, effectiveShares);
                         }
 
-                        // 2) Rééquilibrage des TARGETS par compartiment sur le budget SOURCE réel
+                        // 2) Rééquilibrage des TARGETS par poche sur le budget SOURCE réel
                         var compartments = finalized
                             .Where(f => f.alloc.CompartmentId.HasValue)
                             .Select(f => f.alloc.CompartmentId!.Value)
@@ -455,7 +455,7 @@ namespace api.Services
                             {
                                 state.AccruedAmount = NumericPolicy.RoundMoney(state.AccruedAmount + newlyAccrued);
                                 _logger.LogInformation(
-                                    "📘 Accrual frais contrat {ContractId}, support {SupportId}, compartiment {CompartmentId} : +{Amount:F7} du {Start:yyyy-MM-dd} au {End:yyyy-MM-dd}",
+                                    "📘 Accrual frais contrat {ContractId}, support {SupportId}, poche {CompartmentId} : +{Amount:F7} du {Start:yyyy-MM-dd} au {End:yyyy-MM-dd}",
                                     contract.Id,
                                     alloc.SupportId,
                                     alloc.CompartmentId,
@@ -542,7 +542,7 @@ namespace api.Services
                         await _context.SaveChangesAsync();
 
                         _logger.LogInformation(
-                            "💸 Frais postés : contrat {ContractId}, support {SupportId}, compartiment {CompartmentId} → {FeeAmount:F7} ({Shares:F7} parts), source={Source}",
+                            "💸 Frais postés : contrat {ContractId}, support {SupportId}, poche {CompartmentId} → {FeeAmount:F7} ({Shares:F7} parts), source={Source}",
                             contract.Id,
                             alloc.SupportId,
                             alloc.CompartmentId,
@@ -555,7 +555,7 @@ namespace api.Services
                     {
                         _logger.LogError(
                             ex,
-                            "❌ Erreur ApplyManagementFeesAsync sur contrat {ContractId}, support {SupportId}, compartiment {CompartmentId}",
+                            "❌ Erreur ApplyManagementFeesAsync sur contrat {ContractId}, support {SupportId}, poche {CompartmentId}",
                             contract.Id,
                             alloc.SupportId,
                             alloc.CompartmentId);

@@ -15,7 +15,7 @@ namespace api.Dtos.Compartment
         public string? Notes { get; set; }
         public bool IsDefault { get; set; } = false;
 
-        // 🔹 Valeur actuelle du compartiment
+        // 🔹 Valeur actuelle de la poche
         public decimal CurrentValue { get; set; }
 
         public DateTime CreatedDate { get; set; }

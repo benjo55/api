@@ -1,4 +1,4 @@
-﻿USE Life;
+USE Life;
 GO
 
 PRINT '========================================================';
@@ -41,7 +41,7 @@ LEFT JOIN dbo.FinancialSupports s ON s.Id = a.SupportId
 WHERE o.ContractId <> c.Id;
 PRINT '--------------------------------------------------------';
 
--- 5️⃣ Vérifier cohérence FinancialSupportAllocations (compartiments et montants)
+-- 5️⃣ Vérifier cohérence FinancialSupportAllocations (poches et montants)
 PRINT '🔹 Étape 5 : Supports financiers avec CurrentShares négatifs ou incohérents';
 SELECT fsa.Id, fsa.ContractId, fsa.CompartmentId, fs.Label, fs.ISIN,
        fsa.CurrentShares, fsa.CurrentAmount, fs.LastValuationAmount,

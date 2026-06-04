@@ -45,10 +45,10 @@ namespace api.Models
         // =====================================================================
 
         [NotMapped]
-        public List<int> Compartments { get; set; } = new(); // ✅ liste des compartiments contenant ce support
+        public List<int> Compartments { get; set; } = new(); // ✅ liste des poches contenant ce support
 
         [NotMapped]
-        public bool IsMultiCompartment { get; set; } // ✅ true si le support est présent dans plusieurs compartiments
+        public bool IsMultiCompartment { get; set; } // ✅ true si le support est présent dans plusieurs poches
 
     }
 }

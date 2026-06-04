@@ -195,7 +195,7 @@ namespace api.Dtos.TaxProfile
         /// <summary>Rente viagère à titre onéreux : âge au premier versement pour la fraction imposable</summary>
         public int? AgeAtFirstAnnuityPayment { get; set; }
 
-        // ─── PER multi-compartiments ────────────────────────────────────────
+        // ─── PER multi-poches ────────────────────────────────────────
         public List<PerCompartmentInput> PerCompartments { get; set; } = [];
 
         // ─── Pour les décès ──────────────────────────────────────────────────

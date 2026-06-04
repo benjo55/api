@@ -662,7 +662,7 @@ namespace api.Services
 
             var marginalRate = Math.Max(0m, req.ProgressiveScaleRate ?? 30m);
             if (req.ProgressiveScaleRate is null)
-                warnings.Add("PER multi-compartiments: taux barème non fourni, simulation avec taux marginal 30 %.");
+                warnings.Add("PER multi-poches: taux barème non fourni, simulation avec taux marginal 30 %.");
 
             foreach (var c in req.PerCompartments)
             {
@@ -685,12 +685,12 @@ namespace api.Services
                         break;
                     case PerCompartmentType.EmployeeSavings:
                         capitalTaxable = 0m;
-                        notesComp.Add("Compartiment épargne salariale: capital exonéré, gains imposables.");
+                        notesComp.Add("Poche épargne salariale: capital exonéré, gains imposables.");
                         break;
                     case PerCompartmentType.Mandatory:
                         capitalTaxable = capital;
-                        notesComp.Add("Compartiment obligatoire: sortie en rente généralement privilégiée.");
-                        warnings.Add("PER compartiment obligatoire simulé en capital: vérifier l'éligibilité juridique.");
+                        notesComp.Add("Poche obligatoire: sortie en rente généralement privilégiée.");
+                        warnings.Add("PER poche obligatoire simulé en capital: vérifier l'éligibilité juridique.");
                         break;
                 }
 
@@ -736,10 +736,10 @@ namespace api.Services
             var effectiveRate = req.GrossWithdrawal > 0 ? Round2(totalTaxAmount / req.GrossWithdrawal * 100m) : 0m;
             var irRate = taxableBase > 0 ? Round2(totalIr / taxableBase * 100m) : 0m;
 
-            breakdown.Add($"PER multi-compartiments: base capital taxable = {totalCapitalTaxable:N2} €");
-            breakdown.Add($"PER multi-compartiments: base gains taxables = {totalGainTaxable:N2} €");
+            breakdown.Add($"PER multi-poches: base capital taxable = {totalCapitalTaxable:N2} €");
+            breakdown.Add($"PER multi-poches: base gains taxables = {totalGainTaxable:N2} €");
 
-            notes.Add("Simulation PER multi-compartiments appliquée (volontaire, salariale, obligatoire). ");
+            notes.Add("Simulation PER multi-poches appliquée (volontaire, salariale, obligatoire). ");
 
             return new WithdrawalTaxDetail
             {

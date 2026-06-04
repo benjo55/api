@@ -6,11 +6,14 @@ using api.Rules;
 using api.Services;
 using api.Configuration;
 using api.Middleware;
+using api.Services.Pdf;
+using api.Services.Pdf.Templates;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
+using QuestPDF.Infrastructure;
 using Quartz;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -189,6 +192,8 @@ namespace api.Extensions
         public static IServiceCollection AddApiDependencies(this IServiceCollection services, IConfiguration config)
         {
 
+            QuestPDF.Settings.License = LicenseType.Community;
+
             services.AddScoped<IPersonRepository, PersonRepository>();
             services.AddScoped<IInsurerRepository, InsurerRepository>();
             services.AddScoped<INotaryRepository, NotaryRepository>();
@@ -226,6 +231,11 @@ namespace api.Extensions
             services.AddScoped<IOperationApplier, OperationApplier>();
             services.AddScoped<ITaxProfileRepository, TaxProfileRepository>();
             services.AddScoped<ITaxEngineService, TaxEngineService>();
+            services.AddScoped<IPdfDocumentService, PdfDocumentService>();
+            services.AddScoped<IPdfBusinessDocumentService, PdfBusinessDocumentService>();
+            services.AddSingleton<IPdfTemplate, BusinessPdfTemplate>();
+            services.AddSingleton<IPdfTemplate, ContractSheetPdfTemplate>();
+            services.AddHttpClient("pdf-assets");
 
             // Hosted services
             services.AddHostedService<ContractValuationCronService>();

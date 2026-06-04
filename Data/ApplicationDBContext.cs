@@ -394,12 +394,12 @@ namespace api.Data
                     .HasForeignKey(osa => osa.SupportId)
                     .OnDelete(DeleteBehavior.Restrict); // empêche la suppression d’un support utilisé
 
-                // 🔹 Compartiment (1-N, désormais obligatoire)
+                // 🔹 Poche (1-N, désormais obligatoire)
                 entity.HasOne(osa => osa.Compartment)
                     .WithMany()
                     .HasForeignKey(osa => osa.CompartmentId)
-                    .IsRequired() // ✅ obligatoire : chaque allocation d’opération appartient à un compartiment
-                    .OnDelete(DeleteBehavior.Restrict); // sécurité : empêche suppression compartiment avec historiques
+                    .IsRequired() // ✅ obligatoire : chaque allocation d’opération appartient à une poche
+                    .OnDelete(DeleteBehavior.Restrict); // sécurité : empêche suppression poche avec historiques
 
                 // 🔹 Précision des champs numériques
                 entity.Property(o => o.Amount)
@@ -411,8 +411,8 @@ namespace api.Data
                 entity.Property(o => o.Shares)
                     .HasPrecision(20, 7);
 
-                // 🔹 Index logique (opération + support + compartiment + flow)
-                // Permet SOURCE et TARGET sur le même support/compartiment dans une même opération.
+                // 🔹 Index logique (opération + support + poche + flow)
+                // Permet SOURCE et TARGET sur le même support/poche dans une même opération.
                 entity.HasIndex(o => new { o.OperationId, o.SupportId, o.CompartmentId, o.Flow })
                     .IsUnique()
                     .HasFilter(null)
@@ -458,7 +458,7 @@ namespace api.Data
             {
                 entity.ToTable("Compartments");
 
-                // 🔒 Un seul compartiment global par contrat
+                // 🔒 Un seul poche globale par contrat
                 entity.HasIndex(c => new { c.ContractId, c.IsDefault })
                     .IsUnique()
                     .HasFilter("[IsDefault] = 1");

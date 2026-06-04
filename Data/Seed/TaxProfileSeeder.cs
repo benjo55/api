@@ -125,7 +125,7 @@ namespace api.Data.Seed
                     SocialChargesRate = 17.2m,
                     GainAllowanceSingle = null,
                     GainAllowanceCouple = null,
-                    IrExemptAfterThreshold = true,   // capital exonéré d'IR (compartiment participation)
+                    IrExemptAfterThreshold = true,   // capital exonéré d'IR (poche participation)
                     SocialChargesExemptAfterThreshold = false,
                     HasDeathTaxArticle990I = false,
                     HasDeathTaxArticle757B = false,

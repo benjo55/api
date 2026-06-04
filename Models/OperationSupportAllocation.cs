@@ -51,10 +51,10 @@ namespace api.Models
         // =====================================================================
 
         [NotMapped]
-        public List<int> Compartments { get; set; } = new(); // Liste des compartiments impactés
+        public List<int> Compartments { get; set; } = new(); // Liste des poches impactés
 
         [NotMapped]
-        public bool IsMultiCompartment { get; set; } // true si support présent dans plusieurs compartiments
+        public bool IsMultiCompartment { get; set; } // true si support présent dans plusieurs poches
 
     }
 }

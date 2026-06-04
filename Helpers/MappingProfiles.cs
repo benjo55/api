@@ -37,7 +37,7 @@ namespace api.Helpers
             // --------- FINANCIAL SUPPORT ---------
             config.NewConfig<FinancialSupport, FinancialSupportDto>();
             config.NewConfig<FinancialSupportAllocation, FinancialSupportAllocationDto>()
-                .Map(dest => dest.Support, src => src.Support)
+                .Map(dest => dest.Support, src => src.Support!)
                 .Map(dest => dest.CompartmentId, src => src.CompartmentId);
             config.NewConfig<FinancialSupportAllocationDto, FinancialSupportAllocation>()
                 .Ignore(dest => dest.Support)
@@ -114,12 +114,12 @@ namespace api.Helpers
 
             // --------- ALLOCATIONS (Operation) ---------
             config.NewConfig<OperationSupportAllocation, OperationSupportAllocationDto>()
-                .Map(dest => dest.Support, src => src.Support)
+                .Map(dest => dest.Support, src => src.Support!)
                 .Map(dest => dest.CompartmentId, src => src.CompartmentId)
                 .Map(dest => dest.Shares, src => src.Shares);
             config.NewConfig<OperationSupportAllocationDto, OperationSupportAllocation>()
-                .Ignore(dest => dest.Operation)
-                .Ignore(dest => dest.Support)
+                .Ignore(dest => dest.Operation!)
+                .Ignore(dest => dest.Support!)
                 .Map(dest => dest.CompartmentId, src => src.CompartmentId)
                 .Map(dest => dest.Shares, src => src.Shares);
         }

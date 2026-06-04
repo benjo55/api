@@ -56,12 +56,12 @@ namespace api.Repository
             model.Supports = new List<FinancialSupportAllocation>();
             model.CreatedDate = DateTime.UtcNow;
             model.UpdatedDate = DateTime.UtcNow;
-            model.Label = string.IsNullOrWhiteSpace(model.Label) ? "Compartiment" : model.Label.Trim();
+            model.Label = string.IsNullOrWhiteSpace(model.Label) ? "Poche" : model.Label.Trim();
 
             await _context.Compartments.AddAsync(model);
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("🆕 Compartiment {Label} créé pour le contrat {ContractId}", model.Label, model.ContractId);
+            _logger.LogInformation("🆕 Poche {Label} créé pour le contrat {ContractId}", model.Label, model.ContractId);
             return model;
         }
 
@@ -76,13 +76,13 @@ namespace api.Repository
 
             if (existing == null)
             {
-                _logger.LogWarning("⚠️ Compartiment {Id} introuvable pour mise à jour", id);
+                _logger.LogWarning("⚠️ Poche {Id} introuvable pour mise à jour", id);
                 return null;
             }
 
-            // 🚫 Protection : le compartiment global ne peut pas être modifié
+            // 🚫 Protection : la poche globale ne peut pas être modifiée
             if (existing.IsDefault)
-                throw new InvalidOperationException("Le compartiment global ne peut pas être modifié.");
+                throw new InvalidOperationException("La poche globale ne peut pas être modifiée.");
 
             var restricted = await IsLockedContractWithOperationsAsync(existing.ContractId);
 
@@ -94,17 +94,19 @@ namespace api.Repository
 
                 if (managementChanged || notesChanged || descriptionChanged)
                 {
-                    throw new InvalidOperationException("Ce contrat est verrouillé avec opérations: seul le renommage des compartiments est autorisé.");
+                    throw new InvalidOperationException("Ce contrat est verrouillé avec opérations: seul le renommage des poches est autorisé.");
                 }
             }
 
-            existing.Label = dto.Label;
+            existing.Label = string.IsNullOrWhiteSpace(dto.Label)
+                ? existing.Label
+                : dto.Label.Trim();
 
             if (!restricted)
             {
                 existing.ManagementMode = dto.ManagementMode;
                 existing.Notes = dto.Notes;
-                existing.Description = dto.Description;
+                existing.Description = dto.Description ?? string.Empty;
             }
 
             existing.UpdatedDate = DateTime.UtcNow;
@@ -112,7 +114,7 @@ namespace api.Repository
             // 🚫 On ne touche pas aux allocations FSA (gérées par les opérations)
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("✏️ Compartiment {Id} mis à jour (Label={Label})", existing.Id, existing.Label);
+            _logger.LogInformation("✏️ Poche {Id} mise à jour (Label={Label})", existing.Id, existing.Label);
             return existing;
         }
 
@@ -125,13 +127,13 @@ namespace api.Repository
             if (existing == null) return null;
 
             if (existing.IsDefault)
-                throw new InvalidOperationException("Impossible de renommer le compartiment global.");
+                throw new InvalidOperationException("Impossible de renommer la poche globale.");
 
             existing.Label = string.IsNullOrWhiteSpace(newLabel) ? existing.Label : newLabel.Trim();
             existing.UpdatedDate = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("📝 Label du compartiment {Id} modifié en {Label}", existing.Id, newLabel);
+            _logger.LogInformation("📝 Label de la poche {Id} modifié en {Label}", existing.Id, newLabel);
 
             return existing;
         }
@@ -143,10 +145,10 @@ namespace api.Repository
         {
             var comp = await _context.Compartments.FirstOrDefaultAsync(c => c.Id == id);
             if (comp == null)
-                throw new InvalidOperationException("Compartiment introuvable.");
+                throw new InvalidOperationException("Poche introuvable.");
 
             if (comp.IsDefault)
-                throw new InvalidOperationException("Le compartiment global ne peut pas être supprimé.");
+                throw new InvalidOperationException("La poche globale ne peut pas être supprimée.");
 
             var restricted = await IsLockedContractWithOperationsAsync(comp.ContractId);
             if (restricted)
@@ -154,7 +156,7 @@ namespace api.Repository
                 var invested = await IsCompartmentInvestedAsync(comp.ContractId, comp.Id);
                 if (invested)
                 {
-                    throw new InvalidOperationException($"Le compartiment '{comp.Label}' est investi et ne peut pas être supprimé.");
+                    throw new InvalidOperationException($"La poche '{comp.Label}' est investi et ne peut pas être supprimé.");
                 }
             }
 
@@ -162,7 +164,7 @@ namespace api.Repository
             _context.Compartments.Remove(comp);
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("🗑️ Compartiment {Id} supprimé pour le contrat {ContractId}", comp.Id, comp.ContractId);
+            _logger.LogInformation("🗑️ Poche {Id} supprimé pour le contrat {ContractId}", comp.Id, comp.ContractId);
             return true;
         }
 

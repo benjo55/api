@@ -14,8 +14,8 @@ namespace api.Models
         public Contract Contract { get; set; } = null!;
 
         // Métadonnées
-        public string Label { get; set; } = "Compartiment 1";
-        public string Description { get; set; } = "Description du compartiment";
+        public string Label { get; set; } = "Poche 1";
+        public string Description { get; set; } = "Description de la poche";
         public string? ManagementMode { get; set; } // "Libre", "Pilotée - Prudent/Équilibré/Dynamique", "À horizon"
         public string? Notes { get; set; }
 

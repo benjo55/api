@@ -85,7 +85,7 @@ namespace api.Models
         // 🧾 Documents
         public ICollection<Document> Documents { get; set; } = new List<Document>();
 
-        // 🧾 Compartiments
+        // 🧾 Poches
         public ICollection<Compartment> Compartments { get; set; } = new List<Compartment>();
 
         // 📊 Répartition supports UC / ETF

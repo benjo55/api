@@ -57,7 +57,7 @@ namespace api.Dtos.Contract
         // ⚙️ Options du contrat
         public List<ContractOptionDto> Options { get; set; } = new();
 
-        // ⚙️ Compartiments du contrat
+        // ⚙️ Poches du contrat
         public List<CompartmentDto> Compartments { get; set; } = new List<CompartmentDto>();
 
         // 📄 Documents liés (URL ou metadata)

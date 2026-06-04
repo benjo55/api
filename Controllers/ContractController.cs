@@ -177,10 +177,10 @@ namespace api.Controllers
                     VL = s.Support.LastValuationAmount,
                     DateVL = s.Support.LastValuationDate,
 
-                    // 🎯 Compartiment EXACT de cette allocation
+                    // 🎯 Poche EXACT de cette allocation
                     CompartmentId = s.CompartmentId,
 
-                    // Quantité dans CE compartiment
+                    // Quantité dans CE poche
                     CurrentShares = s.CurrentShares,
                     CurrentAmount = s.CurrentAmount
                 })

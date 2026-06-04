@@ -59,7 +59,7 @@ namespace api.Dtos.Contract
         // Supports au niveau contrat
         public List<UpdateFinancialSupportAllocationDto> Supports { get; set; } = new();
 
-        // Compartiments
+        // Poches
         public List<UpdateCompartmentRequestDto> Compartments { get; set; } = new();
 
         // Documents

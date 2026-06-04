@@ -40,7 +40,7 @@ namespace api.Interfaces
                     (h.Support!.LastValuationAmount ?? 0m) * h.TotalShares);
 
             _logger.LogInformation(
-                "📊 Audit #{ContractNumber}: Compartiments={Compartments:F2}€, Holdings={Holdings:F2}€, CurrentValue={Val:F2}€",
+                "📊 Audit #{ContractNumber}: Poches={Compartments:F2}€, Holdings={Holdings:F2}€, CurrentValue={Val:F2}€",
                 contract.ContractNumber,
                 totalFromCompartments,
                 totalFromHoldings,

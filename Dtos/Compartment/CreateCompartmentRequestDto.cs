@@ -10,7 +10,7 @@ namespace api.Dtos.Compartment
         public int ContractId { get; set; }
 
         [Required]
-        public string Label { get; set; } = "Compartiment";
+        public string Label { get; set; } = "Poche";
 
         public string? Description { get; set; }
         public string? ManagementMode { get; set; }

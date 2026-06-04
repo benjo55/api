@@ -32,7 +32,7 @@ namespace api.Repository
         // -------------------- CREATE --------------------
         public async Task<Contract> CreateAsync(Contract contractModel, CreateContractRequestDto dto)
         {
-            // Empêche EF de réinsérer les compartiments liés au modèle
+            // Empêche EF de réinsérer les poches liés au modèle
             contractModel.Compartments = new List<Compartment>();
 
             await _context.Contracts.AddAsync(contractModel);
@@ -54,15 +54,15 @@ namespace api.Repository
                     ContractId = contractModel.Id,
                     Label = "Global",
                     ManagementMode = "Standard",
-                    Notes = "Compartiment principal automatique",
+                    Notes = "Poche principale automatique",
                     IsDefault = true,
                     CreatedDate = DateTime.UtcNow,
                     UpdatedDate = DateTime.UtcNow
                 });
-                _logger?.LogInformation("🆕 Compartiment global créé automatiquement pour le contrat {ContractId}", contractModel.Id);
+                _logger?.LogInformation("🆕 Poche globale créée automatiquement pour le contrat {ContractId}", contractModel.Id);
             }
 
-            // ➕ Ajoute tous les compartiments du front (y compris le Global envoyé)
+            // ➕ Ajoute toutes les poches du front (y compris le Global envoyé)
             if (dto.Compartments?.Any() == true)
             {
                 foreach (var compDto in dto.Compartments
@@ -298,7 +298,7 @@ namespace api.Repository
                 }
 
                 if (restricted && string.IsNullOrWhiteSpace(dto.Label))
-                    throw new InvalidOperationException("Le libellé du nouveau compartiment est obligatoire.");
+                    throw new InvalidOperationException("Le libellé du nouvea la poche est obligatoire.");
 
                 var isGlobalLabel = string.Equals(dto.Label?.Trim(), "global", StringComparison.OrdinalIgnoreCase);
                 if (isGlobalLabel && existingContract.Compartments.Any(c => c.IsDefault))
@@ -307,7 +307,7 @@ namespace api.Repository
                 existingContract.Compartments.Add(new Compartment
                 {
                     ContractId = existingContract.Id,
-                    Label = string.IsNullOrWhiteSpace(dto.Label) ? "Compartiment" : dto.Label.Trim(),
+                    Label = string.IsNullOrWhiteSpace(dto.Label) ? "Poche" : dto.Label.Trim(),
                     Description = dto.Description ?? string.Empty,
                     ManagementMode = dto.ManagementMode ?? "Libre",
                     Notes = dto.Notes,
@@ -338,7 +338,7 @@ namespace api.Repository
                     if (isInvested)
                     {
                         throw new InvalidOperationException(
-                            $"Le compartiment '{compartment.Label}' ne peut pas être supprimé car il est investi.");
+                            $"La poche '{compartment.Label}' ne peut pas être supprimé car il est investi.");
                     }
                 }
 
@@ -468,7 +468,7 @@ namespace api.Repository
                 .AsNoTracking()
                 .ToListAsync();
 
-            // 🔹 Reconstruction supports par compartiment (SOURCE DE VÉRITÉ = FSA)
+            // 🔹 Reconstruction supports par poche (SOURCE DE VÉRITÉ = FSA)
             foreach (var comp in contract.Compartments)
             {
                 comp.Supports = allocations
@@ -476,7 +476,7 @@ namespace api.Repository
                     .ToList();
             }
 
-            // 🔹 Nettoyage compartiments
+            // 🔹 Nettoyage poches
             contract.Compartments = contract.Compartments
                 .GroupBy(c => c.Id)
                 .Select(g => g.First())
@@ -505,7 +505,7 @@ namespace api.Repository
                 .ToList();
 
             // =====================================================
-            // 🔹 Enrichissement PRU / Perf dans les compartiments
+            // 🔹 Enrichissement PRU / Perf dans les poches
             // (SANS toucher à InvestedAmount)
             // =====================================================
 
@@ -582,7 +582,7 @@ namespace api.Repository
         public async Task<IEnumerable<FinancialSupportAllocation>> GetAvailableSupportsAsync(int contractId, int? compartmentId)
         {
             Console.WriteLine($"🔎 Récupération des supports disponibles pour le contrat {contractId}" +
-                              (compartmentId.HasValue ? $" (compartiment {compartmentId})" : " (tous compartiments)"));
+                              (compartmentId.HasValue ? $" (poche {compartmentId})" : " (tous poches)"));
 
             // Vérifie existence du contrat
             var contractExists = await _context.Contracts.AnyAsync(c => c.Id == contractId);
@@ -593,7 +593,7 @@ namespace api.Repository
             }
 
             // ==========================================================
-            // 🟩 CAS 1 : un compartiment spécifique est demandé
+            // 🟩 CAS 1 : une poche spécifique est demandé
             // ==========================================================
             if (compartmentId.HasValue && compartmentId > 0)
             {
@@ -604,7 +604,7 @@ namespace api.Repository
 
                 if (!compSupports.Any())
                 {
-                    Console.WriteLine($"⚠️ Aucun support trouvé pour le contrat {contractId} / compartiment {compartmentId}");
+                    Console.WriteLine($"⚠️ Aucun support trouvé pour le contrat {contractId} / poche {compartmentId}");
                     return Enumerable.Empty<FinancialSupportAllocation>();
                 }
 
@@ -628,12 +628,12 @@ namespace api.Repository
                     .OrderByDescending(s => s.CurrentAmount)
                     .ToList();
 
-                Console.WriteLine($"📊 {result.Count} supports trouvés pour le compartiment {compartmentId}");
+                Console.WriteLine($"📊 {result.Count} supports trouvés pour la poche {compartmentId}");
                 return result;
             }
 
             // ==========================================================
-            // 🟦 CAS 2 : consolidation de tous les compartiments du contrat
+            // 🟦 CAS 2 : consolidation de toutes les poches du contrat
             // ==========================================================
             var allAllocations = await _context.FinancialSupportAllocations
                 .Where(fsa => fsa.ContractId == contractId)
@@ -940,7 +940,7 @@ namespace api.Repository
                     a.Operation.Status == OperationStatus.Executed   // 🔥 CLÉ
                 );
 
-            // 🔎 Filtrage compartiment si nécessaire
+            // 🔎 Filtrage poche si nécessaire
             if (compartmentId.HasValue)
                 query = query.Where(a => a.CompartmentId == compartmentId.Value);
 
@@ -1013,7 +1013,7 @@ namespace api.Repository
 //         .ToDictionary(h => h.SupportId);
 
 
-//     // 2️⃣ Récupération de toutes les allocations (globaux + compartiments)
+//     // 2️⃣ Récupération de toutes les allocations (globaux + poches)
 //     var allAllocations = await _context.FinancialSupportAllocations
 //         .Where(fsa => fsa.ContractId == contract.Id)
 //         .Include(fsa => fsa.Support)
@@ -1032,14 +1032,14 @@ namespace api.Repository
 //     // Après calculs :
 //     decimal totalContractValue = 0m;
 //     // ========================================================================
-//     // 🔥 PATCH — Reconstruction correcte des supports par compartiment
-//     //     + Ajout du montant investi par support & compartiment
+//     // 🔥 PATCH — Reconstruction correcte des supports par poche
+//     //     + Ajout du montant investi par support & poche
 //     // ========================================================================
 
 //     // On récupère toutes les allocations de supports (déjà chargées dans allAllocations)
 //     foreach (var comp in contract.Compartments)
 //     {
-//         // 1) Sélection des supports appartenant à ce compartiment
+//         // 1) Sélection des supports appartenant à cette poche
 //         comp.Supports = allAllocations
 //             .Where(f => f.CompartmentId == comp.Id)
 //             .ToList();
@@ -1050,7 +1050,7 @@ namespace api.Repository
 //             .Select(g => g.First())
 //             .ToList();
 
-//         // 3) Enrichissement INVESTED par support pour ce compartiment
+//         // 3) Enrichissement INVESTED par support pour cette poche
 //         foreach (var s in comp.Supports)
 //         {
 //             if (holdingBySupportId.TryGetValue(s.SupportId, out var holding))
@@ -1078,13 +1078,13 @@ namespace api.Repository
 //         }
 
 
-//         // 4) Valeur actuelle du compartiment = somme des CurrentAmount
+//         // 4) Valeur actuelle de la poche = somme des CurrentAmount
 //         comp.CurrentValue = Math.Round(
 //             comp.Supports.Sum(s => s.CurrentAmount),
 //             7
 //         );
 
-//         // 5) Total investi du compartiment
+//         // 5) Total investi de la poche
 //         comp.TotalInvested = Math.Round(
 //             comp.Supports.Sum(s => s.InvestedAmount),
 //             7
@@ -1105,7 +1105,7 @@ namespace api.Repository
 //         contract.Supports = globalComp.Supports;
 
 //     Console.WriteLine($"💰 Total = {totalContractValue:F2}€");
-//     Console.WriteLine($"📊 Vue consolidée calculée : {contract.Compartments.Count} compartiments.");
+//     Console.WriteLine($"📊 Vue consolidée calculée : {contract.Compartments.Count} poches.");
 
 //     // ========================================================================
 //     // 🔹 Agrégation des retraits : Executed vs Pending (UX only)

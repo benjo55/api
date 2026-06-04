@@ -82,7 +82,7 @@ namespace api.Dtos.Contract
         // 🆕 Liste des assurés (personnes liées au contrat)
         public List<PersonDto> InsuredPersons { get; set; } = new();
 
-        // 🆕 Compartiments (répartition des actifs)
+        // 🆕 Poches (répartition des actifs)
         public List<CompartmentDto> Compartments { get; set; } = new();
 
         // 🆕 Supports financiers (répartition UC / ETF / fonds)

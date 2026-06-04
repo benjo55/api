@@ -121,7 +121,7 @@ namespace api.Mappers
                         Support = s.Support?.ToFinancialSupportDto()
                     }).ToList() ?? new(),
 
-                // 🔹 Compartiments (multi-support)
+                // 🔹 Poches (multi-support)
                 Compartments = contractModel.Compartments?
                     .Select(c => new CompartmentDto
                     {
@@ -137,7 +137,7 @@ namespace api.Mappers
                         UpdatedDate = c.UpdatedDate,
                         CurrentValue = c.CurrentValue,
 
-                        // ------ Supports du compartiment ------
+                        // ------ Supports de la poche ------
                         Supports = c.Supports?
                             .Select(s => new FinancialSupportAllocationDto
                             {

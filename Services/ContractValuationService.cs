@@ -32,7 +32,7 @@ public class ContractValuationService : IContractValuationService
 
         try
         {
-            // 1️⃣ Charger contrat + compartiments
+            // 1️⃣ Charger contrat + poches
             var contract = await _context.Contracts
                 .Include(c => c.Compartments)
                 .FirstOrDefaultAsync(c => c.Id == contractId);
@@ -109,7 +109,7 @@ public class ContractValuationService : IContractValuationService
 
             await _context.SaveChangesAsync();
 
-            // 6️⃣ 🔥 Valorisation des compartiments = somme FSA
+            // 6️⃣ 🔥 Valorisation des poches = somme FSA
             foreach (var comp in contract.Compartments)
             {
                 comp.CurrentValue = Math.Round(
@@ -130,7 +130,7 @@ public class ContractValuationService : IContractValuationService
                 h.TotalInvested = Math.Round(investedFromFsa, 2);
             }
 
-            // 7️⃣ 🔥 Valeur contrat = somme des compartiments (FSA)
+            // 7️⃣ 🔥 Valeur contrat = somme des poches (FSA)
             decimal totalContractValue = contract.Compartments.Sum(c => c.CurrentValue);
 
             // 8️⃣ Mise à jour des flux du contrat
