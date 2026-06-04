@@ -3,6 +3,7 @@ using api.Interfaces;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
 using QRCoder;
+using System.Net.Http.Json;
 
 namespace api.Services.Pdf
 {
@@ -10,6 +11,7 @@ namespace api.Services.Pdf
     {
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly Dictionary<PdfDocumentType, IPdfTemplate> _templateByDocumentType;
+        private readonly Dictionary<string, byte[]> _resolvedImageCache = new(StringComparer.OrdinalIgnoreCase);
 
         public PdfDocumentService(
             IHttpClientFactory httpClientFactory,
@@ -102,10 +104,44 @@ namespace api.Services.Pdf
 
             if (!string.IsNullOrWhiteSpace(url) && Uri.TryCreate(url, UriKind.Absolute, out var uri))
             {
+                var cacheKey = uri.AbsoluteUri;
+                if (_resolvedImageCache.TryGetValue(cacheKey, out var cached))
+                {
+                    return cached;
+                }
+
                 try
                 {
-                    var client = _httpClientFactory.CreateClient("pdf-assets");
-                    return await client.GetByteArrayAsync(uri, cancellationToken);
+                    if (TryBuildQuickChartPostRequest(uri, out var postUri, out var payload))
+                    {
+                        var bytes = await DownloadWithRetryAsync(async () =>
+                        {
+                            var httpClient = _httpClientFactory.CreateClient("pdf-assets");
+                            using var response = await httpClient.PostAsJsonAsync(postUri, payload, cancellationToken);
+                            response.EnsureSuccessStatusCode();
+                            return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+                        }, cancellationToken);
+
+                        if (bytes is not null && bytes.Length > 0)
+                        {
+                            _resolvedImageCache[cacheKey] = bytes;
+                        }
+
+                        return bytes;
+                    }
+
+                    var fallbackBytes = await DownloadWithRetryAsync(async () =>
+                    {
+                        var httpClientFallback = _httpClientFactory.CreateClient("pdf-assets");
+                        return await httpClientFallback.GetByteArrayAsync(uri, cancellationToken);
+                    }, cancellationToken);
+
+                    if (fallbackBytes is not null && fallbackBytes.Length > 0)
+                    {
+                        _resolvedImageCache[cacheKey] = fallbackBytes;
+                    }
+
+                    return fallbackBytes;
                 }
                 catch
                 {
@@ -114,6 +150,106 @@ namespace api.Services.Pdf
             }
 
             return null;
+        }
+
+        private static async Task<byte[]?> DownloadWithRetryAsync(Func<Task<byte[]>> download, CancellationToken cancellationToken)
+        {
+            const int maxAttempts = 3;
+
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    var bytes = await download();
+                    if (bytes.Length > 0)
+                    {
+                        return bytes;
+                    }
+                }
+                catch when (attempt < maxAttempts)
+                {
+                    // Retry transient download failures.
+                }
+            }
+
+            return null;
+        }
+
+        private static bool TryBuildQuickChartPostRequest(Uri uri, out Uri postUri, out object payload)
+        {
+            postUri = uri;
+            payload = new { };
+
+            if (!string.Equals(uri.Host, "quickchart.io", StringComparison.OrdinalIgnoreCase) ||
+                !uri.AbsolutePath.StartsWith("/chart", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var query = ParseQueryString(uri.Query);
+            if (!query.TryGetValue("c", out var chartConfig) || string.IsNullOrWhiteSpace(chartConfig))
+            {
+                return false;
+            }
+
+            var width = ReadIntQueryValue(query, "width", 500);
+            var height = ReadIntQueryValue(query, "height", 300);
+            var devicePixelRatio = ReadDoubleQueryValue(query, "devicePixelRatio", 2d);
+
+            query.TryGetValue("backgroundColor", out var backgroundColor);
+            query.TryGetValue("format", out var format);
+            query.TryGetValue("version", out var version);
+
+            postUri = new Uri($"{uri.Scheme}://{uri.Host}/chart");
+            payload = new
+            {
+                width,
+                height,
+                devicePixelRatio,
+                backgroundColor,
+                format = string.IsNullOrWhiteSpace(format) ? "png" : format,
+                version,
+                chart = chartConfig
+            };
+
+            return true;
+        }
+
+        private static Dictionary<string, string> ParseQueryString(string query)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                return result;
+            }
+
+            var trimmed = query.StartsWith("?") ? query[1..] : query;
+            foreach (var pair in trimmed.Split('&', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = pair.Split('=', 2);
+                var key = Uri.UnescapeDataString(parts[0]);
+                var value = parts.Length > 1 ? Uri.UnescapeDataString(parts[1]) : string.Empty;
+                result[key] = value;
+            }
+
+            return result;
+        }
+
+        private static int ReadIntQueryValue(IReadOnlyDictionary<string, string> query, string key, int defaultValue)
+        {
+            return query.TryGetValue(key, out var value) && int.TryParse(value, out var parsed)
+                ? parsed
+                : defaultValue;
+        }
+
+        private static double ReadDoubleQueryValue(IReadOnlyDictionary<string, string> query, string key, double defaultValue)
+        {
+            return query.TryGetValue(key, out var value) && double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
+                ? parsed
+                : defaultValue;
         }
 
         private async Task<List<PdfResolvedChartDto>> ResolveChartsAsync(IEnumerable<PdfChartDto> charts, CancellationToken cancellationToken)

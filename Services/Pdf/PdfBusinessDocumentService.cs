@@ -29,9 +29,9 @@ namespace api.Services.Pdf
         {
             var contract = await LoadContractOrThrowAsync(request.ContractId);
             var operations = await LoadOperationsAsync(request.ContractId);
-            var valuationCharts = await BuildSupportValuationChartsAsync(contract, cancellationToken);
+            var appendix = await BuildSupportPerformanceAppendixAsync(contract, cancellationToken);
 
-            var documentRequest = BuildContractSheetDocument(contract, operations, request.FileName, request.LogoBase64, request.LogoUrl, request.QrCodeContent, valuationCharts);
+            var documentRequest = BuildContractSheetDocument(contract, operations, request.FileName, request.LogoBase64, request.LogoUrl, request.QrCodeContent, appendix);
             return await _pdfDocumentService.GenerateAsync(documentRequest, cancellationToken);
         }
 
@@ -39,19 +39,19 @@ namespace api.Services.Pdf
         {
             var contract = await LoadContractOrThrowAsync(request.ContractId);
             var operations = await LoadOperationsAsync(request.ContractId);
-            var valuationCharts = await BuildSupportValuationChartsAsync(contract, cancellationToken);
+            var appendix = await BuildSupportPerformanceAppendixAsync(contract, cancellationToken);
             var generatedParts = new List<MergePdfPartDto>();
 
             if (request.IncludeContractSheet)
             {
-                var contractSheet = BuildContractSheetDocument(contract, operations, $"{request.FileName}-fiche-contrat", request.LogoBase64, request.LogoUrl, BuildContractQrContent(contract), valuationCharts);
+                var contractSheet = BuildContractSheetDocument(contract, operations, $"{request.FileName}-fiche-contrat", request.LogoBase64, request.LogoUrl, BuildContractQrContent(contract), appendix);
                 var contractFile = await _pdfDocumentService.GenerateAsync(contractSheet, cancellationToken);
                 generatedParts.Add(ToMergePart(contractFile, "fiche-contrat"));
             }
 
             if (request.IncludeSituationStatement)
             {
-                var statement = BuildSituationStatementDocument(contract, operations, $"{request.FileName}-releve-situation", request.LogoBase64, request.LogoUrl, valuationCharts);
+                var statement = BuildSituationStatementDocument(contract, operations, $"{request.FileName}-releve-situation", request.LogoBase64, request.LogoUrl, appendix);
                 var statementFile = await _pdfDocumentService.GenerateAsync(statement, cancellationToken);
                 generatedParts.Add(ToMergePart(statementFile, "releve-situation"));
             }
@@ -110,7 +110,7 @@ namespace api.Services.Pdf
             string? logoBase64,
             string? logoUrl,
             string? qrContent,
-            List<PdfChartDto> charts)
+            SupportPerformanceAppendix appendix)
         {
             var personName = BuildPersonName(contract.Person);
 
@@ -123,7 +123,7 @@ namespace api.Services.Pdf
                 Reference = contract.ExternalReference,
                 LogoBase64 = logoBase64,
                 LogoUrl = logoUrl,
-                Charts = charts,
+                Charts = appendix.Charts,
                 QrCodeContent = string.IsNullOrWhiteSpace(qrContent) ? BuildContractQrContent(contract) : qrContent,
                 Metadata =
                 {
@@ -154,7 +154,8 @@ namespace api.Services.Pdf
                 Tables =
                 {
                     BuildSupportsTable(contract),
-                    BuildRecentOperationsTable(operations, contract.Currency)
+                    BuildRecentOperationsTable(operations, contract.Currency),
+                    appendix.Table
                 }
             };
         }
@@ -165,7 +166,7 @@ namespace api.Services.Pdf
             string fileName,
             string? logoBase64,
             string? logoUrl,
-            List<PdfChartDto> charts)
+            SupportPerformanceAppendix appendix)
         {
             var executed = operations.Where(x => x.Status == OperationStatus.Executed).ToList();
             var pending = operations.Where(x => x.Status == OperationStatus.Pending).ToList();
@@ -178,7 +179,7 @@ namespace api.Services.Pdf
                 SubTitle = BuildPersonName(contract.Person),
                 LogoBase64 = logoBase64,
                 LogoUrl = logoUrl,
-                Charts = charts,
+                Charts = appendix.Charts,
                 Metadata =
                 {
                     new PdfMetadataItemDto { Key = "Valeur actuelle", Value = FormatMoney(contract.CurrentValue, contract.Currency) },
@@ -193,7 +194,8 @@ namespace api.Services.Pdf
                 },
                 Tables =
                 {
-                    BuildSupportsTable(contract)
+                    BuildSupportsTable(contract),
+                    appendix.Table
                 }
             };
         }
@@ -453,27 +455,25 @@ namespace api.Services.Pdf
                 .ThenBy(support => support.Support?.Label ?? string.Empty);
         }
 
-        private async Task<List<PdfChartDto>> BuildSupportValuationChartsAsync(Contract contract, CancellationToken cancellationToken)
+        private async Task<SupportPerformanceAppendix> BuildSupportPerformanceAppendixAsync(Contract contract, CancellationToken cancellationToken)
         {
             const int maxPoints = 52;
             var oneYearAgo = DateTime.UtcNow.Date.AddYears(-1);
 
-            var supports = contract.Supports
+            var compartmentById = contract.Compartments.ToDictionary(x => x.Id, x => x.Label);
+            var orderedSupports = OrderSupportsForDisplay(contract.Supports, compartmentById)
                 .GroupBy(x => x.SupportId)
-                .Select(group => group
-                    .OrderByDescending(x => x.CurrentAmount)
-                    .ThenByDescending(x => x.InvestedAmount)
-                    .First())
+                .Select(group => group.First())
                 .ToList();
 
-            if (supports.Count == 0)
+            if (orderedSupports.Count == 0)
             {
-                return new List<PdfChartDto>();
+                return new SupportPerformanceAppendix(BuildSupportPerformanceAppendixTable(Array.Empty<SupportPerformanceSnapshot>(), contract.Currency), new List<PdfChartDto>());
             }
 
-            var charts = new List<PdfChartDto>();
+            var snapshots = new List<SupportPerformanceSnapshot>();
 
-            foreach (var supportAllocation in supports)
+            foreach (var supportAllocation in orderedSupports)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -517,6 +517,7 @@ namespace api.Services.Pdf
                 }
 
                 var supportLabel = supportAllocation.Support?.Label;
+                var pocketLabel = ResolveCompartmentLabel(compartmentById, supportAllocation.CompartmentId);
 
                 var labels = sampled
                     .Select(x => x.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture))
@@ -594,14 +595,43 @@ namespace api.Services.Pdf
                 };
 
                 var chartConfig = JsonSerializer.Serialize(config);
-                charts.Add(new PdfChartDto
+                snapshots.Add(new SupportPerformanceSnapshot
                 {
-                    Title = $"{chartTitle} - Perf 1 an : {perfText}",
-                    Url = $"https://quickchart.io/chart?width=1200&height=420&devicePixelRatio=2&backgroundColor=%23111A2F&c={Uri.EscapeDataString(chartConfig)}"
+                    SupportLabel = chartTitle,
+                    PocketLabel = pocketLabel,
+                    StartValue = sampled.First().Value,
+                    EndValue = sampled.Last().Value,
+                    PerformanceText = perfText,
+                    Chart = new PdfChartDto
+                    {
+                        Title = $"{chartTitle} - {pocketLabel} - Perf 1 an : {perfText}",
+                        Url = $"https://quickchart.io/chart?width=1200&height=420&devicePixelRatio=2&backgroundColor=%23111A2F&c={Uri.EscapeDataString(chartConfig)}"
+                    }
                 });
             }
 
-            return charts;
+            return new SupportPerformanceAppendix(
+                BuildSupportPerformanceAppendixTable(snapshots, contract.Currency),
+                snapshots.Select(x => x.Chart).ToList());
+        }
+
+        private static PdfTableDto BuildSupportPerformanceAppendixTable(IReadOnlyCollection<SupportPerformanceSnapshot> snapshots, string currency)
+        {
+            return new PdfTableDto
+            {
+                Title = "Evolution de la performance des supports",
+                Headers = new List<string> { "Support", "Poche", "Valeur initiale", "Valeur actuelle", "Performance 1 an" },
+                Rows = snapshots
+                    .Select(snapshot => new List<string>
+                    {
+                        snapshot.SupportLabel,
+                        snapshot.PocketLabel,
+                        FormatMoney(snapshot.StartValue, currency),
+                        FormatMoney(snapshot.EndValue, currency),
+                        snapshot.PerformanceText
+                    })
+                    .ToList()
+            };
         }
 
         private static List<ValuationPoint> BuildFallbackPoints(FinancialSupportAllocation supportAllocation)
@@ -741,6 +771,18 @@ namespace api.Services.Pdf
         private static string FormatDate(DateTime date)
         {
             return date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+        }
+
+        private sealed record SupportPerformanceAppendix(PdfTableDto Table, List<PdfChartDto> Charts);
+
+        private sealed record SupportPerformanceSnapshot
+        {
+            public string SupportLabel { get; init; } = string.Empty;
+            public string PocketLabel { get; init; } = string.Empty;
+            public decimal StartValue { get; init; }
+            public decimal EndValue { get; init; }
+            public string PerformanceText { get; init; } = string.Empty;
+            public PdfChartDto Chart { get; init; } = new();
         }
     }
 }

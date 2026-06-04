@@ -103,28 +103,20 @@ namespace api.Services.Pdf.Templates
 
                 if (charts.Count > 0)
                 {
-                    column.Item().PaddingTop(8).Text("Évolution de la VL par support").Bold().FontSize(12);
+                    var firstLeftChart = charts[0];
+                    var firstRightChart = charts.Count > 1 ? charts[1] : null;
 
-                    for (var i = 0; i < charts.Count; i += 2)
+                    column.Item().PaddingTop(8).ShowEntire().Column(section =>
+                    {
+                        section.Item().Text("Graphiques correspondants").Bold().FontSize(12);
+                        section.Item().PaddingTop(6).Element(rowContainer => ComposeChartRow(rowContainer, firstLeftChart, firstRightChart));
+                    });
+
+                    for (var i = 2; i < charts.Count; i += 2)
                     {
                         var leftChart = charts[i];
                         var rightChart = i + 1 < charts.Count ? charts[i + 1] : null;
-
-                        column.Item().PaddingTop(6).EnsureSpace(170).Row(row =>
-                        {
-                            row.RelativeItem().PaddingRight(4).Element(cell => ComposeChartCell(cell, leftChart));
-                            row.RelativeItem().PaddingLeft(4).Element(cell =>
-                            {
-                                if (rightChart is null)
-                                {
-                                    cell.MinHeight(1);
-                                }
-                                else
-                                {
-                                    ComposeChartCell(cell, rightChart);
-                                }
-                            });
-                        });
+                        column.Item().PaddingTop(6).Element(rowContainer => ComposeChartRow(rowContainer, leftChart, rightChart));
                     }
                 }
                 else if (chartImage is not null)
@@ -137,7 +129,7 @@ namespace api.Services.Pdf.Templates
 
         private static void ComposeChartCell(IContainer container, PdfResolvedChartDto chart)
         {
-            container.Border(1).BorderColor(Colors.Grey.Lighten2).Padding(6).Column(chartColumn =>
+            container.ShowEntire().Border(1).BorderColor(Colors.Grey.Lighten2).Padding(6).Column(chartColumn =>
             {
                 if (!string.IsNullOrWhiteSpace(chart.Title))
                 {
@@ -145,6 +137,25 @@ namespace api.Services.Pdf.Templates
                 }
 
                 chartColumn.Item().PaddingTop(3).Image(chart.Content).FitWidth();
+            });
+        }
+
+        private static void ComposeChartRow(IContainer container, PdfResolvedChartDto leftChart, PdfResolvedChartDto? rightChart)
+        {
+            container.Row(row =>
+            {
+                row.RelativeItem().PaddingRight(4).Element(cell => ComposeChartCell(cell, leftChart));
+                row.RelativeItem().PaddingLeft(4).Element(cell =>
+                {
+                    if (rightChart is null)
+                    {
+                        cell.MinHeight(1);
+                    }
+                    else
+                    {
+                        ComposeChartCell(cell, rightChart);
+                    }
+                });
             });
         }
 

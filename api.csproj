@@ -44,6 +44,13 @@
     <None Remove="api.Tests\**\*" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Remove="publish\**" />
+    <None Remove="publish\**" />
+    <Content Remove="bin\**\publish\**" />
+    <None Remove="bin\**\publish\**" />
+  </ItemGroup>
+
   <Target Name="RemoveApiTestsFromPublish" AfterTargets="Publish">
     <RemoveDir Directories="$(PublishDir)api.Tests" />
   </Target>
