@@ -1,5 +1,13 @@
 namespace api.Models.Enum
 {
+    public enum ManagementFeeRateBase
+    {
+        Annual,
+        SemiAnnual,
+        Quarterly,
+        Monthly
+    }
+
     public enum ManagementFeeFrequency
     {
         Monthly,
@@ -10,7 +18,8 @@ namespace api.Models.Enum
     public enum ManagementFeeProrataMethod
     {
         Periodic,
-        Actual365
+        Actual365,
+        ExactPeriodicCompounded
     }
 
     public enum ManagementFeePostingMode

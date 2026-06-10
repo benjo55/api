@@ -110,14 +110,16 @@ namespace api.Repository
             return entity.Adapt<FinancialSupportDto>();
         }
 
-        public async Task<List<FinancialSupportDto>> TypeaheadAsync(string search)
+        public async Task<List<FinancialSupportDto>> TypeaheadAsync(string search, int limit = 50)
         {
+            var safeLimit = Math.Clamp(limit, 1, 200);
+
             return await _context.FinancialSupports
                 .Where(s => s.ISIN.Contains(search)
                     || s.Label.Contains(search)
                     || s.Code.Contains(search))
                 .OrderBy(s => s.Label)
-                .Take(10) // limite pour le typeahead
+                .Take(safeLimit)
                 .Select(s => s.Adapt<FinancialSupportDto>())
                 .ToListAsync();
         }

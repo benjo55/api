@@ -92,6 +92,7 @@ namespace api.Models
         public ICollection<FinancialSupportAllocation> Supports { get; set; } = new List<FinancialSupportAllocation>();
 
         public ICollection<ContractOption> Options { get; set; } = new List<ContractOption>();
+        public ICollection<FeePolicy> FeePolicies { get; set; } = new List<FeePolicy>();
 
         public ICollection<Operation> Operations { get; set; } = new List<Operation>();
         public ICollection<ContractSupportHolding> ContractSupportHoldings { get; set; } = new List<ContractSupportHolding>();

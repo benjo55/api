@@ -14,6 +14,6 @@ namespace api.Interfaces
         Task<bool> AnyByIsinAsync(string isin);
         Task<FinancialSupportDto?> UpdateAsync(int id, UpdateFinancialSupportRequestDto updateDto);
         Task<FinancialSupportDto?> DeleteAsync(int id);
-        Task<List<FinancialSupportDto>> TypeaheadAsync(string search);
+        Task<List<FinancialSupportDto>> TypeaheadAsync(string search, int limit = 50);
     }
 }

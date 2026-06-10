@@ -21,8 +21,9 @@ namespace api.Services
         private readonly EodSettings _eodSettings;
         private readonly IOperationApplier _operationApplier;
         private readonly IManagementFeePolicyResolver _managementFeePolicyResolver;
+        private readonly IOperationFeePolicyResolver _operationFeePolicyResolver;
 
-        public OperationEngineService(ApplicationDBContext context, ILogger<OperationEngineService> logger, IContractSupportHoldingRepository holdingRepo, IContractValuationService valuationService, IOptions<EodSettings> eodSettings, IEodDataProvider eodDataProvider, IDbContextFactory<ApplicationDBContext> dbContextFactory, IOperationApplier operationApplier, IManagementFeePolicyResolver managementFeePolicyResolver)
+        public OperationEngineService(ApplicationDBContext context, ILogger<OperationEngineService> logger, IContractSupportHoldingRepository holdingRepo, IContractValuationService valuationService, IOptions<EodSettings> eodSettings, IEodDataProvider eodDataProvider, IDbContextFactory<ApplicationDBContext> dbContextFactory, IOperationApplier operationApplier, IManagementFeePolicyResolver managementFeePolicyResolver, IOperationFeePolicyResolver operationFeePolicyResolver)
         {
             _context = context;
             _logger = logger;
@@ -33,6 +34,7 @@ namespace api.Services
             _eodSettings = eodSettings.Value;
             _operationApplier = operationApplier;
             _managementFeePolicyResolver = managementFeePolicyResolver;
+            _operationFeePolicyResolver = operationFeePolicyResolver;
         }
 
         // 1️⃣ Maj quotidienne des VL
@@ -337,6 +339,107 @@ namespace api.Services
                         f.alloc.Shares = f.shares;
                         f.alloc.EstimatedNav = null;
                         f.alloc.EstimatedShares = null;
+                    }
+
+                    // ✅ Frais d'opération : résolution & application (par support/poche)
+                    var feeGroups = finalized
+                        .Select(f => (SupportId: f.alloc.SupportId, CompartmentId: f.alloc.CompartmentId))
+                        .Distinct()
+                        .ToList();
+
+                    var contract = await _context.Contracts
+                        .Include(c => c.Product)
+                        .FirstOrDefaultAsync(c => c.Id == op.ContractId);
+
+                    if (contract == null)
+                    {
+                        _logger.LogWarning("⚠️ Contrat introuvable pour opération {OpId} contractId={ContractId}", op.Id, op.ContractId);
+                        await transaction.RollbackAsync();
+                        continue;
+                    }
+
+                    foreach (var g in feeGroups)
+                    {
+                        var supportId = g.SupportId;
+                        var compartmentId = g.CompartmentId;
+
+                        var found = finalized.FirstOrDefault(x => x.alloc.SupportId == supportId);
+                        var support = found.alloc?.Support;
+
+                        var resolvedFees = _operationFeePolicyResolver.ResolveOperationFees(contract, support, op.Type, op.OperationDate);
+                        if (resolvedFees == null || !resolvedFees.Any())
+                            continue;
+
+                        foreach (var rf in resolvedFees)
+                        {
+                            decimal baseAmount = 0m;
+                            if (rf.ApplyOn == api.Models.Enum.FeeApplyOn.Source)
+                            {
+                                baseAmount = finalized
+                                    .Where(x => x.alloc.Flow == OperationFlow.Source && x.alloc.SupportId == supportId && x.alloc.CompartmentId == compartmentId)
+                                    .Sum(x => x.alloc.Amount ?? 0m);
+                            }
+                            else
+                            {
+                                baseAmount = finalized
+                                    .Where(x => x.alloc.Flow == OperationFlow.Target && x.alloc.SupportId == supportId && x.alloc.CompartmentId == compartmentId)
+                                    .Sum(x => x.alloc.Amount ?? 0m);
+                            }
+
+                            if (baseAmount <= 0m)
+                                continue;
+
+                            var feeAmount = rf.Mode == api.Models.Enum.FeeAmountMode.Percentage
+                                ? NumericPolicy.RoundMoney(baseAmount * rf.Rate / 100m)
+                                : rf.FixedAmount;
+
+                            if (feeAmount <= 0m)
+                                continue;
+
+                            var currentHolding = await _context.ContractSupportHoldings
+                                .AsNoTracking()
+                                .FirstOrDefaultAsync(h => h.ContractId == contract.Id && h.SupportId == supportId && h.CompartmentId == compartmentId);
+
+                            if (currentHolding == null || currentHolding.TotalShares <= 0m)
+                                continue;
+
+                            var postingNav = await GetPostingNavAsync(support, supportId, op.OperationDate.AddDays(-1));
+                            if (postingNav <= 0m)
+                                continue;
+
+                            var sharesToRemove = Math.Min(currentHolding.TotalShares, NumericPolicy.RoundShares(feeAmount / postingNav));
+                            if (sharesToRemove <= 0m)
+                                continue;
+
+                            var feeOperation = new Operation
+                            {
+                                ContractId = contract.Id,
+                                Type = OperationType.OperationFee,
+                                OperationDate = op.OperationDate,
+                                ExecutionDate = op.OperationDate,
+                                Status = OperationStatus.Executed,
+                                Amount = feeAmount,
+                                Currency = contract.Currency,
+                                Allocations = new List<OperationSupportAllocation>
+                                {
+                                    new OperationSupportAllocation
+                                    {
+                                        SupportId = supportId,
+                                        Amount = feeAmount,
+                                        Shares = sharesToRemove,
+                                        NavAtOperation = postingNav,
+                                        NavDateAtOperation = op.OperationDate.AddDays(-1),
+                                        CompartmentId = compartmentId
+                                    }
+                                },
+                                CreatedDate = DateTime.UtcNow,
+                                UpdatedDate = DateTime.UtcNow,
+                            };
+
+                            await _context.Operations.AddAsync(feeOperation);
+                            await _operationApplier.ApplyAsync(feeOperation, _context);
+                            await _context.SaveChangesAsync();
+                        }
                     }
 
                     op.Status = OperationStatus.Executed;
@@ -741,13 +844,23 @@ namespace api.Services
                 return annualRate / 365m;
             }
 
-            var periodRate = policy.Frequency switch
+            var periodsPerYear = policy.Frequency switch
             {
-                ManagementFeeFrequency.Monthly => annualRate / 12m,
-                ManagementFeeFrequency.Quarterly => annualRate / 4m,
-                ManagementFeeFrequency.Yearly => annualRate,
-                _ => 0m,
+                ManagementFeeFrequency.Monthly => 12,
+                ManagementFeeFrequency.Quarterly => 4,
+                ManagementFeeFrequency.Yearly => 1,
+                _ => 1,
             };
+
+            var periodRate = policy.ProrataMethod == ManagementFeeProrataMethod.ExactPeriodicCompounded
+                ? (decimal)(Math.Pow(1d + (double)annualRate, 1d / periodsPerYear) - 1d)
+                : policy.Frequency switch
+                {
+                    ManagementFeeFrequency.Monthly => annualRate / 12m,
+                    ManagementFeeFrequency.Quarterly => annualRate / 4m,
+                    ManagementFeeFrequency.Yearly => annualRate,
+                    _ => 0m,
+                };
 
             var (periodStart, periodEnd) = GetPeriodBounds(policy.Frequency, accrualDateUtc.Date);
             var periodDays = (periodEnd - periodStart).Days + 1;

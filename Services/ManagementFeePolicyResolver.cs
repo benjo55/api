@@ -6,8 +6,29 @@ namespace api.Services
 {
     public class ManagementFeePolicyResolver : IManagementFeePolicyResolver
     {
+        private readonly IFeeEngine _feeEngine;
+
+        public ManagementFeePolicyResolver(IFeeEngine feeEngine)
+        {
+            _feeEngine = feeEngine;
+        }
+
         public ResolvedManagementFeePolicy? Resolve(Contract contract, FinancialSupport support, DateTime asOfDateUtc)
         {
+            var resolvedByEngine = _feeEngine.ResolveManagementFee(new ManagementFeeResolutionRequest
+            {
+                ContractId = contract.Id,
+                ProductId = contract.ProductId,
+                FinancialSupportId = support.Id,
+                SupportType = support.SupportType,
+                AsOfDateUtc = asOfDateUtc
+            });
+
+            if (resolvedByEngine != null)
+            {
+                return resolvedByEngine;
+            }
+
             if (support.ContractManagementFeeOverrideEnabled &&
                 support.ContractManagementFeeOverrideRate is decimal supportRate &&
                 supportRate > 0m)
@@ -20,6 +41,7 @@ namespace api.Services
                     return new ResolvedManagementFeePolicy
                     {
                         AnnualRate = supportRate,
+                        RateBase = ManagementFeeRateBase.Annual,
                         Frequency = support.ContractManagementFeeOverrideFrequency ?? ManagementFeeFrequency.Monthly,
                         ProrataMethod = support.ContractManagementFeeOverrideProrataMethod ?? ManagementFeeProrataMethod.Periodic,
                         PostingMode = support.ContractManagementFeeOverridePostingMode
@@ -41,6 +63,7 @@ namespace api.Services
                 return new ResolvedManagementFeePolicy
                 {
                     AnnualRate = productPolicy.AnnualRate,
+                    RateBase = ManagementFeeRateBase.Annual,
                     Frequency = productPolicy.Frequency,
                     ProrataMethod = productPolicy.ProrataMethod,
                     PostingMode = productPolicy.PostingMode,
@@ -55,6 +78,7 @@ namespace api.Services
                 return new ResolvedManagementFeePolicy
                 {
                     AnnualRate = legacyRate,
+                    RateBase = ManagementFeeRateBase.Annual,
                     Frequency = ManagementFeeFrequency.Monthly,
                     ProrataMethod = ManagementFeeProrataMethod.Periodic,
                     PostingMode = ManagementFeePostingMode.UnitCancellation,

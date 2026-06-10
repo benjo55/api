@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using api.Data;
 
@@ -11,9 +12,11 @@ using api.Data;
 namespace api.Migrations
 {
     [DbContext(typeof(ApplicationDBContext))]
-    partial class ApplicationDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260609142850_AddFeePolicy")]
+    partial class AddFeePolicy
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1113,9 +1116,6 @@ namespace api.Migrations
                     b.Property<decimal>("Rate")
                         .HasPrecision(18, 5)
                         .HasColumnType("decimal(18,5)");
-
-                    b.Property<int?>("RateBase")
-                        .HasColumnType("int");
 
                     b.Property<int>("Scope")
                         .HasColumnType("int");
@@ -4229,7 +4229,7 @@ namespace api.Migrations
                     b.HasOne("api.Models.Contract", "Contract")
                         .WithMany("FeePolicies")
                         .HasForeignKey("ContractId")
-                        .OnDelete(DeleteBehavior.NoAction);
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("api.Models.FinancialSupport", "FinancialSupport")
                         .WithMany()

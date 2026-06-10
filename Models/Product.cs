@@ -32,6 +32,7 @@ namespace api.Models
         public TaxProfile? TaxProfile { get; set; }
 
         public ProductManagementFeePolicy? ManagementFeePolicy { get; set; }
+        public ICollection<FeePolicy> FeePolicies { get; set; } = new List<FeePolicy>();
 
         public List<ProductFeature> Features { get; set; } = [];
         public List<ProductTaxOverride> TaxOverrides { get; set; } = [];

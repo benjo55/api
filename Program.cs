@@ -2,6 +2,7 @@ using api.Extensions;
 using api.Middleware;
 using Mapster;
 using System.Reflection;
+using System.Linq;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -46,12 +47,25 @@ app.Use(async (context, next) =>
     if (isProcessPending)
     {
         var hasAuthorizationHeader = context.Request.Headers.ContainsKey("Authorization");
+
+        string tokenPreview = null;
+        if (hasAuthorizationHeader)
+        {
+            var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                var tk = authHeader.Substring("Bearer ".Length).Trim();
+                tokenPreview = tk.Length > 8 ? tk.Substring(0, 8) + "..." : tk;
+            }
+        }
+
         logger.LogInformation(
-            "➡️ Requête {Method} {Path} | AuthHeader={HasAuthHeader} | IsAuthenticated={IsAuthenticated}",
+            "➡️ Requête {Method} {Path} | AuthHeader={HasAuthHeader} | IsAuthenticated={IsAuthenticated} | TokenPreview={TokenPreview}",
             context.Request.Method,
             path,
             hasAuthorizationHeader,
-            context.User?.Identity?.IsAuthenticated ?? false);
+            context.User?.Identity?.IsAuthenticated ?? false,
+            tokenPreview);
     }
 
     await next();

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using api.Data;
 
@@ -11,9 +12,11 @@ using api.Data;
 namespace api.Migrations
 {
     [DbContext(typeof(ApplicationDBContext))]
-    partial class ApplicationDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260604150121_AddProductOperationFeePolicy")]
+    partial class AddProductOperationFeePolicy
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1037,110 +1040,6 @@ namespace api.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("EntityHistories", (string)null);
-                });
-
-            modelBuilder.Entity("api.Models.FeePolicy", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("AmountMode")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ApplyOn")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Category")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("CompartmentId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("ContractId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("EffectiveDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("EndDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("FeeType")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("FinancialSupportId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("FixedAmount")
-                        .HasPrecision(18, 5)
-                        .HasColumnType("decimal(18,5)");
-
-                    b.Property<int?>("Frequency")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsOverride")
-                        .HasColumnType("bit");
-
-                    b.Property<decimal?>("MaxAmount")
-                        .HasPrecision(18, 5)
-                        .HasColumnType("decimal(18,5)");
-
-                    b.Property<decimal?>("MinAmount")
-                        .HasPrecision(18, 5)
-                        .HasColumnType("decimal(18,5)");
-
-                    b.Property<int?>("PostingMode")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Priority")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("ProductId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("ProrataMethod")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("Rate")
-                        .HasPrecision(18, 5)
-                        .HasColumnType("decimal(18,5)");
-
-                    b.Property<int?>("RateBase")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Scope")
-                        .HasColumnType("int");
-
-                    b.Property<string>("SupportType")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<DateTime>("UpdatedDate")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompartmentId");
-
-                    b.HasIndex("ContractId");
-
-                    b.HasIndex("FinancialSupportId");
-
-                    b.HasIndex("ProductId");
-
-                    b.HasIndex("Category", "FeeType", "Scope", "ProductId", "ContractId", "CompartmentId", "FinancialSupportId", "Priority")
-                        .HasDatabaseName("IX_FeePolicies_Resolution");
-
-                    b.ToTable("FeePolicies", (string)null);
                 });
 
             modelBuilder.Entity("api.Models.FieldDescription", b =>
@@ -4219,37 +4118,6 @@ namespace api.Migrations
                     b.Navigation("FinancialSupport");
                 });
 
-            modelBuilder.Entity("api.Models.FeePolicy", b =>
-                {
-                    b.HasOne("api.Models.Compartment", "Compartment")
-                        .WithMany()
-                        .HasForeignKey("CompartmentId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("api.Models.Contract", "Contract")
-                        .WithMany("FeePolicies")
-                        .HasForeignKey("ContractId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
-                    b.HasOne("api.Models.FinancialSupport", "FinancialSupport")
-                        .WithMany()
-                        .HasForeignKey("FinancialSupportId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("api.Models.Product", "Product")
-                        .WithMany("FeePolicies")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
-                    b.Navigation("Compartment");
-
-                    b.Navigation("Contract");
-
-                    b.Navigation("FinancialSupport");
-
-                    b.Navigation("Product");
-                });
-
             modelBuilder.Entity("api.Models.FinancialSupportAllocation", b =>
                 {
                     b.HasOne("api.Models.Compartment", "Compartment")
@@ -4795,8 +4663,6 @@ namespace api.Migrations
 
                     b.Navigation("Documents");
 
-                    b.Navigation("FeePolicies");
-
                     b.Navigation("InsuredLinks");
 
                     b.Navigation("Operations");
@@ -4862,8 +4728,6 @@ namespace api.Migrations
             modelBuilder.Entity("api.Models.Product", b =>
                 {
                     b.Navigation("Features");
-
-                    b.Navigation("FeePolicies");
 
                     b.Navigation("ManagementFeePolicy");
 

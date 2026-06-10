@@ -25,6 +25,8 @@ namespace api.Data
         public DbSet<ProductFeature> ProductFeatures { get; set; }
         public DbSet<ProductTaxOverride> ProductTaxOverrides { get; set; }
         public DbSet<ProductManagementFeePolicy> ProductManagementFeePolicies { get; set; }
+        public DbSet<ProductOperationFeePolicy> ProductOperationFeePolicies { get; set; }
+        public DbSet<FeePolicy> FeePolicies { get; set; }
         public DbSet<ContractManagementFeeAccrual> ContractManagementFeeAccruals { get; set; }
         public DbSet<Brand> Brands { get; set; }
         public DbSet<User> Users { get; set; }
@@ -106,6 +108,7 @@ namespace api.Data
             modelBuilder.Entity<ProductFeature>().ToTable("ProductFeatures");
             modelBuilder.Entity<ProductTaxOverride>().ToTable("ProductTaxOverrides");
             modelBuilder.Entity<ProductManagementFeePolicy>().ToTable("ProductManagementFeePolicies");
+            modelBuilder.Entity<FeePolicy>().ToTable("FeePolicies");
             modelBuilder.Entity<ContractManagementFeeAccrual>().ToTable("ContractManagementFeeAccruals");
             modelBuilder.Entity<Brand>().ToTable("Brands");
             modelBuilder.Entity<User>().ToTable("Users");
@@ -132,6 +135,60 @@ namespace api.Data
                     .IsUnique();
 
                 entity.Property(p => p.AnnualRate).HasPrecision(18, 5);
+            });
+
+            modelBuilder.Entity<ProductOperationFeePolicy>(entity =>
+            {
+                entity.HasOne(p => p.Product)
+                    .WithMany()
+                    .HasForeignKey(p => p.ProductId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(p => new { p.ProductId, p.FeeType, p.ApplyOn })
+                    .IsUnique();
+
+                entity.Property(p => p.Rate).HasPrecision(18, 5);
+                entity.Property(p => p.FixedAmount).HasPrecision(18, 5);
+            });
+
+            modelBuilder.Entity<FeePolicy>(entity =>
+            {
+                entity.Property(p => p.Rate).HasPrecision(18, 5);
+                entity.Property(p => p.FixedAmount).HasPrecision(18, 5);
+                entity.Property(p => p.MinAmount).HasPrecision(18, 5);
+                entity.Property(p => p.MaxAmount).HasPrecision(18, 5);
+
+                entity.HasOne(p => p.Product)
+                    .WithMany(p => p.FeePolicies)
+                    .HasForeignKey(p => p.ProductId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(p => p.Contract)
+                    .WithMany(c => c.FeePolicies)
+                    .HasForeignKey(p => p.ContractId)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                entity.HasOne(p => p.Compartment)
+                    .WithMany()
+                    .HasForeignKey(p => p.CompartmentId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(p => p.FinancialSupport)
+                    .WithMany()
+                    .HasForeignKey(p => p.FinancialSupportId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(p => new
+                {
+                    p.Category,
+                    p.FeeType,
+                    p.Scope,
+                    p.ProductId,
+                    p.ContractId,
+                    p.CompartmentId,
+                    p.FinancialSupportId,
+                    p.Priority
+                }).HasDatabaseName("IX_FeePolicies_Resolution");
             });
 
             modelBuilder.Entity<ProductType>(entity =>

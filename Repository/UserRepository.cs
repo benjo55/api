@@ -52,7 +52,10 @@ namespace api.Repository
             await _context.Users.Include(u => u.UserRoles).ThenInclude(ur => ur.Role).FirstOrDefaultAsync(u => u.Id == id);
 
         public async Task<User?> GetByUsernameAsync(string username) =>
-            await _context.Users.Include(u => u.UserRoles).FirstOrDefaultAsync(u => u.Username == username);
+            await _context.Users
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.Username == username);
 
         public async Task<User> CreateAsync(User user)
         {

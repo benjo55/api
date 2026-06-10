@@ -97,6 +97,8 @@ namespace api.Extensions
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
                 {
+                    options.MapInboundClaims = false;
+
                     options.TokenValidationParameters = new TokenValidationParameters
                     {
                         ValidateIssuer = true,
@@ -219,7 +221,9 @@ namespace api.Extensions
             services.AddHttpClient<IEodDataProvider, EodDataProvider>();
             services.AddHttpClient<ITwelveDataProvider, TwelveDataProvider>();
             services.AddScoped<IContractValuationService, ContractValuationService>();
+            services.AddScoped<IFeeEngine, FeeEngine>();
             services.AddScoped<IManagementFeePolicyResolver, ManagementFeePolicyResolver>();
+            services.AddScoped<IOperationFeePolicyResolver, OperationFeePolicyResolver>();
             services.AddScoped<RuleFactory>();
             services.AddScoped<BusinessRuleValidator>();
             services.AddScoped<IOperationEngineService, OperationEngineService>();

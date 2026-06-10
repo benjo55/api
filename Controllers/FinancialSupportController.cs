@@ -205,13 +205,15 @@ namespace api.Controllers
 
         // Ajoute ceci dans ta classe controller
         [HttpGet("typeahead")]
-        public async Task<IActionResult> Typeahead([FromQuery] string search)
+        public async Task<IActionResult> Typeahead([FromQuery] string search, [FromQuery] int? limit)
         {
             if (string.IsNullOrWhiteSpace(search) || search.Length < 2)
                 return Ok(new List<object>()); // évite les requêtes inutiles
 
+            var safeLimit = Math.Clamp(limit ?? 100, 1, 200);
+
             // Recherche sur ISIN, Label ou Code (ajuste selon ton modèle)
-            var results = await _financialSupportRepository.TypeaheadAsync(search ?? "");
+            var results = await _financialSupportRepository.TypeaheadAsync(search ?? "", safeLimit);
 
             // On retourne uniquement les champs utiles pour le typeahead
             return Ok(new { items = results });
