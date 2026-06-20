@@ -40,8 +40,13 @@ namespace api.Repository
                     .ToListAsync(cancellationToken);
 
             if (!allocations.Any())
+            {
+                if (CanIgnoreAllocations(operation.Type))
+                    return;
+
                 throw new InvalidOperationException(
                     $"Aucune allocation pour opération {operation.Id}");
+            }
 
             switch (operation.Type)
             {
@@ -69,6 +74,18 @@ namespace api.Repository
                 default:
                     return;
             }
+        }
+
+        private static bool CanIgnoreAllocations(OperationType operationType)
+        {
+            return operationType is
+                OperationType.Advance or
+                OperationType.AdvanceRepayment or
+                OperationType.Succession or
+                OperationType.Donation or
+                OperationType.BeneficiaryChange or
+                OperationType.Pledge or
+                OperationType.ConversionToAnnuity;
         }
 
         // ============================================================
@@ -132,18 +149,20 @@ namespace api.Repository
                     throw new InvalidOperationException(
                         $"Rachat invalide (shares={shares}, amount={amount})");
 
-                var fsa = await context.Set<FinancialSupportAllocation>()
-                    .SingleOrDefaultAsync(f =>
-                        f.ContractId == operation.ContractId &&
-                        f.SupportId == alloc.SupportId &&
-                        f.CompartmentId == alloc.CompartmentId, ct)
+                var fsa = await FindFsaAsync(
+                        operation.ContractId,
+                        alloc.SupportId,
+                        alloc.CompartmentId,
+                        context,
+                        ct)
                     ?? throw new InvalidOperationException("FSA introuvable");
 
-                var holding = await context.Set<ContractSupportHolding>()
-                    .SingleOrDefaultAsync(h =>
-                        h.ContractId == operation.ContractId &&
-                        h.SupportId == alloc.SupportId &&
-                        h.CompartmentId == alloc.CompartmentId, ct)
+                var holding = await FindHoldingAsync(
+                        operation.ContractId,
+                        alloc.SupportId,
+                        alloc.CompartmentId,
+                        context,
+                        ct)
                     ?? throw new InvalidOperationException("Holding introuvable");
 
                 if (shares > holding.TotalShares)
@@ -199,18 +218,20 @@ namespace api.Repository
                     throw new InvalidOperationException(
                         $"Frais invalides (shares={shares}, amount={amount})");
 
-                var fsa = await context.Set<FinancialSupportAllocation>()
-                    .SingleOrDefaultAsync(f =>
-                        f.ContractId == operation.ContractId &&
-                        f.SupportId == alloc.SupportId &&
-                        f.CompartmentId == alloc.CompartmentId, ct)
+                var fsa = await FindFsaAsync(
+                        operation.ContractId,
+                        alloc.SupportId,
+                        alloc.CompartmentId,
+                        context,
+                        ct)
                     ?? throw new InvalidOperationException("FSA introuvable");
 
-                var holding = await context.Set<ContractSupportHolding>()
-                    .SingleOrDefaultAsync(h =>
-                        h.ContractId == operation.ContractId &&
-                        h.SupportId == alloc.SupportId &&
-                        h.CompartmentId == alloc.CompartmentId, ct)
+                var holding = await FindHoldingAsync(
+                        operation.ContractId,
+                        alloc.SupportId,
+                        alloc.CompartmentId,
+                        context,
+                        ct)
                     ?? throw new InvalidOperationException("Holding introuvable");
 
                 if (shares > holding.TotalShares)
@@ -248,6 +269,12 @@ namespace api.Repository
             if (!sources.Any() || !targets.Any())
                 throw new InvalidOperationException("Arbitrage invalide : sources ou targets manquants.");
 
+            var totalTargetAmount = targets.Sum(a => a.Amount ?? 0m);
+            if (totalTargetAmount <= 0m)
+                throw new InvalidOperationException("Arbitrage TARGET invalide : montant total nul.");
+
+            decimal totalInvestedToTransfer = 0m;
+
             // ============================================================
             // 🔻 1. VENTES (SOURCE)
             // ============================================================
@@ -263,22 +290,33 @@ namespace api.Repository
                 if (shares <= 0 || amount <= 0)
                     throw new InvalidOperationException("Arbitrage SOURCE invalide");
 
-                var fsa = await context.Set<FinancialSupportAllocation>()
-                    .SingleOrDefaultAsync(f =>
-                        f.ContractId == operation.ContractId &&
-                        f.SupportId == alloc.SupportId &&
-                        f.CompartmentId == alloc.CompartmentId, ct)
+                var fsa = await FindFsaAsync(
+                        operation.ContractId,
+                        alloc.SupportId,
+                        alloc.CompartmentId,
+                        context,
+                        ct)
                     ?? throw new InvalidOperationException("FSA source introuvable");
 
-                var holding = await context.Set<ContractSupportHolding>()
-                    .SingleOrDefaultAsync(h =>
-                        h.ContractId == operation.ContractId &&
-                        h.SupportId == alloc.SupportId &&
-                        h.CompartmentId == alloc.CompartmentId, ct)
+                var holding = await FindHoldingAsync(
+                        operation.ContractId,
+                        alloc.SupportId,
+                        alloc.CompartmentId,
+                        context,
+                        ct)
                     ?? throw new InvalidOperationException("Holding source introuvable");
 
                 if (shares > holding.TotalShares)
                     throw new InvalidOperationException("Arbitrage > parts détenues");
+
+                var investedBefore = holding.TotalInvested;
+                var sharesBefore = holding.TotalShares;
+
+                var investedReduction = sharesBefore > 0m
+                    ? Math.Round(investedBefore * (shares / sharesBefore), 2)
+                    : 0m;
+
+                investedReduction = Math.Min(investedReduction, investedBefore);
 
                 // Si on vend la totalité (ou quasi-totalité après snap moteur), liquidation propre
                 if (shares >= holding.TotalShares)
@@ -288,17 +326,18 @@ namespace api.Repository
                     holding.TotalShares = 0m;
                     holding.TotalInvested = 0m;
                     holding.Pru = 0m;
+
+                    totalInvestedToTransfer += investedBefore;
                 }
                 else
                 {
-                    // 🔥 même logique que withdrawal
-                    var investedReduction = amount;
-
                     fsa.CurrentShares -= shares;
                     fsa.InvestedAmount = Math.Max(0m, fsa.InvestedAmount - investedReduction);
 
                     holding.TotalShares -= shares;
                     holding.TotalInvested = Math.Max(0m, holding.TotalInvested - investedReduction);
+
+                    totalInvestedToTransfer += investedReduction;
                 }
             }
 
@@ -306,8 +345,11 @@ namespace api.Repository
             // 🔺 2. ACHATS (TARGET)
             // ============================================================
 
-            foreach (var alloc in targets)
+            decimal distributedInvested = 0m;
+
+            for (var i = 0; i < targets.Count; i++)
             {
+                var alloc = targets[i];
                 if (alloc.CompartmentId == null)
                     throw new InvalidOperationException("CompartmentId manquant");
 
@@ -317,14 +359,23 @@ namespace api.Repository
                 if (shares <= 0 || amount <= 0)
                     throw new InvalidOperationException("Arbitrage TARGET invalide");
 
+                var investedAmount = i == targets.Count - 1
+                    ? Math.Round(totalInvestedToTransfer - distributedInvested, 2)
+                    : Math.Round(totalInvestedToTransfer * (amount / totalTargetAmount), 2);
+
+                if (investedAmount < 0m)
+                    investedAmount = 0m;
+
+                distributedInvested += investedAmount;
+
                 var fsa = await GetOrCreateFsaAsync(operation, alloc, context, ct);
                 var holding = await GetOrCreateHoldingAsync(operation, alloc, context, ct);
 
                 fsa.CurrentShares += shares;
-                fsa.InvestedAmount += amount;
+                fsa.InvestedAmount += investedAmount;
 
                 holding.TotalShares += shares;
-                holding.TotalInvested += amount;
+                holding.TotalInvested += investedAmount;
 
                 // 🔥 recalcul PRU comme payment
                 holding.Pru = holding.TotalShares > 0
@@ -339,11 +390,12 @@ namespace api.Repository
             DbContext context,
             CancellationToken ct)
         {
-            var fsa = await context.Set<FinancialSupportAllocation>()
-                .SingleOrDefaultAsync(f =>
-                    f.ContractId == operation.ContractId &&
-                    f.SupportId == alloc.SupportId &&
-                    f.CompartmentId == alloc.CompartmentId, ct);
+            var fsa = await FindFsaAsync(
+                operation.ContractId,
+                alloc.SupportId,
+                alloc.CompartmentId,
+                context,
+                ct);
 
             if (fsa != null)
                 return fsa;
@@ -367,11 +419,12 @@ namespace api.Repository
             DbContext context,
             CancellationToken ct)
         {
-            var holding = await context.Set<ContractSupportHolding>()
-                .SingleOrDefaultAsync(h =>
-                    h.ContractId == operation.ContractId &&
-                    h.SupportId == alloc.SupportId &&
-                    h.CompartmentId == alloc.CompartmentId, ct);
+            var holding = await FindHoldingAsync(
+                operation.ContractId,
+                alloc.SupportId,
+                alloc.CompartmentId,
+                context,
+                ct);
 
             if (holding != null)
                 return holding;
@@ -388,6 +441,52 @@ namespace api.Repository
 
             context.Set<ContractSupportHolding>().Add(holding);
             return holding;
+        }
+
+        private static Task<FinancialSupportAllocation?> FindFsaAsync(
+            int contractId,
+            int supportId,
+            int? compartmentId,
+            DbContext context,
+            CancellationToken ct)
+        {
+            var tracked = context.Set<FinancialSupportAllocation>().Local
+                .FirstOrDefault(f =>
+                    f.ContractId == contractId &&
+                    f.SupportId == supportId &&
+                    f.CompartmentId == compartmentId);
+
+            if (tracked != null)
+                return Task.FromResult<FinancialSupportAllocation?>(tracked);
+
+            return context.Set<FinancialSupportAllocation>()
+                .SingleOrDefaultAsync(f =>
+                    f.ContractId == contractId &&
+                    f.SupportId == supportId &&
+                    f.CompartmentId == compartmentId, ct);
+        }
+
+        private static Task<ContractSupportHolding?> FindHoldingAsync(
+            int contractId,
+            int supportId,
+            int? compartmentId,
+            DbContext context,
+            CancellationToken ct)
+        {
+            var tracked = context.Set<ContractSupportHolding>().Local
+                .FirstOrDefault(h =>
+                    h.ContractId == contractId &&
+                    h.SupportId == supportId &&
+                    h.CompartmentId == compartmentId);
+
+            if (tracked != null)
+                return Task.FromResult<ContractSupportHolding?>(tracked);
+
+            return context.Set<ContractSupportHolding>()
+                .SingleOrDefaultAsync(h =>
+                    h.ContractId == contractId &&
+                    h.SupportId == supportId &&
+                    h.CompartmentId == compartmentId, ct);
         }
     }
 

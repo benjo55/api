@@ -95,6 +95,7 @@ namespace api.Models
         public ICollection<FeePolicy> FeePolicies { get; set; } = new List<FeePolicy>();
 
         public ICollection<Operation> Operations { get; set; } = new List<Operation>();
+        public ICollection<Advance> Advances { get; set; } = new List<Advance>();
         public ICollection<ContractSupportHolding> ContractSupportHoldings { get; set; } = new List<ContractSupportHolding>();
 
         [NotMapped]

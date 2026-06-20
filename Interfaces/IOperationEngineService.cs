@@ -4,6 +4,15 @@ using api.Models;
 
 namespace api.Interfaces
 {
+    public sealed class ContractFeeRecalculationResult
+    {
+        public int ContractId { get; init; }
+        public int RemovedFeeOperations { get; init; }
+        public int RemovedFeeApplications { get; init; }
+        public int ReplayedOperationFees { get; init; }
+        public int ReplayedManagementFees { get; init; }
+    }
+
     public interface IOperationEngineService
     {
         Task UpdateValuationsAsync();        // Mise à jour VL (EOD par défaut, Twelve fallback)
@@ -13,6 +22,7 @@ namespace api.Interfaces
         Task ApplyManagementFeesAsync();
         Task RebuildContractAsync(int contractId);
         Task ApplyOperationAsync(Operation op);
+        Task<ContractFeeRecalculationResult> RecalculateContractFeesAsync(int contractId);
 
     }
 }

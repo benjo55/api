@@ -17,6 +17,7 @@ namespace api.Models
         [MaxLength(200)] public string Label { get; set; } = string.Empty;
         [MaxLength(12)] public string ISIN { get; set; } = string.Empty;
         [MaxLength(30)] public string SupportType { get; set; } = string.Empty;
+        public FinancialSupportNature? SupportNature { get; set; }
         [MaxLength(3)] public string Currency { get; set; } = "EUR";
         [MaxLength(20)] public string Status { get; set; } = "Active";
         [MaxLength(100)] public string? MarketingName { get; set; }

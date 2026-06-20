@@ -26,6 +26,11 @@ namespace api.Models
         public decimal? Amount { get; set; }
         public string Currency { get; set; } = "EUR";
 
+        // 🔗 If this operation is a generated fee, this points to the triggering operation.
+        public int? SourceOperationId { get; set; }
+        public Operation? SourceOperation { get; set; }
+        public ICollection<Operation> GeneratedFeeOperations { get; set; } = new List<Operation>();
+
         // Audit
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedDate { get; set; } = DateTime.UtcNow;

@@ -281,6 +281,21 @@ namespace api.Controllers
             });
         }
 
+        [HttpPost("{id:int}/recalculate-fees")]
+        public async Task<IActionResult> RecalculateFees(int id)
+        {
+            var result = await _operationEngineService.RecalculateContractFeesAsync(id);
+            return Ok(new
+            {
+                message = "Recalcul des frais terminé",
+                result.ContractId,
+                result.RemovedFeeOperations,
+                result.RemovedFeeApplications,
+                result.ReplayedOperationFees,
+                result.ReplayedManagementFees
+            });
+        }
+
         private void EnrichResolvedManagementFeePolicy(Contract contract, ContractDto dto)
         {
             ApplyResolvedPolicy(contract, dto.Supports, contract.Supports);

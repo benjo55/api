@@ -49,17 +49,21 @@ namespace api.Mappers
 
                 PaidExecuted = contractModel.PaidExecuted,
                 PaidPending = contractModel.PaidPending,
+                // Versements cumulés = FreePayment + ScheduledPayment exécutés (hors versement initial affiché séparément)
                 TotalPayments = contractModel.TotalPayments,
 
                 WithdrawnExecuted = contractModel.WithdrawnExecuted,
                 WithdrawnPending = contractModel.WithdrawnPending,
-                TotalWithdrawals = contractModel.WithdrawnExecuted + contractModel.WithdrawnPending,
+                // Retraits cumulés = exécutés uniquement
+                TotalWithdrawals = contractModel.WithdrawnExecuted,
                 FeeExecuted = contractModel.FeeExecuted,
                 FeePending = contractModel.FeePending,
                 TotalFees = contractModel.FeeExecuted + contractModel.FeePending,
                 TotalSwitches = contractModel.TotalSwitches,
                 TotalSwitchesAmount = contractModel.TotalSwitchesAmount,
 
+                // NetInvested et PerformancePercent calculés par ContractValuationService
+                // sur opérations Executed uniquement → pas d'opérations futures incluses
                 NetInvested = contractModel.NetInvested,
                 PerformancePercent = contractModel.PerformancePercent,
                 CurrentValue = contractModel.CurrentValue,
@@ -170,6 +174,11 @@ namespace api.Mappers
                         Url = d.Url,
                         UploadedAt = d.UploadedAt
                     })
+                    .ToList() ?? new(),
+
+                Advances = contractModel.Advances?
+                    .OrderByDescending(a => a.RequestDate)
+                    .Select(a => a.ToDto())
                     .ToList() ?? new()
             };
         }

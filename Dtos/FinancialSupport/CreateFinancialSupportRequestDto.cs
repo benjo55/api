@@ -11,6 +11,7 @@ namespace api.Dtos.FinancialSupport
         [JsonPropertyName("isin")]
         public string? ISIN { get; set; }
         public string? SupportType { get; set; }
+        public FinancialSupportNature? SupportNature { get; set; }
         public string? Currency { get; set; }
         public string? Status { get; set; }
         public string? MarketingName { get; set; }

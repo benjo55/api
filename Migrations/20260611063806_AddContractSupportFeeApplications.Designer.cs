@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using api.Data;
 
@@ -11,9 +12,11 @@ using api.Data;
 namespace api.Migrations
 {
     [DbContext(typeof(ApplicationDBContext))]
-    partial class ApplicationDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260611063806_AddContractSupportFeeApplications")]
+    partial class AddContractSupportFeeApplications
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -229,16 +232,9 @@ namespace api.Migrations
                     b.Property<int>("OperationId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("AdvanceId")
-                        .HasColumnType("int");
-
                     b.Property<decimal>("Amount")
                         .HasPrecision(20, 7)
                         .HasColumnType("decimal(20,7)");
-
-                    b.Property<string>("Comment")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
 
                     b.Property<decimal>("InterestRate")
                         .HasPrecision(18, 4)
@@ -247,147 +243,9 @@ namespace api.Migrations
                     b.Property<DateTime>("MaturityDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("TransactionType")
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
-
                     b.HasKey("OperationId");
 
-                    b.HasIndex("AdvanceId");
-
                     b.ToTable("AdvanceDetails", (string)null);
-                });
-
-            modelBuilder.Entity("api.Models.Advance", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("AdvanceNumber")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
-
-                    b.Property<DateTime?>("ApprovalDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal?>("ApprovedAmount")
-                        .HasPrecision(20, 7)
-                        .HasColumnType("decimal(20,7)");
-
-                    b.Property<int>("ContractId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("DisbursementDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("DurationMonths")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("InterestRate")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<bool>("Locked")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime?>("MaturityDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal>("OutstandingCapital")
-                        .HasPrecision(20, 7)
-                        .HasColumnType("decimal(20,7)");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTime>("RequestDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal>("RequestedAmount")
-                        .HasPrecision(20, 7)
-                        .HasColumnType("decimal(20,7)");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsRequired()
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<DateTime>("UpdatedDate")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AdvanceNumber")
-                        .IsUnique()
-                        .HasDatabaseName("UX_Advances_AdvanceNumber");
-
-                    b.HasIndex("ContractId", "Status")
-                        .HasDatabaseName("IX_Advances_Contract_Status");
-
-                    b.ToTable("Advances", (string)null);
-                });
-
-            modelBuilder.Entity("api.Models.AdvanceTransaction", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("AdvanceId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(20, 7)
-                        .HasColumnType("decimal(20,7)");
-
-                    b.Property<string>("Comment")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTime>("CreatedDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("OperationDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("OperationId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
-
-                    b.Property<DateTime>("UpdatedDate")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AdvanceId", "OperationDate")
-                        .HasDatabaseName("IX_AdvanceTransactions_Advance_Date");
-
-                    b.HasIndex("OperationId")
-                        .IsUnique()
-                        .HasFilter("[OperationId] IS NOT NULL")
-                        .HasDatabaseName("UX_AdvanceTransactions_OperationId");
-
-                    b.ToTable("AdvanceTransactions", (string)null);
                 });
 
             modelBuilder.Entity("api.Models.ArbitrageDetail", b =>
@@ -1649,10 +1507,6 @@ namespace api.Migrations
 
                     b.Property<string>("SupportType")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<string>("SupportNature")
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
@@ -4224,47 +4078,11 @@ namespace api.Migrations
 
             modelBuilder.Entity("api.Models.AdvanceDetail", b =>
                 {
-                    b.HasOne("api.Models.Advance", "Advance")
-                        .WithMany()
-                        .HasForeignKey("AdvanceId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("api.Models.Operation", "Operation")
                         .WithOne("AdvanceDetail")
                         .HasForeignKey("api.Models.AdvanceDetail", "OperationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Advance");
-
-                    b.Navigation("Operation");
-                });
-
-            modelBuilder.Entity("api.Models.Advance", b =>
-                {
-                    b.HasOne("api.Models.Contract", "Contract")
-                        .WithMany("Advances")
-                        .HasForeignKey("ContractId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Contract");
-                });
-
-            modelBuilder.Entity("api.Models.AdvanceTransaction", b =>
-                {
-                    b.HasOne("api.Models.Advance", "Advance")
-                        .WithMany("Transactions")
-                        .HasForeignKey("AdvanceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("api.Models.Operation", "Operation")
-                        .WithMany()
-                        .HasForeignKey("OperationId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Advance");
 
                     b.Navigation("Operation");
                 });
@@ -5108,8 +4926,6 @@ namespace api.Migrations
 
             modelBuilder.Entity("api.Models.Contract", b =>
                 {
-                    b.Navigation("Advances");
-
                     b.Navigation("BeneficiaryClause");
 
                     b.Navigation("Compartments");
@@ -5155,11 +4971,6 @@ namespace api.Migrations
                     b.Navigation("RiskProfiles");
 
                     b.Navigation("Valuations");
-                });
-
-            modelBuilder.Entity("api.Models.Advance", b =>
-                {
-                    b.Navigation("Transactions");
                 });
 
             modelBuilder.Entity("api.Models.Operation", b =>

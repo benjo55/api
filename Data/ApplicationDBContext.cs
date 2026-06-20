@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using api.Models;
 using api.Models.Configurations;
+using api.Models.Enum;
 using Microsoft.EntityFrameworkCore;
 
 namespace api.Data
@@ -28,6 +29,7 @@ namespace api.Data
         public DbSet<ProductOperationFeePolicy> ProductOperationFeePolicies { get; set; }
         public DbSet<FeePolicy> FeePolicies { get; set; }
         public DbSet<ContractManagementFeeAccrual> ContractManagementFeeAccruals { get; set; }
+        public DbSet<ContractSupportFeeApplication> ContractSupportFeeApplications { get; set; }
         public DbSet<Brand> Brands { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<Role> Roles { get; set; }
@@ -67,6 +69,8 @@ namespace api.Data
         public DbSet<WithdrawalDetail> WithdrawalDetails { get; set; }
         public DbSet<ArbitrageDetail> ArbitrageDetails { get; set; }
         public DbSet<AdvanceDetail> AdvanceDetails { get; set; }
+        public DbSet<Advance> Advances { get; set; }
+        public DbSet<AdvanceTransaction> AdvanceTransactions { get; set; }
         public DbSet<PaymentDetail> PaymentDetails { get; set; }
         public DbSet<OperationSupportAllocation> OperationSupportAllocations { get; set; }
         public DbSet<ContractSupportHolding> ContractSupportHoldings { get; set; }
@@ -110,6 +114,7 @@ namespace api.Data
             modelBuilder.Entity<ProductManagementFeePolicy>().ToTable("ProductManagementFeePolicies");
             modelBuilder.Entity<FeePolicy>().ToTable("FeePolicies");
             modelBuilder.Entity<ContractManagementFeeAccrual>().ToTable("ContractManagementFeeAccruals");
+            modelBuilder.Entity<ContractSupportFeeApplication>().ToTable("ContractSupportFeeApplications");
             modelBuilder.Entity<Brand>().ToTable("Brands");
             modelBuilder.Entity<User>().ToTable("Users");
             modelBuilder.Entity<Role>().ToTable("Roles");
@@ -124,6 +129,10 @@ namespace api.Data
                 .HasIndex(f => new { f.EntityName, f.FieldName })
                 .IsUnique();
             modelBuilder.Entity<FinancialSupport>().ToTable("FinancialSupports");
+            modelBuilder.Entity<FinancialSupport>()
+                .Property(fs => fs.SupportNature)
+                .HasConversion<string>()
+                .HasMaxLength(30);
             modelBuilder.Entity<ProductManagementFeePolicy>(entity =>
             {
                 entity.HasOne(p => p.Product)
@@ -255,6 +264,49 @@ namespace api.Data
                 entity.HasIndex(a => new { a.ContractId, a.SupportId, a.CompartmentId })
                     .IsUnique()
                     .HasDatabaseName("UX_ContractManagementFeeAccrual_Contract_Support_Compartment");
+            });
+
+            modelBuilder.Entity<ContractSupportFeeApplication>(entity =>
+            {
+                entity.HasOne(f => f.Contract)
+                    .WithMany()
+                    .HasForeignKey(f => f.ContractId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(f => f.FeeOperation)
+                    .WithMany()
+                    .HasForeignKey(f => f.FeeOperationId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(f => f.SourceOperation)
+                    .WithMany()
+                    .HasForeignKey(f => f.SourceOperationId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(f => f.Compartment)
+                    .WithMany()
+                    .HasForeignKey(f => f.CompartmentId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(f => f.Support)
+                    .WithMany()
+                    .HasForeignKey(f => f.SupportId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.Property(f => f.BaseAmount).HasPrecision(20, 7);
+                entity.Property(f => f.FeeAmount).HasPrecision(20, 7);
+                entity.Property(f => f.FeeShares).HasPrecision(20, 7);
+                entity.Property(f => f.NavUsed).HasPrecision(20, 7);
+                entity.Property(f => f.PolicySource).HasMaxLength(100);
+
+                entity.HasIndex(f => new { f.ContractId, f.EffectiveDate })
+                    .HasDatabaseName("IX_ContractSupportFeeApplications_Contract_Date");
+
+                entity.HasIndex(f => new { f.ContractId, f.CompartmentId, f.SupportId, f.FeeNature })
+                    .HasDatabaseName("IX_ContractSupportFeeApplications_Contract_Compartment_Support_Nature");
+
+                entity.HasIndex(f => f.FeeOperationId)
+                    .HasDatabaseName("IX_ContractSupportFeeApplications_FeeOperation");
             });
             modelBuilder.Entity<SupportValuation>().ToTable("SupportValuations");
             modelBuilder.Entity<SupportRegulation>().ToTable("SupportRegulations");
@@ -432,6 +484,12 @@ namespace api.Data
                 .HasForeignKey(o => o.ContractId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<Operation>()
+                .HasOne(o => o.SourceOperation)
+                .WithMany(o => o.GeneratedFeeOperations)
+                .HasForeignKey(o => o.SourceOperationId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             // ==========================================================
             // 🔗 OperationSupportAllocation — Relations et contraintes
             // ==========================================================
@@ -558,10 +616,73 @@ namespace api.Data
             modelBuilder.Entity<AdvanceDetail>().ToTable("AdvanceDetails");
             modelBuilder.Entity<AdvanceDetail>().Property(a => a.Amount).HasPrecision(20, 7);
             modelBuilder.Entity<AdvanceDetail>().Property(a => a.InterestRate).HasPrecision(18, 4);
+            modelBuilder.Entity<AdvanceDetail>().Property(a => a.TransactionType).HasConversion<string>().HasMaxLength(40);
+            modelBuilder.Entity<AdvanceDetail>().Property(a => a.Comment).HasMaxLength(500);
             modelBuilder.Entity<AdvanceDetail>()
                 .HasOne(d => d.Operation)
                 .WithOne(o => o.AdvanceDetail)
                 .HasForeignKey<AdvanceDetail>(d => d.OperationId);
+            modelBuilder.Entity<AdvanceDetail>()
+                .HasOne(d => d.Advance)
+                .WithMany()
+                .HasForeignKey(d => d.AdvanceId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Advance>(entity =>
+            {
+                entity.ToTable("Advances");
+
+                entity.HasOne(a => a.Contract)
+                    .WithMany(c => c.Advances)
+                    .HasForeignKey(a => a.ContractId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(a => a.AdvanceNumber)
+                    .HasMaxLength(40)
+                    .IsRequired();
+
+                entity.Property(a => a.RequestedAmount).HasPrecision(20, 7);
+                entity.Property(a => a.ApprovedAmount).HasPrecision(20, 7);
+                entity.Property(a => a.OutstandingCapital).HasPrecision(20, 7);
+                entity.Property(a => a.InterestRate).HasPrecision(18, 4);
+                entity.Property(a => a.Reason).HasMaxLength(500);
+                entity.Property(a => a.Status).HasConversion<string>().HasMaxLength(30);
+                entity.Property(a => a.RowVersion).IsRowVersion();
+
+                entity.HasIndex(a => a.AdvanceNumber)
+                    .IsUnique()
+                    .HasDatabaseName("UX_Advances_AdvanceNumber");
+
+                entity.HasIndex(a => new { a.ContractId, a.Status })
+                    .HasDatabaseName("IX_Advances_Contract_Status");
+            });
+
+            modelBuilder.Entity<AdvanceTransaction>(entity =>
+            {
+                entity.ToTable("AdvanceTransactions");
+
+                entity.HasOne(t => t.Advance)
+                    .WithMany(a => a.Transactions)
+                    .HasForeignKey(t => t.AdvanceId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(t => t.Operation)
+                    .WithMany()
+                    .HasForeignKey(t => t.OperationId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.Property(t => t.Type).HasConversion<string>().HasMaxLength(40);
+                entity.Property(t => t.Amount).HasPrecision(20, 7);
+                entity.Property(t => t.Comment).HasMaxLength(500);
+
+                entity.HasIndex(t => new { t.AdvanceId, t.OperationDate })
+                    .HasDatabaseName("IX_AdvanceTransactions_Advance_Date");
+
+                entity.HasIndex(t => t.OperationId)
+                    .IsUnique()
+                    .HasFilter("[OperationId] IS NOT NULL")
+                    .HasDatabaseName("UX_AdvanceTransactions_OperationId");
+            });
 
             // 🔹 PaymentDetail
             modelBuilder.Entity<PaymentDetail>().ToTable("PaymentDetails");

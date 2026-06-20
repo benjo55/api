@@ -454,6 +454,8 @@ namespace api.Repository
                 .Include(c => c.Compartments)
                 .Include(c => c.ContractSupportHoldings)
                     .ThenInclude(h => h.Support)
+                .Include(c => c.Advances)
+                    .ThenInclude(a => a.Transactions)
                 .Include(c => c.Operations)
                 .AsNoTracking()
                 .FirstOrDefaultAsync();

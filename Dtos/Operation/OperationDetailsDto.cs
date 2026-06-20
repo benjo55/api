@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using api.Models.Enum;
 
 namespace api.Dtos.Operation
 {
@@ -10,6 +11,7 @@ namespace api.Dtos.Operation
     [JsonDerivedType(typeof(PaymentDetailsDto), "payment")]
     [JsonDerivedType(typeof(WithdrawalDetailsDto), "withdrawal")]
     [JsonDerivedType(typeof(ArbitrageDetailsDto), "arbitrage")]
+    [JsonDerivedType(typeof(AdvanceDetailsDto), "advance")]
     public abstract class OperationDetailsDto { }
 
     /* =========================================================
@@ -117,5 +119,21 @@ namespace api.Dtos.Operation
 
         /// <summary>none | equalizeTargets</summary>
         public string? RebalancePolicy { get; set; }
+    }
+
+    /* =========================================================
+       ADVANCE
+    ========================================================= */
+
+    public class AdvanceDetailsDto : OperationDetailsDto
+    {
+        /// <summary>grant | repayment</summary>
+        public string Mode { get; set; } = "grant";
+        public int? AdvanceId { get; set; }
+        public string? AdvanceNumber { get; set; }
+        public AdvanceTransactionType? TransactionType { get; set; }
+        public decimal? InterestRate { get; set; }
+        public DateTime? MaturityDate { get; set; }
+        public string? Comment { get; set; }
     }
 }

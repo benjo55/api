@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using api.Data;
 using api.Dtos.Generic;
 using api.Helpers;
+using api.Interfaces;
 using api.Models;
 using api.Services;
 
@@ -10,13 +11,20 @@ public class OperationRepository : IOperationRepository
     private readonly ApplicationDBContext _context;
     private readonly IContractValuationService _valuationService;
     private readonly BusinessRuleValidator _validator;
+    private readonly IAdvanceOperationService _advanceOperationService;
     private readonly ILogger<OperationRepository> _logger;
 
-    public OperationRepository(ApplicationDBContext context, IContractValuationService valuationService, BusinessRuleValidator validator, ILogger<OperationRepository> logger)
+    public OperationRepository(
+        ApplicationDBContext context,
+        IContractValuationService valuationService,
+        BusinessRuleValidator validator,
+        IAdvanceOperationService advanceOperationService,
+        ILogger<OperationRepository> logger)
     {
         _context = context;
         _valuationService = valuationService;
         _validator = validator;
+        _advanceOperationService = advanceOperationService;
         _logger = logger;
     }
 
@@ -25,7 +33,7 @@ public class OperationRepository : IOperationRepository
         var operations = _context.Operations
             .Include(o => o.WithdrawalDetail)
             .Include(o => o.ArbitrageDetail)
-            .Include(o => o.AdvanceDetail)
+            .Include(o => o.AdvanceDetail).ThenInclude(d => d!.Advance)
             .Include(o => o.PaymentDetail)
             .Include(o => o.Contract)
             .AsQueryable();
@@ -62,7 +70,7 @@ public class OperationRepository : IOperationRepository
         await _context.Operations
             .Include(o => o.WithdrawalDetail)
             .Include(o => o.ArbitrageDetail)
-            .Include(o => o.AdvanceDetail)
+            .Include(o => o.AdvanceDetail).ThenInclude(d => d!.Advance)
             .Include(o => o.PaymentDetail)
             .Include(o => o.Allocations).ThenInclude(a => a.Support)
             .Include(o => o.Contract)
@@ -73,7 +81,7 @@ public class OperationRepository : IOperationRepository
             .Where(o => o.ContractId == contractId)
             .Include(o => o.WithdrawalDetail)
             .Include(o => o.ArbitrageDetail)
-            .Include(o => o.AdvanceDetail)
+            .Include(o => o.AdvanceDetail).ThenInclude(d => d!.Advance)
             .Include(o => o.PaymentDetail)
             .Include(o => o.Allocations).ThenInclude(a => a.Support)
             .Include(o => o.Contract)
@@ -96,6 +104,7 @@ public class OperationRepository : IOperationRepository
             }
 
             ValidateScheduledPaymentDefinition(operation);
+            await _advanceOperationService.ValidateForCreationAsync(operation);
 
             // ==========================================================
             // 1️⃣ Validation métier
@@ -207,6 +216,7 @@ public class OperationRepository : IOperationRepository
             .Include(o => o.PaymentDetail)
             .Include(o => o.WithdrawalDetail)
             .Include(o => o.ArbitrageDetail)
+            .Include(o => o.AdvanceDetail)
             .FirstOrDefaultAsync(o => o.Id == operation.Id);
 
         if (existing == null)
@@ -222,6 +232,8 @@ public class OperationRepository : IOperationRepository
                 "Les parts, la VL et le PRU sont figés."
             );
         }
+
+        await _advanceOperationService.ValidateForCreationAsync(operation);
 
         // ==========================================================
         // 1️⃣ Mise à jour des champs simples (sans impact financier)
@@ -284,6 +296,24 @@ public class OperationRepository : IOperationRepository
             existing.ArbitrageDetail.Percentage = operation.ArbitrageDetail.Percentage;
             existing.ArbitrageDetail.ScheduleGroupId =
                 operation.ArbitrageDetail.ScheduleGroupId ?? existing.ArbitrageDetail.ScheduleGroupId;
+        }
+
+        if (operation.AdvanceDetail != null)
+        {
+            if (existing.AdvanceDetail == null)
+            {
+                existing.AdvanceDetail = new AdvanceDetail
+                {
+                    OperationId = existing.Id,
+                };
+            }
+
+            existing.AdvanceDetail.Amount = operation.AdvanceDetail.Amount;
+            existing.AdvanceDetail.InterestRate = operation.AdvanceDetail.InterestRate;
+            existing.AdvanceDetail.MaturityDate = operation.AdvanceDetail.MaturityDate;
+            existing.AdvanceDetail.AdvanceId = operation.AdvanceDetail.AdvanceId;
+            existing.AdvanceDetail.TransactionType = operation.AdvanceDetail.TransactionType;
+            existing.AdvanceDetail.Comment = operation.AdvanceDetail.Comment;
         }
 
         // ==========================================================

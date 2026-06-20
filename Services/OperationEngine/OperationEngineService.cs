@@ -22,8 +22,9 @@ namespace api.Services
         private readonly IOperationApplier _operationApplier;
         private readonly IManagementFeePolicyResolver _managementFeePolicyResolver;
         private readonly IOperationFeePolicyResolver _operationFeePolicyResolver;
+        private readonly IAdvanceOperationService _advanceOperationService;
 
-        public OperationEngineService(ApplicationDBContext context, ILogger<OperationEngineService> logger, IContractSupportHoldingRepository holdingRepo, IContractValuationService valuationService, IOptions<EodSettings> eodSettings, IEodDataProvider eodDataProvider, IDbContextFactory<ApplicationDBContext> dbContextFactory, IOperationApplier operationApplier, IManagementFeePolicyResolver managementFeePolicyResolver, IOperationFeePolicyResolver operationFeePolicyResolver)
+        public OperationEngineService(ApplicationDBContext context, ILogger<OperationEngineService> logger, IContractSupportHoldingRepository holdingRepo, IContractValuationService valuationService, IOptions<EodSettings> eodSettings, IEodDataProvider eodDataProvider, IDbContextFactory<ApplicationDBContext> dbContextFactory, IOperationApplier operationApplier, IManagementFeePolicyResolver managementFeePolicyResolver, IOperationFeePolicyResolver operationFeePolicyResolver, IAdvanceOperationService advanceOperationService)
         {
             _context = context;
             _logger = logger;
@@ -35,6 +36,7 @@ namespace api.Services
             _operationApplier = operationApplier;
             _managementFeePolicyResolver = managementFeePolicyResolver;
             _operationFeePolicyResolver = operationFeePolicyResolver;
+            _advanceOperationService = advanceOperationService;
         }
 
         // 1️⃣ Maj quotidienne des VL
@@ -138,6 +140,7 @@ namespace api.Services
 
             var pendingOps = await _context.Operations
                 .Include(o => o.PaymentDetail)
+                .Include(o => o.AdvanceDetail)
                 .Include(o => o.Allocations)
                     .ThenInclude(a => a.Support)
                 .Where(o => o.Status == OperationStatus.Pending)
@@ -363,6 +366,11 @@ namespace api.Services
                         var supportId = g.SupportId;
                         var compartmentId = g.CompartmentId;
 
+                        if (!compartmentId.HasValue)
+                            continue;
+
+                        var compartmentIdValue = compartmentId.Value;
+
                         var found = finalized.FirstOrDefault(x => x.alloc.SupportId == supportId);
                         var support = found.alloc?.Support;
 
@@ -403,7 +411,7 @@ namespace api.Services
                             if (currentHolding == null || currentHolding.TotalShares <= 0m)
                                 continue;
 
-                            var postingNav = await GetPostingNavAsync(support, supportId, op.OperationDate.AddDays(-1));
+                            var postingNav = await GetPostingNavAsync(support ?? new FinancialSupport { Id = supportId }, supportId, op.OperationDate.AddDays(-1));
                             if (postingNav <= 0m)
                                 continue;
 
@@ -415,6 +423,7 @@ namespace api.Services
                             {
                                 ContractId = contract.Id,
                                 Type = OperationType.OperationFee,
+                                SourceOperationId = op.Id,
                                 OperationDate = op.OperationDate,
                                 ExecutionDate = op.OperationDate,
                                 Status = OperationStatus.Executed,
@@ -429,7 +438,7 @@ namespace api.Services
                                         Shares = sharesToRemove,
                                         NavAtOperation = postingNav,
                                         NavDateAtOperation = op.OperationDate.AddDays(-1),
-                                        CompartmentId = compartmentId
+                                        CompartmentId = compartmentIdValue
                                     }
                                 },
                                 CreatedDate = DateTime.UtcNow,
@@ -437,9 +446,57 @@ namespace api.Services
                             };
 
                             await _context.Operations.AddAsync(feeOperation);
+                            await _context.ContractSupportFeeApplications.AddAsync(new ContractSupportFeeApplication
+                            {
+                                ContractId = contract.Id,
+                                FeeOperation = feeOperation,
+                                SourceOperationId = op.Id,
+                                FeeNature = MapFeeNatureFromOperation(op.Type),
+                                CompartmentId = compartmentIdValue,
+                                SupportId = supportId,
+                                ApplyOn = rf.ApplyOn,
+                                BaseAmount = baseAmount,
+                                FeeAmount = feeAmount,
+                                FeeShares = sharesToRemove,
+                                NavUsed = postingNav,
+                                NavDateUsed = op.OperationDate.AddDays(-1),
+                                PolicySource = rf.Source,
+                                PolicyId = null,
+                                EffectiveDate = op.OperationDate.Date,
+                                CreatedDate = DateTime.UtcNow,
+                            });
                             await _operationApplier.ApplyAsync(feeOperation, _context);
                             await _context.SaveChangesAsync();
                         }
+                    }
+
+                    if (!finalized.Any())
+                    {
+                        var canExecuteWithoutAllocations =
+                            op.Type == OperationType.Advance ||
+                            op.Type == OperationType.AdvanceRepayment ||
+                            op.Type == OperationType.Succession ||
+                            op.Type == OperationType.Donation ||
+                            op.Type == OperationType.BeneficiaryChange ||
+                            op.Type == OperationType.Pledge ||
+                            op.Type == OperationType.ConversionToAnnuity;
+
+                        if (!canExecuteWithoutAllocations)
+                            throw new InvalidOperationException($"Opération {op.Id} sans allocations.");
+
+                        if (op.Type is OperationType.Advance or OperationType.AdvanceRepayment)
+                            await _advanceOperationService.ApplyAsync(op);
+
+                        op.Status = OperationStatus.Executed;
+                        op.ExecutionDate = op.OperationDate;
+                        op.UpdatedDate = DateTime.UtcNow;
+
+                        await _context.SaveChangesAsync();
+                        await transaction.CommitAsync();
+
+                        impactedContracts.Add(op.ContractId);
+                        _logger.LogInformation("✔ Opération #{Id} exécutée sans allocations", op.Id);
+                        continue;
                     }
 
                     op.Status = OperationStatus.Executed;
@@ -634,6 +691,25 @@ namespace api.Services
                         };
 
                         await _context.Operations.AddAsync(feeOperation);
+                        await _context.ContractSupportFeeApplications.AddAsync(new ContractSupportFeeApplication
+                        {
+                            ContractId = contract.Id,
+                            FeeOperation = feeOperation,
+                            SourceOperationId = null,
+                            FeeNature = ContractSupportFeeNature.ManagementFee,
+                            CompartmentId = alloc.CompartmentId,
+                            SupportId = alloc.SupportId,
+                            ApplyOn = FeeApplyOn.Target,
+                            BaseAmount = feeAmount,
+                            FeeAmount = feeAmount,
+                            FeeShares = sharesToRemove,
+                            NavUsed = postingNav,
+                            NavDateUsed = runDate.AddDays(-1),
+                            PolicySource = policy.Source,
+                            PolicyId = null,
+                            EffectiveDate = runDate,
+                            CreatedDate = DateTime.UtcNow,
+                        });
 
                         // 🔥 APPLIQUER L’EFFET FINANCIER
                         await _operationApplier.ApplyAsync(feeOperation, _context);
@@ -921,6 +997,20 @@ namespace api.Services
             return 0m;
         }
 
+        private static ContractSupportFeeNature MapFeeNatureFromOperation(OperationType operationType)
+        {
+            return operationType switch
+            {
+                OperationType.InitialPayment or OperationType.FreePayment or OperationType.ScheduledPayment
+                    => ContractSupportFeeNature.ContributionFee,
+                OperationType.PartialWithdrawal or OperationType.TotalWithdrawal or OperationType.ScheduledWithdrawal
+                    => ContractSupportFeeNature.WithdrawalFee,
+                OperationType.Arbitrage or OperationType.ScheduledArbitrage
+                    => ContractSupportFeeNature.ArbitrageFee,
+                _ => ContractSupportFeeNature.OtherFee,
+            };
+        }
+
         private static DateTime MaxDate(DateTime left, DateTime right)
             => left >= right ? left : right;
 
@@ -960,7 +1050,8 @@ namespace api.Services
                     .Where(o =>
                         o.ContractId == contractId &&
                         o.Status == OperationStatus.Executed)
-                    .OrderBy(o => o.OperationDate)
+                    .OrderBy(o => o.ExecutionDate ?? o.OperationDate)
+                    .ThenBy(o => o.Id)
                     .ToListAsync();
 
                 if (!executedOps.Any())
@@ -1035,6 +1126,522 @@ namespace api.Services
                 await transaction.RollbackAsync();
                 throw;
             }
+        }
+
+        public async Task<ContractFeeRecalculationResult> RecalculateContractFeesAsync(int contractId)
+        {
+            _logger.LogWarning("♻️ Recalcul des frais démarré pour contrat {ContractId}", contractId);
+
+            var contractExists = await _context.Contracts.AnyAsync(c => c.Id == contractId);
+            if (!contractExists)
+                throw new InvalidOperationException($"Contrat {contractId} introuvable.");
+
+            ContractFeeRecalculationResult? result = null;
+
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                var feeOps = await _context.Operations
+                    .Where(o =>
+                        o.ContractId == contractId &&
+                        (o.Type == OperationType.ManagementFee || o.Type == OperationType.OperationFee))
+                    .ToListAsync();
+
+                var feeApps = await _context.ContractSupportFeeApplications
+                    .Where(f => f.ContractId == contractId)
+                    .ToListAsync();
+
+                var accruals = await _context.ContractManagementFeeAccruals
+                    .Where(a => a.ContractId == contractId)
+                    .ToListAsync();
+
+                if (feeApps.Count > 0)
+                    _context.ContractSupportFeeApplications.RemoveRange(feeApps);
+
+                if (feeOps.Count > 0)
+                    _context.Operations.RemoveRange(feeOps);
+
+                if (accruals.Count > 0)
+                    _context.ContractManagementFeeAccruals.RemoveRange(accruals);
+
+                var oldFsas = await _context.FinancialSupportAllocations
+                    .Where(x => x.ContractId == contractId)
+                    .ToListAsync();
+
+                var oldHoldings = await _context.ContractSupportHoldings
+                    .Where(x => x.ContractId == contractId)
+                    .ToListAsync();
+
+                _context.FinancialSupportAllocations.RemoveRange(oldFsas);
+                _context.ContractSupportHoldings.RemoveRange(oldHoldings);
+
+                await _context.SaveChangesAsync();
+
+                var executedSourceOps = await _context.Operations
+                    .Include(o => o.Allocations)
+                        .ThenInclude(a => a.Support)
+                    .Where(o =>
+                        o.ContractId == contractId &&
+                        o.Status == OperationStatus.Executed &&
+                        (
+                            o.Type == OperationType.InitialPayment ||
+                            o.Type == OperationType.FreePayment ||
+                            o.Type == OperationType.ScheduledPayment ||
+                            o.Type == OperationType.PartialWithdrawal ||
+                            o.Type == OperationType.TotalWithdrawal ||
+                            o.Type == OperationType.ScheduledWithdrawal ||
+                            o.Type == OperationType.Arbitrage ||
+                            o.Type == OperationType.ScheduledArbitrage
+                        ) &&
+                        o.Allocations.Any())
+                    .OrderBy(o => o.ExecutionDate ?? o.OperationDate)
+                    .ThenBy(o => o.Id)
+                    .ToListAsync();
+
+                foreach (var op in executedSourceOps)
+                {
+                    var replayOperation = BuildReplayOperation(op);
+
+                    if (op.Type == OperationType.PartialWithdrawal ||
+                        op.Type == OperationType.TotalWithdrawal ||
+                        op.Type == OperationType.ScheduledWithdrawal)
+                    {
+                        await NormalizeWithdrawalAllocationsForReplayAsync(replayOperation);
+                    }
+
+                    await _operationApplier.ApplyAsync(replayOperation, _context);
+                }
+
+                await _context.SaveChangesAsync();
+
+                var contract = await _context.Contracts
+                    .Include(c => c.Product)
+                        .ThenInclude(p => p!.ManagementFeePolicy)
+                    .FirstOrDefaultAsync(c => c.Id == contractId)
+                    ?? throw new InvalidOperationException($"Contrat {contractId} introuvable après rebuild.");
+
+                var replayedOperationFees = await ReplayOperationFeesForExecutedOperationsAsync(contract, executedSourceOps);
+                var replayedManagementFees = await ReplayManagementFeesForContractAsync(contract, forcePost: true);
+
+                await transaction.CommitAsync();
+
+                result = new ContractFeeRecalculationResult
+                {
+                    ContractId = contractId,
+                    RemovedFeeOperations = feeOps.Count,
+                    RemovedFeeApplications = feeApps.Count,
+                    ReplayedOperationFees = replayedOperationFees,
+                    ReplayedManagementFees = replayedManagementFees,
+                };
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+
+            await _valuationService.ComputeContractValueAsync(contractId);
+
+            _logger.LogInformation(
+                "✅ Recalcul des frais terminé contrat {ContractId}: removedOps={RemovedOps}, removedApps={RemovedApps}, replayOpFees={ReplayOpFees}, replayMgmtFees={ReplayMgmtFees}",
+                contractId,
+                result!.RemovedFeeOperations,
+                result.RemovedFeeApplications,
+                result.ReplayedOperationFees,
+                result.ReplayedManagementFees);
+
+            return result;
+        }
+
+        private static Operation BuildReplayOperation(Operation source)
+        {
+            return new Operation
+            {
+                Id = source.Id,
+                ContractId = source.ContractId,
+                Type = source.Type,
+                Status = source.Status,
+                OperationDate = source.OperationDate,
+                ExecutionDate = source.ExecutionDate,
+                Amount = source.Amount,
+                Currency = source.Currency,
+                Allocations = source.Allocations
+                    .Select(a => new OperationSupportAllocation
+                    {
+                        SupportId = a.SupportId,
+                        CompartmentId = a.CompartmentId,
+                        Amount = a.Amount,
+                        Shares = a.Shares,
+                        EstimatedShares = a.EstimatedShares,
+                        Flow = a.Flow,
+                        NavAtOperation = a.NavAtOperation,
+                        NavDateAtOperation = a.NavDateAtOperation,
+                        EstimatedNav = a.EstimatedNav,
+                    })
+                    .ToList(),
+            };
+        }
+
+        private async Task NormalizeWithdrawalAllocationsForReplayAsync(Operation operation)
+        {
+            if (operation.Allocations == null || !operation.Allocations.Any())
+                throw new InvalidOperationException($"RecalculateFees: opération {operation.Id} sans allocations de rachat.");
+
+            var replayableAllocations = new List<OperationSupportAllocation>();
+
+            foreach (var alloc in operation.Allocations)
+            {
+                if (!alloc.CompartmentId.HasValue)
+                {
+                    alloc.CompartmentId = _context.ContractSupportHoldings.Local
+                        .Where(h =>
+                            h.ContractId == operation.ContractId &&
+                            h.SupportId == alloc.SupportId &&
+                            h.TotalShares > 0m)
+                        .OrderByDescending(h => h.TotalShares)
+                        .Select(h => (int?)h.CompartmentId)
+                        .FirstOrDefault();
+
+                    if (!alloc.CompartmentId.HasValue)
+                    {
+                        alloc.CompartmentId = await _context.ContractSupportHoldings
+                            .Where(h =>
+                                h.ContractId == operation.ContractId &&
+                                h.SupportId == alloc.SupportId &&
+                                h.TotalShares > 0m)
+                            .OrderByDescending(h => h.TotalShares)
+                            .Select(h => (int?)h.CompartmentId)
+                            .FirstOrDefaultAsync();
+                    }
+
+                    if (!alloc.CompartmentId.HasValue)
+                    {
+                        throw new InvalidOperationException(
+                            $"RecalculateFees: compartiment introuvable pour opId={operation.Id}, supportId={alloc.SupportId}.");
+                    }
+                }
+
+                var requestedAmount = alloc.Amount ?? 0m;
+                var requestedShares = alloc.Shares ?? alloc.EstimatedShares ?? 0m;
+
+                if (requestedShares <= 0m)
+                {
+                    var nav = alloc.NavAtOperation ?? alloc.EstimatedNav;
+                    if (nav is decimal positiveNav && positiveNav > 0m && requestedAmount > 0m)
+                    {
+                        requestedShares = NumericPolicy.RoundShares(requestedAmount / positiveNav);
+                    }
+                }
+
+                if (requestedShares <= 0m || requestedAmount <= 0m)
+                    throw new InvalidOperationException(
+                        $"RecalculateFees: allocation rachat invalide opId={operation.Id}, supportId={alloc.SupportId}, compartmentId={alloc.CompartmentId}.");
+
+                var holding = _context.ContractSupportHoldings.Local
+                    .FirstOrDefault(h =>
+                        h.ContractId == operation.ContractId &&
+                        h.SupportId == alloc.SupportId &&
+                        h.CompartmentId == alloc.CompartmentId.Value);
+
+                if (holding == null)
+                {
+                    holding = await _context.ContractSupportHoldings
+                        .FirstOrDefaultAsync(h =>
+                            h.ContractId == operation.ContractId &&
+                            h.SupportId == alloc.SupportId &&
+                            h.CompartmentId == alloc.CompartmentId.Value);
+                }
+
+                var heldShares = holding?.TotalShares ?? 0m;
+                if (heldShares <= 0m)
+                {
+                    throw new InvalidOperationException(
+                        $"RecalculateFees: holdings insuffisants pour opId={operation.Id}, supportId={alloc.SupportId}, compartmentId={alloc.CompartmentId}.");
+                }
+
+                if (requestedShares > heldShares)
+                {
+                    throw new InvalidOperationException(
+                        $"RecalculateFees: rachat irréjouable opId={operation.Id}, supportId={alloc.SupportId}, compartmentId={alloc.CompartmentId}, requestedShares={requestedShares}, heldShares={heldShares}.");
+                }
+                else
+                {
+                    alloc.Shares = requestedShares;
+                }
+
+                if ((alloc.Shares ?? 0m) > 0m && (alloc.Amount ?? 0m) > 0m)
+                {
+                    replayableAllocations.Add(alloc);
+                }
+            }
+
+            operation.Allocations = replayableAllocations;
+
+            if (replayableAllocations.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    $"RecalculateFees: aucune allocation de rachat rejouable pour opId={operation.Id}.");
+            }
+        }
+
+        private async Task<int> ReplayOperationFeesForExecutedOperationsAsync(Contract contract, List<Operation> executedSourceOps)
+        {
+            var created = 0;
+
+            foreach (var op in executedSourceOps)
+            {
+                if (op.Allocations == null || !op.Allocations.Any())
+                    continue;
+
+                var feeGroups = op.Allocations
+                    .Select(f => new { f.SupportId, f.CompartmentId })
+                    .Distinct()
+                    .ToList();
+
+                foreach (var g in feeGroups)
+                {
+                    if (!g.CompartmentId.HasValue)
+                        continue;
+
+                    var compartmentId = g.CompartmentId.Value;
+                    var supportId = g.SupportId;
+
+                    var support = op.Allocations
+                        .FirstOrDefault(a => a.SupportId == supportId)?.Support;
+
+                    if (support == null)
+                    {
+                        support = await _context.FinancialSupports
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(s => s.Id == supportId);
+                    }
+
+                    var resolvedFees = _operationFeePolicyResolver.ResolveOperationFees(contract, support, op.Type, op.OperationDate);
+                    if (resolvedFees == null || !resolvedFees.Any())
+                        continue;
+
+                    foreach (var rf in resolvedFees)
+                    {
+                        decimal baseAmount;
+
+                        if (rf.ApplyOn == FeeApplyOn.Source)
+                        {
+                            baseAmount = op.Allocations
+                                .Where(x => x.Flow == OperationFlow.Source && x.SupportId == supportId && x.CompartmentId == compartmentId)
+                                .Sum(x => x.Amount ?? 0m);
+                        }
+                        else
+                        {
+                            baseAmount = op.Allocations
+                                .Where(x => x.Flow == OperationFlow.Target && x.SupportId == supportId && x.CompartmentId == compartmentId)
+                                .Sum(x => x.Amount ?? 0m);
+                        }
+
+                        if (baseAmount <= 0m)
+                            continue;
+
+                        var feeAmount = rf.Mode == FeeAmountMode.Percentage
+                            ? NumericPolicy.RoundMoney(baseAmount * rf.Rate / 100m)
+                            : rf.FixedAmount;
+
+                        if (feeAmount <= 0m)
+                            continue;
+
+                        var currentHolding = await _context.ContractSupportHoldings
+                            .FirstOrDefaultAsync(h => h.ContractId == contract.Id && h.SupportId == supportId && h.CompartmentId == compartmentId);
+
+                        if (currentHolding == null || currentHolding.TotalShares <= 0m)
+                            continue;
+
+                        var postingNav = await GetPostingNavAsync(support ?? new FinancialSupport { Id = supportId }, supportId, op.OperationDate.AddDays(-1));
+                        if (postingNav <= 0m)
+                            continue;
+
+                        var sharesToRemove = Math.Min(currentHolding.TotalShares, NumericPolicy.RoundShares(feeAmount / postingNav));
+                        if (sharesToRemove <= 0m)
+                            continue;
+
+                        var feeOperation = new Operation
+                        {
+                            ContractId = contract.Id,
+                            Type = OperationType.OperationFee,
+                            SourceOperationId = op.Id,
+                            OperationDate = op.OperationDate,
+                            ExecutionDate = op.ExecutionDate ?? op.OperationDate,
+                            Status = OperationStatus.Executed,
+                            Amount = feeAmount,
+                            Currency = contract.Currency,
+                            Allocations = new List<OperationSupportAllocation>
+                            {
+                                new OperationSupportAllocation
+                                {
+                                    SupportId = supportId,
+                                    Amount = feeAmount,
+                                    Shares = sharesToRemove,
+                                    NavAtOperation = postingNav,
+                                    NavDateAtOperation = op.OperationDate.AddDays(-1),
+                                    CompartmentId = compartmentId
+                                }
+                            },
+                            CreatedDate = DateTime.UtcNow,
+                            UpdatedDate = DateTime.UtcNow,
+                        };
+
+                        await _context.Operations.AddAsync(feeOperation);
+                        await _context.ContractSupportFeeApplications.AddAsync(new ContractSupportFeeApplication
+                        {
+                            ContractId = contract.Id,
+                            FeeOperation = feeOperation,
+                            SourceOperationId = op.Id,
+                            FeeNature = MapFeeNatureFromOperation(op.Type),
+                            CompartmentId = compartmentId,
+                            SupportId = supportId,
+                            ApplyOn = rf.ApplyOn,
+                            BaseAmount = baseAmount,
+                            FeeAmount = feeAmount,
+                            FeeShares = sharesToRemove,
+                            NavUsed = postingNav,
+                            NavDateUsed = op.OperationDate.AddDays(-1),
+                            PolicySource = rf.Source,
+                            PolicyId = null,
+                            EffectiveDate = op.OperationDate.Date,
+                            CreatedDate = DateTime.UtcNow,
+                        });
+
+                        await _operationApplier.ApplyAsync(feeOperation, _context);
+                        created++;
+                    }
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return created;
+        }
+
+        private async Task<int> ReplayManagementFeesForContractAsync(Contract contract, bool forcePost)
+        {
+            var created = 0;
+            var runDate = DateTime.UtcNow.Date;
+
+            var allocations = await _context.FinancialSupportAllocations
+                .Include(a => a.Support)
+                .Where(a => a.ContractId == contract.Id)
+                .ToListAsync();
+
+            var accrualStates = await _context.ContractManagementFeeAccruals
+                .Where(a => a.ContractId == contract.Id)
+                .ToDictionaryAsync(a => (a.ContractId, a.SupportId, a.CompartmentId));
+
+            foreach (var alloc in allocations)
+            {
+                if (alloc.Support == null)
+                    continue;
+
+                var policy = _managementFeePolicyResolver.Resolve(contract, alloc.Support, runDate);
+                if (policy == null)
+                    continue;
+
+                var state = GetOrCreateAccrualState(accrualStates, contract.Id, alloc.SupportId, alloc.CompartmentId);
+                var accrualStart = GetAccrualStartDate(contract, policy, state);
+                var accrualEnd = GetAccrualEndDate(policy, runDate);
+
+                if (accrualStart <= accrualEnd)
+                {
+                    var newlyAccrued = await ComputeDailyAccrualAsync(contract, alloc, policy, accrualStart, accrualEnd);
+                    if (newlyAccrued > 0m)
+                    {
+                        state.AccruedAmount = NumericPolicy.RoundMoney(state.AccruedAmount + newlyAccrued);
+                    }
+
+                    state.LastAccruedDate = accrualEnd;
+                    state.UpdatedDate = DateTime.UtcNow;
+                }
+
+                if (policy.PostingMode == ManagementFeePostingMode.NetServedYield)
+                    continue;
+
+                if (!forcePost && !ShouldPostForRun(policy, runDate, state.LastPostedDate))
+                    continue;
+
+                var feeAmount = NumericPolicy.RoundMoney(state.AccruedAmount);
+                if (feeAmount <= 0m)
+                    continue;
+
+                var currentHolding = await _context.ContractSupportHoldings
+                    .FirstOrDefaultAsync(h =>
+                        h.ContractId == contract.Id &&
+                        h.SupportId == alloc.SupportId &&
+                        h.CompartmentId == alloc.CompartmentId);
+
+                if (currentHolding == null || currentHolding.TotalShares <= 0m)
+                    continue;
+
+                var postingNav = await GetPostingNavAsync(alloc.Support, alloc.SupportId, runDate.AddDays(-1));
+                if (postingNav <= 0m)
+                    continue;
+
+                var sharesToRemove = Math.Min(currentHolding.TotalShares, NumericPolicy.RoundShares(feeAmount / postingNav));
+                if (sharesToRemove <= 0m)
+                    continue;
+
+                var feeOperation = new Operation
+                {
+                    ContractId = contract.Id,
+                    Type = OperationType.ManagementFee,
+                    OperationDate = runDate,
+                    ExecutionDate = runDate,
+                    Status = OperationStatus.Executed,
+                    Amount = feeAmount,
+                    Currency = contract.Currency,
+                    Allocations = new List<OperationSupportAllocation>
+                    {
+                        new OperationSupportAllocation
+                        {
+                            SupportId = alloc.SupportId,
+                            Amount = feeAmount,
+                            Shares = sharesToRemove,
+                            NavAtOperation = postingNav,
+                            NavDateAtOperation = runDate.AddDays(-1),
+                            CompartmentId = alloc.CompartmentId
+                        }
+                    },
+                    CreatedDate = DateTime.UtcNow,
+                    UpdatedDate = DateTime.UtcNow,
+                };
+
+                await _context.Operations.AddAsync(feeOperation);
+                await _context.ContractSupportFeeApplications.AddAsync(new ContractSupportFeeApplication
+                {
+                    ContractId = contract.Id,
+                    FeeOperation = feeOperation,
+                    SourceOperationId = null,
+                    FeeNature = ContractSupportFeeNature.ManagementFee,
+                    CompartmentId = alloc.CompartmentId,
+                    SupportId = alloc.SupportId,
+                    ApplyOn = FeeApplyOn.Target,
+                    BaseAmount = feeAmount,
+                    FeeAmount = feeAmount,
+                    FeeShares = sharesToRemove,
+                    NavUsed = postingNav,
+                    NavDateUsed = runDate.AddDays(-1),
+                    PolicySource = policy.Source,
+                    PolicyId = null,
+                    EffectiveDate = runDate,
+                    CreatedDate = DateTime.UtcNow,
+                });
+
+                await _operationApplier.ApplyAsync(feeOperation, _context);
+
+                state.AccruedAmount = 0m;
+                state.LastPostedDate = runDate;
+                state.UpdatedDate = DateTime.UtcNow;
+
+                created++;
+            }
+
+            await _context.SaveChangesAsync();
+            return created;
         }
 
         public static class NumericPolicy

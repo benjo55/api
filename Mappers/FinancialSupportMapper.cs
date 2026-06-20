@@ -14,6 +14,7 @@ namespace api.Mappers
                 Label = model.Label,
                 ISIN = model.ISIN,
                 SupportType = model.SupportType,
+                SupportNature = model.SupportNature,
                 Currency = model.Currency,
                 Status = model.Status,
                 MarketingName = model.MarketingName,

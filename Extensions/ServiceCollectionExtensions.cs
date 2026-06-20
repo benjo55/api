@@ -213,6 +213,8 @@ namespace api.Extensions
             services.AddScoped<IFieldDescriptionRepository, FieldDescriptionRepository>();
             services.AddScoped<EntityHistoryService>();
             services.AddScoped<IFinancialSupportRepository, FinancialSupportRepository>();
+            services.AddScoped<IAdvanceRepository, AdvanceRepository>();
+            services.AddScoped<IAdvanceOperationService, AdvanceOperationService>();
             services.AddScoped<ISupportHistoricalDataRepository, SupportHistoricalDataRepository>();
             services.AddScoped<IContractOptionTypeRepository, ContractOptionTypeRepository>();
             services.AddScoped<FinancialSupportImportService>();

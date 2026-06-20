@@ -20,6 +20,9 @@ namespace api.Dtos.Operation
         public decimal? Amount { get; set; }
         public string Currency { get; set; } = "EUR";
 
+        // 🔗 Opération source (versement/rachat/arbitrage) ayant déclenché ce frais
+        public int? SourceOperationId { get; set; }
+
         // 🔹 Détails polymorphes (discriminant JSON : "kind")
         public OperationDetailsDto? Details { get; set; }
 

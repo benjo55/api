@@ -724,6 +724,7 @@ namespace api.Services.Pdf
                 OperationType.Arbitrage => "Arbitrage",
                 OperationType.ScheduledArbitrage => "Arbitrage programmé",
                 OperationType.Advance => "Avance",
+                OperationType.AdvanceRepayment => "Remboursement d'avance",
                 OperationType.Succession => "Succession",
                 OperationType.Donation => "Donation",
                 OperationType.BeneficiaryChange => "Changement de bénéficiaire",

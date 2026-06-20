@@ -27,7 +27,8 @@ public enum OperationType
     // Administratif
     BeneficiaryChange,
     Pledge,
-    ConversionToAnnuity
+    ConversionToAnnuity,
+    AdvanceRepayment
 }
 
 public enum OperationStatus

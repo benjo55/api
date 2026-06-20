@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using api.Dtos.Advance;
 using api.Dtos.BeneficiaryClause;
 using api.Dtos.Compartment;
 using api.Dtos.Document;
@@ -99,6 +100,8 @@ namespace api.Dtos.Contract
 
         // 🆕 Retraits cumulés liés au contrat
         public ICollection<WithdrawalDetailsDto> Withdrawals { get; set; } = new List<WithdrawalDetailsDto>();
+
+        public ICollection<AdvanceDto> Advances { get; set; } = new List<AdvanceDto>();
 
         // public List<FinancialSupportAllocationDto> ConsolidatedSupports { get; set; } = new();
 

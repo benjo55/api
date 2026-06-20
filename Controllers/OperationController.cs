@@ -650,9 +650,11 @@ public class OperationController : ControllerBase
             PaymentDetail = OperationDetailsMapper.ToPaymentModel(dto.Details),
             WithdrawalDetail = OperationDetailsMapper.ToWithdrawalModel(dto.Details),
             ArbitrageDetail = OperationDetailsMapper.ToArbitrageModel(dto.Details),
-            AdvanceDetail = dto.AdvanceDetail is null
-                ? null
-                : new AdvanceDetail
+            AdvanceDetail = dto.Details is AdvanceDetailsDto
+                ? OperationDetailsMapper.ToAdvanceModel(dto.Details, dto.Amount)
+                : dto.AdvanceDetail is null
+                    ? null
+                    : new AdvanceDetail
                 {
                     Amount = dto.AdvanceDetail.Amount,
                     InterestRate = dto.AdvanceDetail.InterestRate,
@@ -729,6 +731,7 @@ public class OperationController : ControllerBase
             ExecutionDate = op.ExecutionDate,
             Amount = op.Amount,
             Currency = string.IsNullOrWhiteSpace(op.Currency) ? "EUR" : op.Currency,
+            SourceOperationId = op.SourceOperationId,
             Details = OperationDetailsMapper.ToDto(op),
             AdvanceDetail = op.AdvanceDetail is null
                 ? null

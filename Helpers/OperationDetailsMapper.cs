@@ -64,6 +64,20 @@ namespace api.Helpers
                 };
             }
 
+            if (op.AdvanceDetail != null)
+            {
+                return new AdvanceDetailsDto
+                {
+                    Mode = op.Type == OperationType.AdvanceRepayment ? "repayment" : "grant",
+                    AdvanceId = op.AdvanceDetail.AdvanceId,
+                    AdvanceNumber = op.AdvanceDetail.Advance?.AdvanceNumber,
+                    TransactionType = op.AdvanceDetail.TransactionType,
+                    InterestRate = op.AdvanceDetail.Advance?.InterestRate ?? op.AdvanceDetail.InterestRate,
+                    MaturityDate = op.AdvanceDetail.Advance?.MaturityDate ?? op.AdvanceDetail.MaturityDate,
+                    Comment = op.AdvanceDetail.Comment,
+                };
+            }
+
             return null;
         }
 
@@ -126,6 +140,21 @@ namespace api.Helpers
                 ToSupportId = 0,
                 Percentage = 0,
                 ScheduleGroupId = ad.ScheduleGroupId,
+            };
+        }
+
+        public static AdvanceDetail? ToAdvanceModel(OperationDetailsDto? dto, decimal? amount)
+        {
+            if (dto is not AdvanceDetailsDto ad) return null;
+
+            return new AdvanceDetail
+            {
+                AdvanceId = ad.AdvanceId,
+                TransactionType = ad.TransactionType,
+                Comment = ad.Comment,
+                Amount = amount ?? 0m,
+                InterestRate = ad.InterestRate ?? 0m,
+                MaturityDate = ad.MaturityDate ?? DateTime.UtcNow
             };
         }
     }
