@@ -16,8 +16,8 @@ namespace api.Repository
     /// - Les parts sont la source de vérité
     /// - Le PRU est recalculé uniquement sur versement
     /// - Le PRU ne change jamais sur rachat
-    /// - TotalInvested diminue proportionnellement lors d’un rachat
-    /// - Les frais retirent des parts sans diminuer l'investi client
+    /// - TotalInvested représente le coût de revient restant
+    /// - Rachats et frais retirent le coût des parts cédées
     /// - Aucune valorisation (CurrentAmount) n’est gérée ici
     /// </summary>
     public sealed class OperationApplier : IOperationApplier
@@ -115,10 +115,10 @@ namespace api.Repository
                 var holding = await GetOrCreateHoldingAsync(operation, alloc, context, ct);
 
                 fsa.CurrentShares += shares;
-                fsa.InvestedAmount += amount;
+                fsa.InvestedAmount = RoundBasis(fsa.InvestedAmount + amount);
 
                 holding.TotalShares += shares;
-                holding.TotalInvested += amount;
+                holding.TotalInvested = RoundBasis(holding.TotalInvested + amount);
 
                 holding.Pru = holding.TotalShares > 0
                     ? Math.Round(holding.TotalInvested / holding.TotalShares, 7)
@@ -168,16 +168,20 @@ namespace api.Repository
                 if (shares > holding.TotalShares)
                     throw new InvalidOperationException("Retrait > parts détenues");
 
-                // 🔥 CORRECTION : on utilise le montant cash réel
-                var investedReduction = amount;
+                var investedReduction = CostForShares(
+                    holding.TotalInvested,
+                    holding.TotalShares,
+                    shares);
 
                 // 🔹 Mise à jour FSA
                 fsa.CurrentShares -= shares;
-                fsa.InvestedAmount = Math.Max(0m, fsa.InvestedAmount - investedReduction);
+                fsa.InvestedAmount = RoundBasis(
+                    Math.Max(0m, fsa.InvestedAmount - investedReduction));
 
                 // 🔹 Mise à jour Holding
                 holding.TotalShares -= shares;
-                holding.TotalInvested = Math.Max(0m, holding.TotalInvested - investedReduction);
+                holding.TotalInvested = RoundBasis(
+                    Math.Max(0m, holding.TotalInvested - investedReduction));
 
                 // 🔒 PRU ne change PAS sur rachat
 
@@ -189,9 +193,9 @@ namespace api.Repository
                     fsa.InvestedAmount = 0m;
                 }
 
-                // 🔹 (Optionnel mais recommandé) éviter dérives décimales
-                fsa.InvestedAmount = Math.Round(fsa.InvestedAmount, 2);
-                holding.TotalInvested = Math.Round(holding.TotalInvested, 2);
+                holding.Pru = holding.TotalShares > 0m
+                    ? Math.Round(holding.TotalInvested / holding.TotalShares, 7)
+                    : 0m;
             }
         }
 
@@ -237,14 +241,29 @@ namespace api.Repository
                 if (shares > holding.TotalShares)
                     throw new InvalidOperationException("Frais > parts détenues");
 
+                var costReduction = CostForShares(
+                    holding.TotalInvested,
+                    holding.TotalShares,
+                    shares);
+
                 fsa.CurrentShares = Math.Max(0m, fsa.CurrentShares - shares);
                 holding.TotalShares = Math.Max(0m, holding.TotalShares - shares);
+                fsa.InvestedAmount = RoundBasis(
+                    Math.Max(0m, fsa.InvestedAmount - costReduction));
+                holding.TotalInvested = RoundBasis(
+                    Math.Max(0m, holding.TotalInvested - costReduction));
 
                 if (holding.TotalShares == 0)
                 {
                     fsa.CurrentShares = 0m;
                     holding.TotalShares = 0m;
+                    fsa.InvestedAmount = 0m;
+                    holding.TotalInvested = 0m;
                 }
+
+                holding.Pru = holding.TotalShares > 0m
+                    ? Math.Round(holding.TotalInvested / holding.TotalShares, 7)
+                    : 0m;
 
                 holding.LastUpdated = DateTime.UtcNow;
             }
@@ -272,8 +291,6 @@ namespace api.Repository
             var totalTargetAmount = targets.Sum(a => a.Amount ?? 0m);
             if (totalTargetAmount <= 0m)
                 throw new InvalidOperationException("Arbitrage TARGET invalide : montant total nul.");
-
-            decimal totalInvestedToTransfer = 0m;
 
             // ============================================================
             // 🔻 1. VENTES (SOURCE)
@@ -312,9 +329,10 @@ namespace api.Repository
                 var investedBefore = holding.TotalInvested;
                 var sharesBefore = holding.TotalShares;
 
-                var investedReduction = sharesBefore > 0m
-                    ? Math.Round(investedBefore * (shares / sharesBefore), 2)
-                    : 0m;
+                var investedReduction = CostForShares(
+                    investedBefore,
+                    sharesBefore,
+                    shares);
 
                 investedReduction = Math.Min(investedReduction, investedBefore);
 
@@ -327,25 +345,25 @@ namespace api.Repository
                     holding.TotalInvested = 0m;
                     holding.Pru = 0m;
 
-                    totalInvestedToTransfer += investedBefore;
                 }
                 else
                 {
                     fsa.CurrentShares -= shares;
-                    fsa.InvestedAmount = Math.Max(0m, fsa.InvestedAmount - investedReduction);
+                    fsa.InvestedAmount = RoundBasis(
+                        Math.Max(0m, fsa.InvestedAmount - investedReduction));
 
                     holding.TotalShares -= shares;
-                    holding.TotalInvested = Math.Max(0m, holding.TotalInvested - investedReduction);
-
-                    totalInvestedToTransfer += investedReduction;
+                    holding.TotalInvested = RoundBasis(
+                        Math.Max(0m, holding.TotalInvested - investedReduction));
+                    holding.Pru = holding.TotalShares > 0m
+                        ? Math.Round(holding.TotalInvested / holding.TotalShares, 7)
+                        : 0m;
                 }
             }
 
             // ============================================================
             // 🔺 2. ACHATS (TARGET)
             // ============================================================
-
-            decimal distributedInvested = 0m;
 
             for (var i = 0; i < targets.Count; i++)
             {
@@ -359,23 +377,16 @@ namespace api.Repository
                 if (shares <= 0 || amount <= 0)
                     throw new InvalidOperationException("Arbitrage TARGET invalide");
 
-                var investedAmount = i == targets.Count - 1
-                    ? Math.Round(totalInvestedToTransfer - distributedInvested, 2)
-                    : Math.Round(totalInvestedToTransfer * (amount / totalTargetAmount), 2);
-
-                if (investedAmount < 0m)
-                    investedAmount = 0m;
-
-                distributedInvested += investedAmount;
+                var investedAmount = RoundBasis(amount);
 
                 var fsa = await GetOrCreateFsaAsync(operation, alloc, context, ct);
                 var holding = await GetOrCreateHoldingAsync(operation, alloc, context, ct);
 
                 fsa.CurrentShares += shares;
-                fsa.InvestedAmount += investedAmount;
+                fsa.InvestedAmount = RoundBasis(fsa.InvestedAmount + investedAmount);
 
                 holding.TotalShares += shares;
-                holding.TotalInvested += investedAmount;
+                holding.TotalInvested = RoundBasis(holding.TotalInvested + investedAmount);
 
                 // 🔥 recalcul PRU comme payment
                 holding.Pru = holding.TotalShares > 0
@@ -383,6 +394,21 @@ namespace api.Repository
                     : 0m;
             }
         }
+
+        private static decimal CostForShares(
+            decimal currentCostBasis,
+            decimal currentShares,
+            decimal sharesToRemove)
+        {
+            if (currentCostBasis <= 0m || currentShares <= 0m || sharesToRemove <= 0m)
+                return 0m;
+
+            var effectiveShares = Math.Min(sharesToRemove, currentShares);
+            return RoundBasis(currentCostBasis * effectiveShares / currentShares);
+        }
+
+        private static decimal RoundBasis(decimal value) =>
+            Math.Round(value, 7, MidpointRounding.AwayFromZero);
 
         private static async Task<FinancialSupportAllocation> GetOrCreateFsaAsync(
             Operation operation,

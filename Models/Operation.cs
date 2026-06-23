@@ -24,6 +24,14 @@ namespace api.Models
         public DateTime? ExecutionDate { get; set; }
         [Column(TypeName = "decimal(20,7)")]
         public decimal? Amount { get; set; }
+
+        // Montant saisi lors de la création. Il reste immuable après dénouement.
+        [Column(TypeName = "decimal(20,7)")]
+        public decimal? RequestedAmount { get; set; }
+
+        // Montant réellement dénoué après application des VL et plafonnement des parts.
+        [Column(TypeName = "decimal(20,7)")]
+        public decimal? ExecutedAmount { get; set; }
         public string Currency { get; set; } = "EUR";
 
         // 🔗 If this operation is a generated fee, this points to the triggering operation.

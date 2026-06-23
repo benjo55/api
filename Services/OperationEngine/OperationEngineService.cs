@@ -24,6 +24,13 @@ namespace api.Services
         private readonly IOperationFeePolicyResolver _operationFeePolicyResolver;
         private readonly IAdvanceOperationService _advanceOperationService;
 
+        private sealed record ManagementFeeAccrualComputation(
+            decimal FeeAmount,
+            decimal BaseAmountDays,
+            int ChargeableDays,
+            DateTime? FirstChargeableDate,
+            DateTime? LastChargeableDate);
+
         public OperationEngineService(ApplicationDBContext context, ILogger<OperationEngineService> logger, IContractSupportHoldingRepository holdingRepo, IContractValuationService valuationService, IOptions<EodSettings> eodSettings, IEodDataProvider eodDataProvider, IDbContextFactory<ApplicationDBContext> dbContextFactory, IOperationApplier operationApplier, IManagementFeePolicyResolver managementFeePolicyResolver, IOperationFeePolicyResolver operationFeePolicyResolver, IAdvanceOperationService advanceOperationService)
         {
             _context = context;
@@ -344,6 +351,14 @@ namespace api.Services
                         f.alloc.EstimatedShares = null;
                     }
 
+                    op.RequestedAmount ??= op.Amount;
+                    var executedAmount = ResolveExecutedAmount(op, finalized.Select(f => f.alloc));
+                    if (finalized.Any())
+                    {
+                        op.ExecutedAmount = executedAmount;
+                        op.Amount = executedAmount;
+                    }
+
                     // ✅ Frais d'opération : résolution & application (par support/poche)
                     var feeGroups = finalized
                         .Select(f => (SupportId: f.alloc.SupportId, CompartmentId: f.alloc.CompartmentId))
@@ -428,6 +443,8 @@ namespace api.Services
                                 ExecutionDate = op.OperationDate,
                                 Status = OperationStatus.Executed,
                                 Amount = feeAmount,
+                                RequestedAmount = feeAmount,
+                                ExecutedAmount = feeAmount,
                                 Currency = contract.Currency,
                                 Allocations = new List<OperationSupportAllocation>
                                 {
@@ -456,6 +473,8 @@ namespace api.Services
                                 SupportId = supportId,
                                 ApplyOn = rf.ApplyOn,
                                 BaseAmount = baseAmount,
+                                FeeMode = rf.Mode,
+                                AppliedRate = rf.Mode == FeeAmountMode.Percentage ? rf.Rate : null,
                                 FeeAmount = feeAmount,
                                 FeeShares = sharesToRemove,
                                 NavUsed = postingNav,
@@ -487,6 +506,8 @@ namespace api.Services
                         if (op.Type is OperationType.Advance or OperationType.AdvanceRepayment)
                             await _advanceOperationService.ApplyAsync(op);
 
+                        op.RequestedAmount ??= op.Amount;
+                        op.ExecutedAmount = op.Amount;
                         op.Status = OperationStatus.Executed;
                         op.ExecutionDate = op.OperationDate;
                         op.UpdatedDate = DateTime.UtcNow;
@@ -518,7 +539,9 @@ namespace api.Services
                                 Type = OperationType.ScheduledPayment,
                                 Status = OperationStatus.Pending,
                                 OperationDate = nextOperationDate.Value,
-                                Amount = op.Amount,
+                                Amount = op.RequestedAmount ?? op.Amount,
+                                RequestedAmount = op.RequestedAmount ?? op.Amount,
+                                ExecutedAmount = null,
                                 Currency = op.Currency,
                                 CreatedDate = DateTime.UtcNow,
                                 UpdatedDate = DateTime.UtcNow,
@@ -569,6 +592,21 @@ namespace api.Services
             _logger.LogInformation("🏁 ProcessPendingOperationsAsync terminé.");
         }
 
+        private static decimal ResolveExecutedAmount(
+            Operation operation,
+            IEnumerable<OperationSupportAllocation> allocations)
+        {
+            var rows = allocations.ToList();
+            if (operation.Type is OperationType.Arbitrage or OperationType.ScheduledArbitrage)
+            {
+                return NumericPolicy.RoundMoney(rows
+                    .Where(a => a.Flow == OperationFlow.Source)
+                    .Sum(a => a.Amount ?? 0m));
+            }
+
+            return NumericPolicy.RoundMoney(rows.Sum(a => a.Amount ?? 0m));
+        }
+
         // 4️⃣ Placeholder règles de gestion
         public async Task ApplyRulesAsync()
         {
@@ -610,16 +648,16 @@ namespace api.Services
 
                         if (accrualStart <= accrualEnd)
                         {
-                            var newlyAccrued = await ComputeDailyAccrualAsync(contract, alloc, policy, accrualStart, accrualEnd);
-                            if (newlyAccrued > 0m)
+                            var computation = await ComputeDailyAccrualAsync(contract, alloc, policy, accrualStart, accrualEnd);
+                            if (computation.FeeAmount > 0m)
                             {
-                                state.AccruedAmount = NumericPolicy.RoundMoney(state.AccruedAmount + newlyAccrued);
+                                ApplyAccrualComputation(state, computation);
                                 _logger.LogInformation(
                                     "📘 Accrual frais contrat {ContractId}, support {SupportId}, poche {CompartmentId} : +{Amount:F7} du {Start:yyyy-MM-dd} au {End:yyyy-MM-dd}",
                                     contract.Id,
                                     alloc.SupportId,
                                     alloc.CompartmentId,
-                                    newlyAccrued,
+                                    computation.FeeAmount,
                                     accrualStart,
                                     accrualEnd);
                             }
@@ -673,6 +711,8 @@ namespace api.Services
                             ExecutionDate = runDate,
                             Status = OperationStatus.Executed,
                             Amount = feeAmount,
+                            RequestedAmount = feeAmount,
+                            ExecutedAmount = feeAmount,
                             Currency = contract.Currency,
                             Allocations = new List<OperationSupportAllocation>
                             {
@@ -700,7 +740,16 @@ namespace api.Services
                             CompartmentId = alloc.CompartmentId,
                             SupportId = alloc.SupportId,
                             ApplyOn = FeeApplyOn.Target,
-                            BaseAmount = feeAmount,
+                            BaseAmount = GetAverageAccrualBase(state),
+                            FeeMode = FeeAmountMode.Percentage,
+                            AppliedRate = policy.AnnualRate,
+                            RateBase = policy.RateBase,
+                            Frequency = policy.Frequency,
+                            ProrataMethod = policy.ProrataMethod,
+                            PostingMode = policy.PostingMode,
+                            AccrualStartDate = state.AccrualStartDate,
+                            AccrualEndDate = state.LastAccruedDate,
+                            AccruedDays = state.AccruedDays,
                             FeeAmount = feeAmount,
                             FeeShares = sharesToRemove,
                             NavUsed = postingNav,
@@ -715,6 +764,9 @@ namespace api.Services
                         await _operationApplier.ApplyAsync(feeOperation, _context);
 
                         state.AccruedAmount = 0m;
+                        state.AccumulatedBaseAmount = 0m;
+                        state.AccruedDays = 0;
+                        state.AccrualStartDate = null;
                         state.LastPostedDate = runDate;
                         state.UpdatedDate = DateTime.UtcNow;
 
@@ -762,6 +814,8 @@ namespace api.Services
                 SupportId = supportId,
                 CompartmentId = compartmentId,
                 AccruedAmount = 0m,
+                AccumulatedBaseAmount = 0m,
+                AccruedDays = 0,
                 CreatedDate = DateTime.UtcNow,
                 UpdatedDate = DateTime.UtcNow,
             };
@@ -788,7 +842,7 @@ namespace api.Services
             return yesterday;
         }
 
-        private async Task<decimal> ComputeDailyAccrualAsync(
+        private async Task<ManagementFeeAccrualComputation> ComputeDailyAccrualAsync(
             Contract contract,
             FinancialSupportAllocation allocation,
             ResolvedManagementFeePolicy policy,
@@ -796,7 +850,7 @@ namespace api.Services
             DateTime endDate)
         {
             if (startDate > endDate)
-                return 0m;
+                return new ManagementFeeAccrualComputation(0m, 0m, 0, null, null);
 
             var operationAllocations = await _context.OperationSupportAllocations
                 .Include(a => a.Operation)
@@ -850,6 +904,10 @@ namespace api.Services
 
             var shares = openingShares;
             var accruedAmount = 0m;
+            var baseAmountDays = 0m;
+            var chargeableDays = 0;
+            DateTime? firstChargeableDate = null;
+            DateTime? lastChargeableDate = null;
 
             for (var day = startDate.Date; day <= endDate.Date; day = day.AddDays(1))
             {
@@ -866,12 +924,39 @@ namespace api.Services
                 if (shares <= 0m || currentNav is not decimal nav || nav <= 0m)
                     continue;
 
-                var dailyAmount = NumericPolicy.RoundMoney(shares * nav * ComputeDailyRate(policy, day));
-                accruedAmount = NumericPolicy.RoundMoney(accruedAmount + dailyAmount);
+                var dailyBase = shares * nav;
+                baseAmountDays += dailyBase;
+                chargeableDays++;
+                firstChargeableDate ??= day;
+                lastChargeableDate = day;
+
+                var dailyAmount = NumericPolicy.RoundAmount(dailyBase * ComputeDailyRate(policy, day));
+                accruedAmount = NumericPolicy.RoundAmount(accruedAmount + dailyAmount);
             }
 
-            return accruedAmount;
+            return new ManagementFeeAccrualComputation(
+                accruedAmount,
+                NumericPolicy.RoundAmount(baseAmountDays),
+                chargeableDays,
+                firstChargeableDate,
+                lastChargeableDate);
         }
+
+        private static void ApplyAccrualComputation(
+            ContractManagementFeeAccrual state,
+            ManagementFeeAccrualComputation computation)
+        {
+            state.AccruedAmount = NumericPolicy.RoundAmount(state.AccruedAmount + computation.FeeAmount);
+            state.AccumulatedBaseAmount = NumericPolicy.RoundAmount(
+                state.AccumulatedBaseAmount + computation.BaseAmountDays);
+            state.AccruedDays += computation.ChargeableDays;
+            state.AccrualStartDate ??= computation.FirstChargeableDate;
+        }
+
+        private static decimal GetAverageAccrualBase(ContractManagementFeeAccrual state)
+            => state.AccruedDays > 0
+                ? NumericPolicy.RoundAmount(state.AccumulatedBaseAmount / state.AccruedDays)
+                : 0m;
 
         private async Task<decimal> GetPostingNavAsync(FinancialSupport support, int supportId, DateTime valuationDate)
         {
@@ -1471,6 +1556,8 @@ namespace api.Services
                             ExecutionDate = op.ExecutionDate ?? op.OperationDate,
                             Status = OperationStatus.Executed,
                             Amount = feeAmount,
+                            RequestedAmount = feeAmount,
+                            ExecutedAmount = feeAmount,
                             Currency = contract.Currency,
                             Allocations = new List<OperationSupportAllocation>
                             {
@@ -1499,6 +1586,8 @@ namespace api.Services
                             SupportId = supportId,
                             ApplyOn = rf.ApplyOn,
                             BaseAmount = baseAmount,
+                            FeeMode = rf.Mode,
+                            AppliedRate = rf.Mode == FeeAmountMode.Percentage ? rf.Rate : null,
                             FeeAmount = feeAmount,
                             FeeShares = sharesToRemove,
                             NavUsed = postingNav,
@@ -1548,10 +1637,10 @@ namespace api.Services
 
                 if (accrualStart <= accrualEnd)
                 {
-                    var newlyAccrued = await ComputeDailyAccrualAsync(contract, alloc, policy, accrualStart, accrualEnd);
-                    if (newlyAccrued > 0m)
+                    var computation = await ComputeDailyAccrualAsync(contract, alloc, policy, accrualStart, accrualEnd);
+                    if (computation.FeeAmount > 0m)
                     {
-                        state.AccruedAmount = NumericPolicy.RoundMoney(state.AccruedAmount + newlyAccrued);
+                        ApplyAccrualComputation(state, computation);
                     }
 
                     state.LastAccruedDate = accrualEnd;
@@ -1593,6 +1682,8 @@ namespace api.Services
                     ExecutionDate = runDate,
                     Status = OperationStatus.Executed,
                     Amount = feeAmount,
+                    RequestedAmount = feeAmount,
+                    ExecutedAmount = feeAmount,
                     Currency = contract.Currency,
                     Allocations = new List<OperationSupportAllocation>
                     {
@@ -1620,7 +1711,16 @@ namespace api.Services
                     CompartmentId = alloc.CompartmentId,
                     SupportId = alloc.SupportId,
                     ApplyOn = FeeApplyOn.Target,
-                    BaseAmount = feeAmount,
+                    BaseAmount = GetAverageAccrualBase(state),
+                    FeeMode = FeeAmountMode.Percentage,
+                    AppliedRate = policy.AnnualRate,
+                    RateBase = policy.RateBase,
+                    Frequency = policy.Frequency,
+                    ProrataMethod = policy.ProrataMethod,
+                    PostingMode = policy.PostingMode,
+                    AccrualStartDate = state.AccrualStartDate,
+                    AccrualEndDate = state.LastAccruedDate,
+                    AccruedDays = state.AccruedDays,
                     FeeAmount = feeAmount,
                     FeeShares = sharesToRemove,
                     NavUsed = postingNav,
@@ -1634,6 +1734,9 @@ namespace api.Services
                 await _operationApplier.ApplyAsync(feeOperation, _context);
 
                 state.AccruedAmount = 0m;
+                state.AccumulatedBaseAmount = 0m;
+                state.AccruedDays = 0;
+                state.AccrualStartDate = null;
                 state.LastPostedDate = runDate;
                 state.UpdatedDate = DateTime.UtcNow;
 
@@ -1653,6 +1756,9 @@ namespace api.Services
                 => Math.Round(value, 2, MidpointRounding.AwayFromZero);
 
             public static decimal RoundPru(decimal value)
+                => Math.Round(value, 7, MidpointRounding.AwayFromZero);
+
+            public static decimal RoundAmount(decimal value)
                 => Math.Round(value, 7, MidpointRounding.AwayFromZero);
         }
     }

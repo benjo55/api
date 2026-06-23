@@ -23,6 +23,12 @@ namespace api.Models
         [Column(TypeName = "decimal(20,7)")]
         public decimal AccruedAmount { get; set; }
 
+        [Column(TypeName = "decimal(20,7)")]
+        public decimal AccumulatedBaseAmount { get; set; }
+
+        public int AccruedDays { get; set; }
+        public DateTime? AccrualStartDate { get; set; }
+
         public DateTime? LastAccruedDate { get; set; }
         public DateTime? LastPostedDate { get; set; }
 

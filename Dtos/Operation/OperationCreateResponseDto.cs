@@ -7,6 +7,8 @@ namespace api.Dtos.Operation
         public int ContractId { get; set; }
         public string OperationType { get; set; } = string.Empty;
         public decimal Amount { get; set; }
+        public decimal RequestedAmount { get; set; }
+        public decimal? ExecutedAmount { get; set; }
         public string Status { get; set; } = string.Empty;
 
         // 🔹 Liste synthétique des allocations

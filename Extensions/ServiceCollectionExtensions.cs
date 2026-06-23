@@ -223,6 +223,8 @@ namespace api.Extensions
             services.AddHttpClient<IEodDataProvider, EodDataProvider>();
             services.AddHttpClient<ITwelveDataProvider, TwelveDataProvider>();
             services.AddScoped<IContractValuationService, ContractValuationService>();
+            services.AddScoped<ICostBasisService, CostBasisService>();
+            services.AddScoped<IContractAuditService, ContractAuditService>();
             services.AddScoped<IFeeEngine, FeeEngine>();
             services.AddScoped<IManagementFeePolicyResolver, ManagementFeePolicyResolver>();
             services.AddScoped<IOperationFeePolicyResolver, OperationFeePolicyResolver>();

@@ -16,6 +16,15 @@ namespace api.Dtos.Contract
         public string SupportIsin { get; set; } = string.Empty;
         public FeeApplyOn ApplyOn { get; set; }
         public decimal BaseAmount { get; set; }
+        public FeeAmountMode? FeeMode { get; set; }
+        public decimal? AppliedRate { get; set; }
+        public ManagementFeeRateBase? RateBase { get; set; }
+        public ManagementFeeFrequency? Frequency { get; set; }
+        public ManagementFeeProrataMethod? ProrataMethod { get; set; }
+        public ManagementFeePostingMode? PostingMode { get; set; }
+        public DateTime? AccrualStartDate { get; set; }
+        public DateTime? AccrualEndDate { get; set; }
+        public int? AccruedDays { get; set; }
         public decimal FeeAmount { get; set; }
         public decimal FeeShares { get; set; }
         public decimal NavUsed { get; set; }

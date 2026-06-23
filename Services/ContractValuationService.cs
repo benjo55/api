@@ -12,13 +12,16 @@ public class ContractValuationService : IContractValuationService
 {
     private readonly ApplicationDBContext _context;
     private readonly ILogger<ContractValuationService> _logger;
+    private readonly api.Interfaces.ICostBasisService _costBasisService;
 
     public ContractValuationService(
         ApplicationDBContext context,
-        ILogger<ContractValuationService> logger)
+        ILogger<ContractValuationService> logger,
+        api.Interfaces.ICostBasisService costBasisService)
     {
         _context = context;
         _logger = logger;
+        _costBasisService = costBasisService;
     }
 
     // ==========================================================
@@ -42,6 +45,10 @@ public class ContractValuationService : IContractValuationService
                 _logger.LogWarning("❌ Contrat {ContractId} introuvable.", contractId);
                 return 0m;
             }
+
+            // Le coût de revient est dérivé du journal exécuté, jamais des flux
+            // externes agrégés du contrat.
+            await _costBasisService.RebuildAsync(contractId);
 
             // 2️⃣ Charger holdings consolidés (PRU / perf uniquement)
             var holdings = await _context.ContractSupportHoldings
@@ -119,7 +126,7 @@ public class ContractValuationService : IContractValuationService
                 );
             }
 
-            // 5️⃣ BIS 🔥 Synchronisation CASH : Holding.TotalInvested = somme FSA
+            // 5️⃣ BIS : synchronisation du coût de revient par position.
             foreach (var h in holdings)
             {
                 var investedFromFsa = fsas
@@ -127,7 +134,15 @@ public class ContractValuationService : IContractValuationService
                                 f.CompartmentId == h.CompartmentId)
                     .Sum(f => f.InvestedAmount);
 
-                h.TotalInvested = Math.Round(investedFromFsa, 2);
+                h.TotalInvested = Math.Round(investedFromFsa, 7);
+                h.Pru = h.TotalShares > 0m
+                    ? Math.Round(h.TotalInvested / h.TotalShares, 7, MidpointRounding.AwayFromZero)
+                    : 0m;
+
+                h.PerformancePercent = h.TotalInvested > 0m
+                    ? Math.Round(((h.CurrentAmount ?? 0m) - h.TotalInvested) / h.TotalInvested * 100m, 4,
+                        MidpointRounding.AwayFromZero)
+                    : 0m;
             }
 
             // 7️⃣ 🔥 Valeur contrat = somme des poches (FSA)

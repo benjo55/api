@@ -117,6 +117,8 @@ public class OperationRepository : IOperationRepository
             var rawAllocations = operation.Allocations?.ToList() ?? new List<OperationSupportAllocation>();
             operation.Allocations = new List<OperationSupportAllocation>();
             operation.Status = OperationStatus.Pending;
+            operation.RequestedAmount ??= operation.Amount;
+            operation.ExecutedAmount = null;
 
             _context.Operations.Add(operation);
             await _context.SaveChangesAsync();
@@ -241,6 +243,8 @@ public class OperationRepository : IOperationRepository
         existing.Type = operation.Type;
         existing.OperationDate = operation.OperationDate;
         existing.Amount = operation.Amount;
+        existing.RequestedAmount = operation.RequestedAmount ?? operation.Amount;
+        existing.ExecutedAmount = null;
         existing.Currency = operation.Currency;
         existing.UpdatedDate = DateTime.UtcNow;
 

@@ -831,6 +831,16 @@ namespace api.Migrations
                         .HasPrecision(20, 7)
                         .HasColumnType("decimal(20,7)");
 
+                    b.Property<int>("AccruedDays")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("AccrualStartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("AccumulatedBaseAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
                     b.Property<int>("CompartmentId")
                         .HasColumnType("int");
 
@@ -908,6 +918,18 @@ namespace api.Migrations
                     b.Property<int>("ApplyOn")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("AccrualEndDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("AccrualStartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("AccruedDays")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("AppliedRate")
+                        .HasColumnType("decimal(18,7)");
+
                     b.Property<decimal>("BaseAmount")
                         .HasPrecision(20, 7)
                         .HasColumnType("decimal(20,7)");
@@ -928,10 +950,16 @@ namespace api.Migrations
                         .HasPrecision(20, 7)
                         .HasColumnType("decimal(20,7)");
 
+                    b.Property<int?>("FeeMode")
+                        .HasColumnType("int");
+
                     b.Property<int>("FeeNature")
                         .HasColumnType("int");
 
                     b.Property<int>("FeeOperationId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("Frequency")
                         .HasColumnType("int");
 
                     b.Property<decimal>("FeeShares")
@@ -952,6 +980,15 @@ namespace api.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("PostingMode")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ProrataMethod")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("RateBase")
+                        .HasColumnType("int");
 
                     b.Property<int?>("SourceOperationId")
                         .HasColumnType("int");
@@ -2052,6 +2089,10 @@ namespace api.Migrations
                         .HasPrecision(20, 7)
                         .HasColumnType("decimal(20,7)");
 
+                    b.Property<decimal?>("ExecutedAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
                     b.Property<int>("ContractId")
                         .HasColumnType("int");
 
@@ -2067,6 +2108,10 @@ namespace api.Migrations
 
                     b.Property<DateTime>("OperationDate")
                         .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("RequestedAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
 
                     b.Property<int?>("SourceOperationId")
                         .HasColumnType("int");

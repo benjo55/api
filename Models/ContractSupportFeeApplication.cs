@@ -34,6 +34,20 @@ namespace api.Models
         [Column(TypeName = "decimal(20,7)")]
         public decimal BaseAmount { get; set; }
 
+        public FeeAmountMode? FeeMode { get; set; }
+
+        [Column(TypeName = "decimal(18,7)")]
+        public decimal? AppliedRate { get; set; }
+
+        public ManagementFeeRateBase? RateBase { get; set; }
+        public ManagementFeeFrequency? Frequency { get; set; }
+        public ManagementFeeProrataMethod? ProrataMethod { get; set; }
+        public ManagementFeePostingMode? PostingMode { get; set; }
+
+        public DateTime? AccrualStartDate { get; set; }
+        public DateTime? AccrualEndDate { get; set; }
+        public int? AccruedDays { get; set; }
+
         [Column(TypeName = "decimal(20,7)")]
         public decimal FeeAmount { get; set; }
 

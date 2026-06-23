@@ -701,47 +701,39 @@ namespace api.Repository
                 .Where(h => h.ContractId == contractId)
                 .ToListAsync();
 
-            var result = new List<ContractSupportHoldingDto>();
-
-            foreach (var h in holdings)
-            {
-                var vl = h.Support?.LastValuationAmount ?? 0m;
-
-                // 🔍 Nettoyage
-                var pru = Math.Round(h.Pru, 7);
-                var shares = Math.Round(h.TotalShares, 7);
-                var invested = Math.Round(h.TotalInvested, 7);
-
-                // 💰 Valeur actuelle (la vraie !)
-                var currentValue = Math.Round(shares * vl, 7);
-
-                // 📈 Performance : (VL / PRU - 1) × 100
-                decimal performancePercent = 0m;
-                if (pru > 0 && vl > 0)
+            return holdings
+                .GroupBy(h => h.SupportId)
+                .Select(group =>
                 {
-                    performancePercent = Math.Round(((vl - pru) / pru) * 100m, 4);
-                }
+                    var first = group.First();
+                    var vl = first.Support?.LastValuationAmount ?? 0m;
+                    var shares = Math.Round(group.Sum(h => h.TotalShares), 7);
+                    var costBasis = Math.Round(group.Sum(h => h.TotalInvested), 7);
+                    var currentValue = Math.Round(group.Sum(h => h.CurrentAmount ?? 0m), 7);
+                    var pru = shares > 0m
+                        ? Math.Round(costBasis / shares, 7, MidpointRounding.AwayFromZero)
+                        : 0m;
+                    var performancePercent = costBasis > 0m
+                        ? Math.Round((currentValue - costBasis) / costBasis * 100m, 4,
+                            MidpointRounding.AwayFromZero)
+                        : 0m;
 
-                Console.WriteLine(
-                    $"[Holding] {h.Support?.ISIN} | PRU={pru} | VL={vl} | Parts={shares} | Value={currentValue} | Perf={performancePercent}%");
-
-                // 🔄 Ajout DTO
-                result.Add(new ContractSupportHoldingDto
-                {
-                    SupportId = h.SupportId,
-                    SupportLabel = h.Support?.Label ?? "",
-                    ISIN = h.Support?.ISIN ?? "",
-                    Vl = vl,
-                    Pru = pru,
-                    TotalShares = shares,
-                    TotalInvested = invested,
-                    CurrentValue = currentValue,
-                    PerformancePercent = performancePercent,
-                    LastUpdated = h.Support?.UpdatedDate
-                });
-            }
-
-            return result;
+                    return new ContractSupportHoldingDto
+                    {
+                        SupportId = group.Key,
+                        SupportLabel = first.Support?.Label ?? "",
+                        ISIN = first.Support?.ISIN ?? "",
+                        Vl = vl,
+                        Pru = pru,
+                        TotalShares = shares,
+                        TotalInvested = costBasis,
+                        CurrentValue = currentValue,
+                        PerformancePercent = performancePercent,
+                        LastUpdated = group.Max(h => h.LastUpdated)
+                    };
+                })
+                .OrderByDescending(h => h.CurrentValue)
+                .ToList();
         }
 
         public void DetachAllEntities()

@@ -22,6 +22,7 @@ namespace api.Controllers
         private readonly IContractValuationService _valuationService;
         private readonly IOperationRepository _operationRepository;
         private readonly IManagementFeePolicyResolver _managementFeePolicyResolver;
+        private readonly IContractAuditService _contractAuditService;
 
         public ContractController(
             IContractRepository contractRepository,
@@ -29,7 +30,8 @@ namespace api.Controllers
             IOperationEngineService operationEngineService,
             IOperationRepository operationRepository,
             IContractValuationService valuationService,
-            IManagementFeePolicyResolver managementFeePolicyResolver)
+            IManagementFeePolicyResolver managementFeePolicyResolver,
+            IContractAuditService contractAuditService)
         {
             _contractRepository = contractRepository;
             _productRepository = productRepository;
@@ -37,6 +39,7 @@ namespace api.Controllers
             _operationRepository = operationRepository;
             _valuationService = valuationService;
             _managementFeePolicyResolver = managementFeePolicyResolver;
+            _contractAuditService = contractAuditService;
         }
 
         [HttpGet]
@@ -66,6 +69,19 @@ namespace api.Controllers
             var dto = contract.ToContractDto();
             EnrichResolvedManagementFeePolicy(contract, dto);
             return Ok(dto);
+        }
+
+        [HttpGet("{id:int}/reconciliation")]
+        public async Task<IActionResult> GetReconciliation([FromRoute] int id)
+        {
+            try
+            {
+                return Ok(await _contractAuditService.GetReconciliationAsync(id));
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound($"Contrat {id} introuvable.");
+            }
         }
 
         [HttpPost]
