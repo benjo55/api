@@ -55,7 +55,18 @@ namespace api.Repository
             await _context.Users
                 .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
-                .FirstOrDefaultAsync(u => u.Username == username);
+                .FirstOrDefaultAsync(u => u.NormalizedUsername == NormalizeUserName(username));
+
+        public async Task<User?> GetByUsernameOrEmailAsync(string usernameOrEmail)
+        {
+            var normalized = NormalizeUserName(usernameOrEmail);
+            return await _context.Users
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u =>
+                    u.NormalizedUsername == normalized
+                    || u.NormalizedEmail == normalized);
+        }
 
         public async Task<User> CreateAsync(User user)
         {
@@ -70,9 +81,12 @@ namespace api.Repository
             if (existingUser == null) return null;
 
             existingUser.Username = user.Username;
+            existingUser.NormalizedUsername = user.NormalizedUsername;
             existingUser.PasswordHash = user.PasswordHash;
 
             existingUser.Email = user.Email;
+            existingUser.NormalizedEmail = user.NormalizedEmail;
+            existingUser.PhoneNumber = user.PhoneNumber;
 
             await _context.SaveChangesAsync();
             return existingUser;
@@ -89,6 +103,15 @@ namespace api.Repository
         }
 
         public async Task<bool> UsernameExistsAsync(string username) =>
-            await _context.Users.AnyAsync(u => u.Username == username);
+            await _context.Users.AnyAsync(u => u.NormalizedUsername == NormalizeUserName(username));
+
+        public async Task<bool> EmailExistsAsync(string email) =>
+            await _context.Users.AnyAsync(u => u.NormalizedEmail == NormalizeEmail(email));
+
+        private static string NormalizeUserName(string username) =>
+            username.Trim().ToUpperInvariant();
+
+        private static string NormalizeEmail(string email) =>
+            email.Trim().ToUpperInvariant();
     }
 }

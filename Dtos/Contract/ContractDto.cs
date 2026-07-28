@@ -34,6 +34,9 @@ namespace api.Dtos.Contract
 
         public int? PersonId { get; set; }
         public int? ProductId { get; set; }
+        public int? ProductVersionId { get; set; }
+        public string? ProductVersionCode { get; set; }
+        public string? ProductVersionName { get; set; }
         public string? ProductCode { get; set; }
         public string? ProductName { get; set; }
         public ContractFamily? ContractFamily { get; set; }

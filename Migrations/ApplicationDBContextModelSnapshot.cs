@@ -22,6 +22,8 @@ namespace api.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.HasSequence("TaxReceiptNumberSequence");
+
             modelBuilder.Entity("ContractOptionType", b =>
                 {
                     b.Property<int>("Id")
@@ -224,38 +226,55 @@ namespace api.Migrations
                         });
                 });
 
-            modelBuilder.Entity("api.Models.AdvanceDetail", b =>
+            modelBuilder.Entity("api.Models.AdminAuditEvent", b =>
                 {
-                    b.Property<int>("OperationId")
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    b.Property<int?>("AdvanceId")
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("ActingUserId")
                         .HasColumnType("int");
 
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(20, 7)
-                        .HasColumnType("decimal(20,7)");
+                    b.Property<string>("ActingUsername")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("Comment")
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DetailsJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Reason")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
-                    b.Property<decimal>("InterestRate")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                    b.Property<string>("ResultCode")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
 
-                    b.Property<DateTime>("MaturityDate")
-                        .HasColumnType("datetime2");
+                    b.Property<int?>("TargetRoleId")
+                        .HasColumnType("int");
 
-                    b.Property<string>("TransactionType")
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
+                    b.Property<int?>("TargetUserId")
+                        .HasColumnType("int");
 
-                    b.HasKey("OperationId");
+                    b.HasKey("Id");
 
-                    b.HasIndex("AdvanceId");
+                    b.HasIndex("Action", "CreatedAt")
+                        .HasDatabaseName("IX_AdminAuditEvents_Action_Date");
 
-                    b.ToTable("AdvanceDetails", (string)null);
+                    b.HasIndex("TargetUserId", "CreatedAt")
+                        .HasDatabaseName("IX_AdminAuditEvents_TargetUser_Date");
+
+                    b.ToTable("AdminAuditEvents", (string)null);
                 });
 
             modelBuilder.Entity("api.Models.Advance", b =>
@@ -316,8 +335,8 @@ namespace api.Migrations
                         .HasColumnType("decimal(20,7)");
 
                     b.Property<byte[]>("RowVersion")
-                        .IsRequired()
                         .IsConcurrencyToken()
+                        .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
@@ -339,6 +358,40 @@ namespace api.Migrations
                         .HasDatabaseName("IX_Advances_Contract_Status");
 
                     b.ToTable("Advances", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.AdvanceDetail", b =>
+                {
+                    b.Property<int>("OperationId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("AdvanceId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<decimal>("InterestRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<DateTime>("MaturityDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TransactionType")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.HasKey("OperationId");
+
+                    b.HasIndex("AdvanceId");
+
+                    b.ToTable("AdvanceDetails", (string)null);
                 });
 
             modelBuilder.Entity("api.Models.AdvanceTransaction", b =>
@@ -379,13 +432,13 @@ namespace api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AdvanceId", "OperationDate")
-                        .HasDatabaseName("IX_AdvanceTransactions_Advance_Date");
-
                     b.HasIndex("OperationId")
                         .IsUnique()
-                        .HasFilter("[OperationId] IS NOT NULL")
-                        .HasDatabaseName("UX_AdvanceTransactions_OperationId");
+                        .HasDatabaseName("UX_AdvanceTransactions_OperationId")
+                        .HasFilter("[OperationId] IS NOT NULL");
+
+                    b.HasIndex("AdvanceId", "OperationDate")
+                        .HasDatabaseName("IX_AdvanceTransactions_Advance_Date");
 
                     b.ToTable("AdvanceTransactions", (string)null);
                 });
@@ -481,6 +534,189 @@ namespace api.Migrations
                     b.HasIndex("PersonId");
 
                     b.ToTable("BeneficiaryClausePersons", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.BeneficiaryOrganization", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("AddressGeoJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("AddressLine2")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTime?>("ApprovalDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("CountryCode")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)");
+
+                    b.Property<string>("FiscalArticle")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("HelloAssoConnectionError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("HelloAssoConnectionLastCheckedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("HelloAssoConnectionStatus")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("HelloAssoCredentialKey")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("HelloAssoEnvironment")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("HelloAssoOrganizationSlug")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("Identifier")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("IdentifierType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsBankTransferEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDonationEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsEligibleForTaxReceipt")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsHelloAssoPaymentEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsPayPalEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LegalName")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("OrganizationCategory")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("OrganizationSubCategory")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("OtherCategoryDescription")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("PayPalCredentialKey")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("PayPalEnvironment")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("PayPalMerchantAlias")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("PayPalMerchantId")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("PostalCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime?>("RecognitionDecreeDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("RecognitionOfficialJournalDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RnaNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Siret")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("StreetName")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("StreetNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HelloAssoOrganizationSlug")
+                        .HasDatabaseName("IX_BeneficiaryOrganizations_HelloAssoSlug");
+
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("IX_BeneficiaryOrganizations_IsActive");
+
+                    b.HasIndex("IdentifierType", "Identifier")
+                        .IsUnique();
+
+                    b.ToTable("BeneficiaryOrganizations", (string)null);
                 });
 
             modelBuilder.Entity("api.Models.Brand", b =>
@@ -579,6 +815,114 @@ namespace api.Migrations
                     b.ToTable("Brands", (string)null);
                 });
 
+            modelBuilder.Entity("api.Models.ClauseDefinition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("ClauseDefinitions", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.ClauseRevision", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ClauseDefinitionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ContentHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("ContentHtml")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("EditorJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("EffectiveFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("MajorVersion")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MinorVersion")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PlainText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClauseDefinitionId", "MajorVersion", "MinorVersion")
+                        .IsUnique();
+
+                    b.ToTable("ClauseRevisions", (string)null);
+                });
+
             modelBuilder.Entity("api.Models.ClientTypeCompliance", b =>
                 {
                     b.Property<int>("Id")
@@ -610,6 +954,1111 @@ namespace api.Migrations
                     b.HasIndex("FinancialSupportId");
 
                     b.ToTable("ClientTypeCompliances", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.CartographyDomainDocument", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EmployerEntity")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployerEntity")
+                        .IsUnique();
+
+                    b.ToTable("CartographyDomainDocuments", "cmdb");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.CartographyDomainDocumentSection", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CartographyDomainDocumentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ContentHtml")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EditorJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("HeadingLevel")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PlainText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SectionKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CartographyDomainDocumentId", "SectionKey")
+                        .IsUnique();
+
+                    b.ToTable("CartographyDomainDocumentSections", "cmdb");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.CartographyNodeLayout", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("ConfigurationItemId")
+                        .HasColumnType("int");
+
+                    b.Property<double>("PositionX")
+                        .HasColumnType("float");
+
+                    b.Property<double>("PositionY")
+                        .HasColumnType("float");
+
+                    b.Property<string>("ScopeKey")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("ScopeType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConfigurationItemId");
+
+                    b.HasIndex("ScopeType", "ScopeKey", "UserName", "ConfigurationItemId")
+                        .IsUnique();
+
+                    b.ToTable("CartographyNodeLayouts", "cmdb");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.CiAttributeDefinition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("DataType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsFacet")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("AttributeDefinitions", "cmdb");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.CiAttributeValue", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("AttributeDefinitionId")
+                        .HasColumnType("int");
+
+                    b.Property<bool?>("BooleanValue")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("ConfigurationItemId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DateTimeValue")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("NumberValue")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("decimal(28,8)");
+
+                    b.Property<string>("RawValue")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("StringValue")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AttributeDefinitionId");
+
+                    b.HasIndex("ConfigurationItemId", "AttributeDefinitionId")
+                        .IsUnique();
+
+                    b.ToTable("AttributeValues", "cmdb");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.CiSupportAssignment", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("ConfigurationItemId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("GroupName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ManagerEntity")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("ManagerName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ManagerTeam")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("RoleName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConfigurationItemId", "GroupName", "RoleName")
+                        .IsUnique();
+
+                    b.ToTable("SupportAssignments", "cmdb");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.CmdbImportRun", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("AttributeCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ErrorSummary")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("InsertedCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RejectedCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RelationshipCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SourceSystem")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int>("SupportAssignmentCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UpdatedCount")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ImportRuns", "cmdb");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.CmdbRelationship", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("IsBlocking")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsCurrent")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("RelationshipTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SourceCiId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SourceSystem")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("TargetCiId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RelationshipTypeId");
+
+                    b.HasIndex("SourceCiId", "IsCurrent");
+
+                    b.HasIndex("TargetCiId", "IsCurrent");
+
+                    b.HasIndex("SourceCiId", "TargetCiId", "RelationshipTypeId", "SourceSystem")
+                        .IsUnique();
+
+                    b.ToTable("Relationships", "cmdb");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.CmdbRelationshipType", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("Family")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDirectional")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("RelationshipTypes", "cmdb");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.ConfigurationItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ApplicationCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ApplicationDomain")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("BudgetCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DatabaseCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("EntityPath")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ExternalCiNumber")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<bool>("IsCurrent")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsPlaceholder")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("Locked")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("OwnerName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("PlatformName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("PlatformType")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ResponsibleEmployer")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("Rpo")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Rto")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime?>("SourceUpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Version")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExternalCiNumber")
+                        .IsUnique();
+
+                    b.HasIndex("Name");
+
+                    b.HasIndex("Model", "Category", "Status", "IsCurrent");
+
+                    b.ToTable("ConfigurationItems", "cmdb");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.ConfigurationItemApplicationProfile", b =>
+                {
+                    b.Property<int>("ConfigurationItemId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ApplicationCriticality")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("ApplicationNature")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("AuthenticationMode")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("CloudServiceModel")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<bool?>("CodeScanEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DetailedDescription")
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("ExternalTechnicalAdminCount")
+                        .HasColumnType("int");
+
+                    b.Property<bool?>("FailoverTestPerformed")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("GeneralTechnicalFramework")
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("HostingMode")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("HostingNetworkZone")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("HostingProvider")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("IamSolution")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int?>("InternalTechnicalAdminCount")
+                        .HasColumnType("int");
+
+                    b.Property<bool?>("InternetExposed")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastAccessRecertificationDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal?>("LastAccessRemediationPercentage")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<DateTime?>("LastBugBountyDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("LastFailoverTestDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("LastPentestDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("LastRedTeamDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("LastRestorationTestResult")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("LegalOwnerEntity")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("MainFunctionalProcesses")
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool?>("MfaEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("NonProductionBusinessData")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("NonProductionPersonalData")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("OpenRecommendationsHigh")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("OpenRecommendationsLow")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("OpenRecommendationsMedium")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OtherStakeholders")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("OverallArchitecture")
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("OverdueRecommendationsHigh")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("OverdueRecommendationsLow")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("OverdueRecommendationsMedium")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PendingTestActionsCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PersonalDataPseudonymization")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("PreviousAccessRecertificationDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal?>("PreviousAccessRemediationPercentage")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<DateTime?>("PreviousFailoverTestDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("PreviousPentestDate")
+                        .HasColumnType("date");
+
+                    b.Property<bool?>("ProcessesPersonalData")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("RestorationTestedWithinYear")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("SecurityComments")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("ShortDescription")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool?>("SourceCodeAvailable")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("StandalonePasswordRules")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("ConfigurationItemId");
+
+                    b.ToTable("ApplicationProfiles", "cmdb");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.ExchangePattern", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("DefaultTechnologyId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Family")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("InteractionMode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("Locked")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("TriggerMode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("TypicalUses")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("DefaultTechnologyId");
+
+                    b.ToTable("ExchangePatterns", "integration");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Code = "API_SYNC",
+                            CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DefaultTechnologyId = 1,
+                            Description = "Requête/réponse synchrone.",
+                            Family = "API",
+                            InteractionMode = "Synchronous",
+                            IsActive = true,
+                            IsSystem = true,
+                            Locked = false,
+                            Name = "API synchrone",
+                            TriggerMode = "OnDemand"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Code = "API_ASYNC_CALLBACK",
+                            CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DefaultTechnologyId = 1,
+                            Description = "Appel asynchrone avec notification de résultat.",
+                            Family = "API",
+                            InteractionMode = "Asynchronous",
+                            IsActive = true,
+                            IsSystem = true,
+                            Locked = false,
+                            Name = "API asynchrone avec callback",
+                            TriggerMode = "OnDemand"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Code = "KAFKA_EVENT",
+                            CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DefaultTechnologyId = 2,
+                            Description = "Publication et consommation événementielles.",
+                            Family = "Messaging",
+                            InteractionMode = "Asynchronous",
+                            IsActive = true,
+                            IsSystem = true,
+                            Locked = false,
+                            Name = "Événement Kafka",
+                            TriggerMode = "EventDriven"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Code = "ETL_BATCH",
+                            CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DefaultTechnologyId = 4,
+                            Description = "Extraction, transformation et chargement planifiés.",
+                            Family = "ETL",
+                            InteractionMode = "Asynchronous",
+                            IsActive = true,
+                            IsSystem = true,
+                            Locked = false,
+                            Name = "ETL batch",
+                            TriggerMode = "Scheduled"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Code = "ELT_BATCH",
+                            CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Extraction, chargement puis transformation planifiés.",
+                            Family = "ELT",
+                            InteractionMode = "Asynchronous",
+                            IsActive = true,
+                            IsSystem = true,
+                            Locked = false,
+                            Name = "ELT batch",
+                            TriggerMode = "Scheduled"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Code = "SFTP_BATCH",
+                            CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DefaultTechnologyId = 3,
+                            Description = "Dépôt ou collecte planifiée de fichiers.",
+                            Family = "FileTransfer",
+                            InteractionMode = "Asynchronous",
+                            IsActive = true,
+                            IsSystem = true,
+                            Locked = false,
+                            Name = "Fichier SFTP",
+                            TriggerMode = "Scheduled"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Code = "CDC_STREAM",
+                            CreatedDate = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Capture continue des changements de données.",
+                            Family = "CDC",
+                            InteractionMode = "Asynchronous",
+                            IsActive = true,
+                            IsSystem = true,
+                            Locked = false,
+                            Name = "CDC continu",
+                            TriggerMode = "Continuous"
+                        });
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.FlowRouteStep", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("ConfigurationItemId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ConfigurationJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("IntegrationFlowId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("StepKind")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("StepOrder")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("TechnologyId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConfigurationItemId");
+
+                    b.HasIndex("TechnologyId");
+
+                    b.HasIndex("IntegrationFlowId", "StepOrder")
+                        .IsUnique();
+
+                    b.ToTable("FlowRouteSteps", "integration");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.IntegrationFlow", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<long?>("AverageMessagesPerDay")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal?>("AveragePayloadKb")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<int?>("BrokerCiId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ChannelName")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<long?>("CmdbRelationshipId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<bool>("ContainsPersonalData")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Criticality")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("DataClassification")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("EndpointReference")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("ExchangePatternId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ExpectedLatencyMs")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FlowGroupCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<bool?>("IsEncryptedInTransit")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("Locked")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int?>("PeakMessagesPerMinute")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SourceCiId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int>("TargetCiId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("TechnologyId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TransportProtocol")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ValidFromDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ValidToDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BrokerCiId");
+
+                    b.HasIndex("CmdbRelationshipId");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("ExchangePatternId");
+
+                    b.HasIndex("TechnologyId");
+
+                    b.HasIndex("SourceCiId", "Status");
+
+                    b.HasIndex("TargetCiId", "Status");
+
+                    b.ToTable("IntegrationFlows", "integration");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.IntegrationTechnology", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("Family")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("Technologies", "integration");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Code = "REST",
+                            Family = "API",
+                            IsActive = true,
+                            Name = "API REST"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Code = "KAFKA",
+                            Family = "Messaging",
+                            IsActive = true,
+                            Name = "Apache Kafka"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Code = "SFTP",
+                            Family = "FileTransfer",
+                            IsActive = true,
+                            Name = "SFTP"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Code = "SSIS",
+                            Family = "ETL",
+                            IsActive = true,
+                            Name = "SQL Server Integration Services"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Code = "TALEND",
+                            Family = "ETL",
+                            IsActive = true,
+                            Name = "Talend"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Code = "RABBITMQ",
+                            Family = "Messaging",
+                            IsActive = true,
+                            Name = "RabbitMQ"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Code = "JDBC",
+                            Family = "Database",
+                            IsActive = true,
+                            Name = "JDBC / accès base"
+                        });
                 });
 
             modelBuilder.Entity("api.Models.Compartment", b =>
@@ -760,6 +2209,9 @@ namespace api.Migrations
                     b.Property<int?>("ProductId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("ProductVersionId")
+                        .HasColumnType("int");
+
                     b.Property<decimal?>("RedemptionValue")
                         .HasPrecision(20, 7)
                         .HasColumnType("decimal(20,7)");
@@ -801,7 +2253,69 @@ namespace api.Migrations
 
                     b.HasIndex("ProductId");
 
+                    b.HasIndex("ProductVersionId");
+
                     b.ToTable("Contracts", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.ContractDocumentInstance", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("ApplicableGeneralTermsRevisionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<int>("ContractId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DataSnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("IssuedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("IssuedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<int?>("PdfArtifactId")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<int>("TemplateRevisionId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicableGeneralTermsRevisionId");
+
+                    b.HasIndex("ContractId");
+
+                    b.HasIndex("PdfArtifactId");
+
+                    b.HasIndex("TemplateRevisionId");
+
+                    b.ToTable("ContractDocumentInstances", (string)null);
                 });
 
             modelBuilder.Entity("api.Models.ContractInsuredPerson", b =>
@@ -827,6 +2341,9 @@ namespace api.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("AccrualStartDate")
+                        .HasColumnType("datetime2");
+
                     b.Property<decimal>("AccruedAmount")
                         .HasPrecision(20, 7)
                         .HasColumnType("decimal(20,7)");
@@ -834,11 +2351,7 @@ namespace api.Migrations
                     b.Property<int>("AccruedDays")
                         .HasColumnType("int");
 
-                    b.Property<DateTime?>("AccrualStartDate")
-                        .HasColumnType("datetime2");
-
                     b.Property<decimal>("AccumulatedBaseAmount")
-                        .HasPrecision(20, 7)
                         .HasColumnType("decimal(20,7)");
 
                     b.Property<int>("CompartmentId")
@@ -915,9 +2428,6 @@ namespace api.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("ApplyOn")
-                        .HasColumnType("int");
-
                     b.Property<DateTime?>("AccrualEndDate")
                         .HasColumnType("datetime2");
 
@@ -929,6 +2439,9 @@ namespace api.Migrations
 
                     b.Property<decimal?>("AppliedRate")
                         .HasColumnType("decimal(18,7)");
+
+                    b.Property<int>("ApplyOn")
+                        .HasColumnType("int");
 
                     b.Property<decimal>("BaseAmount")
                         .HasPrecision(20, 7)
@@ -959,12 +2472,12 @@ namespace api.Migrations
                     b.Property<int>("FeeOperationId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("Frequency")
-                        .HasColumnType("int");
-
                     b.Property<decimal>("FeeShares")
                         .HasPrecision(20, 7)
                         .HasColumnType("decimal(20,7)");
+
+                    b.Property<int?>("Frequency")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("NavDateUsed")
                         .HasColumnType("datetime2");
@@ -1211,6 +2724,510 @@ namespace api.Migrations
                     b.ToTable("Documents");
                 });
 
+            modelBuilder.Entity("api.Models.DocumentArtifact", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CacheKey")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<int?>("ContractDocumentInstanceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<DateTime>("GeneratedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("GeneratedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("Hash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<int?>("LegalDocumentRevisionId")
+                        .HasColumnType("int");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CacheKey")
+                        .HasFilter("[CacheKey] IS NOT NULL");
+
+                    b.HasIndex("ContractDocumentInstanceId");
+
+                    b.HasIndex("LegalDocumentRevisionId");
+
+                    b.HasIndex("StorageKey")
+                        .IsUnique();
+
+                    b.ToTable("DocumentArtifacts", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.DocumentAuditEvent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("DetailJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("LegalDocumentDefinitionId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("LegalDocumentNodeId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("LegalDocumentRevisionId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LegalDocumentDefinitionId");
+
+                    b.HasIndex("LegalDocumentNodeId");
+
+                    b.HasIndex("LegalDocumentRevisionId", "CreatedAt");
+
+                    b.ToTable("DocumentAuditEvents", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.DocumentLayoutTemplate", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("Css")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FooterHtml")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("HeaderHtml")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("MarginBottomMm")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8,2)");
+
+                    b.Property<decimal>("MarginLeftMm")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8,2)");
+
+                    b.Property<decimal>("MarginRightMm")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8,2)");
+
+                    b.Property<decimal>("MarginTopMm")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8,2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("PageFormat")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<int>("TemplateVersion")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code", "TemplateVersion")
+                        .IsUnique();
+
+                    b.ToTable("DocumentLayoutTemplates", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.Donation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("Article200Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("Article978Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Comments")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("ConfirmedPaymentProvider")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<DateTime>("DonationDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DonationForm")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("DonationNature")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("DonorId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ExternalReference")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<bool>("IsCancelled")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LegacyDonationLinkStatus")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<int>("OrganizationId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OtherFormDescription")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("OtherNatureDescription")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("PaymentConfirmedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PaymentMethod")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("PostPaymentProcessedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PostPaymentProcessingError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("PublicId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("TaxRegime")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DonationDate")
+                        .HasDatabaseName("IX_Donations_DonationDate");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Donations_PublicId");
+
+                    b.HasIndex("Reference")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Donations_Reference")
+                        .HasFilter("[Reference] IS NOT NULL");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_Donations_UserId");
+
+                    b.HasIndex("DonorId", "Status")
+                        .HasDatabaseName("IX_Donations_Donor_Status");
+
+                    b.ToTable("Donations", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.DonationDonorSnapshot", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AddressLine1")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("AddressLine2")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("Country")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DonationId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PostalCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DonationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_DonationDonorSnapshots_DonationId");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_DonationDonorSnapshots_UserId");
+
+                    b.ToTable("DonationDonorSnapshots", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.Donor", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AddressGeoJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("AddressLine1")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("AddressLine2")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("CompanyName")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("CountryCode")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DonorType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("PostalCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("StreetName")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("StreetNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .HasDatabaseName("IX_Donors_Email");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Donors_UserId")
+                        .HasFilter("[UserId] IS NOT NULL");
+
+                    b.HasIndex("LastName", "FirstName", "PostalCode")
+                        .HasDatabaseName("IX_Donors_DuplicateLookup");
+
+                    b.ToTable("Donors", (string)null);
+                });
+
             modelBuilder.Entity("api.Models.ESGDetail", b =>
                 {
                     b.Property<int>("Id")
@@ -1371,6 +3388,9 @@ namespace api.Migrations
                     b.Property<int?>("ProductId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("ProductVersionId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("ProrataMethod")
                         .HasColumnType("int");
 
@@ -1401,7 +3421,9 @@ namespace api.Migrations
 
                     b.HasIndex("ProductId");
 
-                    b.HasIndex("Category", "FeeType", "Scope", "ProductId", "ContractId", "CompartmentId", "FinancialSupportId", "Priority")
+                    b.HasIndex("ProductVersionId");
+
+                    b.HasIndex("Category", "FeeType", "Scope", "ProductId", "ProductVersionId", "ContractId", "CompartmentId", "FinancialSupportId", "Priority")
                         .HasDatabaseName("IX_FeePolicies_Resolution");
 
                     b.ToTable("FeePolicies", (string)null);
@@ -1684,12 +3706,12 @@ namespace api.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<string>("SupportType")
-                        .IsRequired()
+                    b.Property<string>("SupportNature")
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
-                    b.Property<string>("SupportNature")
+                    b.Property<string>("SupportType")
+                        .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
@@ -1954,6 +3976,325 @@ namespace api.Migrations
                     b.ToTable("Insurers", (string)null);
                 });
 
+            modelBuilder.Entity("api.Models.LegalDocumentDefinition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<int?>("CurrentDraftRevisionId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("CurrentPublishedRevisionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsLibrary")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("CurrentDraftRevisionId");
+
+                    b.HasIndex("CurrentPublishedRevisionId");
+
+                    b.ToTable("LegalDocumentDefinitions", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.LegalDocumentNode", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BusinessCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("ContentHtml")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DisplayConditionJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EditorJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IncludeInTableOfContents")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsConditional")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("KeepWithNext")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("LegalDocumentRevisionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("NumberingStyle")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<int?>("ParentNodeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PlainText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SourceClauseRevisionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StableKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<bool>("StartOnNewPage")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LegalDocumentRevisionId");
+
+                    b.HasIndex("ParentNodeId");
+
+                    b.HasIndex("SourceClauseRevisionId");
+
+                    b.HasIndex("LegalDocumentRevisionId", "StableKey")
+                        .IsUnique();
+
+                    b.HasIndex("ParentNodeId", "SortOrder");
+
+                    b.ToTable("LegalDocumentNodes", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.LegalDocumentRevision", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("BasedOnRevisionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ChangeSummary")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("ContentHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<int?>("DocumentLayoutTemplateId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("EffectiveFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("LegalDocumentDefinitionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MajorVersion")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MinorVersion")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PublishedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime?>("ValidatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ValidatedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("ValidationComment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BasedOnRevisionId");
+
+                    b.HasIndex("DocumentLayoutTemplateId");
+
+                    b.HasIndex("LegalDocumentDefinitionId", "MajorVersion", "MinorVersion")
+                        .IsUnique();
+
+                    b.ToTable("LegalDocumentRevisions", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.LegalNature", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("LegalNatures", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Code = "INSURANCE_CONTRACT",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Contrat d'assurance"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Code = "CAPITALIZATION_CONTRACT",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Contrat de capitalisation"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Code = "RETIREMENT_PLAN",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Plan d'épargne retraite"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Code = "COLLECTIVE_INSURANCE_CONTRACT",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Contrat collectif d'assurance"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Code = "INVESTMENT_ACCOUNT",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Compte d'investissement"
+                        });
+                });
+
             modelBuilder.Entity("api.Models.MarketingTarget", b =>
                 {
                     b.Property<int>("Id")
@@ -2089,10 +4430,6 @@ namespace api.Migrations
                         .HasPrecision(20, 7)
                         .HasColumnType("decimal(20,7)");
 
-                    b.Property<decimal?>("ExecutedAmount")
-                        .HasPrecision(20, 7)
-                        .HasColumnType("decimal(20,7)");
-
                     b.Property<int>("ContractId")
                         .HasColumnType("int");
 
@@ -2103,6 +4440,9 @@ namespace api.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<decimal?>("ExecutedAmount")
+                        .HasColumnType("decimal(20,7)");
+
                     b.Property<DateTime?>("ExecutionDate")
                         .HasColumnType("datetime2");
 
@@ -2110,7 +4450,6 @@ namespace api.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<decimal?>("RequestedAmount")
-                        .HasPrecision(20, 7)
                         .HasColumnType("decimal(20,7)");
 
                     b.Property<int?>("SourceOperationId")
@@ -2191,6 +4530,233 @@ namespace api.Migrations
                     b.ToTable("OperationSupportAllocations", (string)null);
                 });
 
+            modelBuilder.Entity("api.Models.OrganizationBankAccount", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AccountHolder")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("BankName")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<int>("BeneficiaryOrganizationId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("BicLastFour")
+                        .IsRequired()
+                        .HasMaxLength(4)
+                        .HasColumnType("nvarchar(4)");
+
+                    b.Property<string>("CountryCode")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<string>("EncryptedBic")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EncryptedIban")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("IbanLastFour")
+                        .IsRequired()
+                        .HasMaxLength(4)
+                        .HasColumnType("nvarchar(4)");
+
+                    b.Property<string>("Instructions")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsVerified")
+                        .HasColumnType("bit");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ValidFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ValidTo")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BeneficiaryOrganizationId", "IsActive", "ValidFrom")
+                        .HasDatabaseName("IX_OrganizationBankAccounts_Organization_Active");
+
+                    b.ToTable("OrganizationBankAccounts", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.PaymentAttempt", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AdminNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("AuthorizedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("CheckoutUrlExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ConfirmedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<int>("DonationId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DonorTransferDeclarationComment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("DonorTransferDeclaredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ExpiredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FailedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("InternalReference")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<DateTime?>("LastReconciledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PaymentStatus")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("ProviderCheckoutIntentId")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("ProviderOrderId")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("ProviderPaymentId")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("ProviderPaymentState")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("RedirectUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("RefundedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DonationId")
+                        .HasDatabaseName("IX_PaymentAttempts_DonationId");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_PaymentAttempts_IdempotencyKey")
+                        .HasFilter("[IdempotencyKey] IS NOT NULL");
+
+                    b.HasIndex("InternalReference")
+                        .IsUnique()
+                        .HasDatabaseName("UX_PaymentAttempts_InternalReference");
+
+                    b.HasIndex("ProviderCheckoutIntentId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_PaymentAttempts_CheckoutIntentId")
+                        .HasFilter("[ProviderCheckoutIntentId] IS NOT NULL");
+
+                    b.HasIndex("ProviderPaymentId")
+                        .HasDatabaseName("IX_PaymentAttempts_ProviderPaymentId");
+
+                    b.ToTable("PaymentAttempts", (string)null);
+                });
+
             modelBuilder.Entity("api.Models.PaymentDetail", b =>
                 {
                     b.Property<int>("OperationId")
@@ -2231,6 +4797,66 @@ namespace api.Migrations
                     b.ToTable("PaymentDetails", (string)null);
                 });
 
+            modelBuilder.Entity("api.Models.PaymentWebhookInbox", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EventType")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ExternalObjectId")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ProcessingStatus")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("RawPayload")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcessingStatus", "ReceivedAt")
+                        .HasDatabaseName("IX_PaymentWebhookInbox_Status_ReceivedAt");
+
+                    b.HasIndex("Provider", "PayloadHash")
+                        .IsUnique()
+                        .HasDatabaseName("UX_PaymentWebhookInbox_Provider_PayloadHash");
+
+                    b.ToTable("PaymentWebhookInbox", (string)null);
+                });
+
             modelBuilder.Entity("api.Models.Permission", b =>
                 {
                     b.Property<int>("Id")
@@ -2243,9 +4869,13 @@ namespace api.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("bit");
+
                     b.Property<string>("PermissionCode")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("PermissionName")
                         .IsRequired()
@@ -2253,6 +4883,11 @@ namespace api.Migrations
                         .HasColumnType("nvarchar(50)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("PermissionCode")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Permissions_PermissionCode")
+                        .HasFilter("[PermissionCode] <> ''");
 
                     b.ToTable("Permissions", (string)null);
                 });
@@ -2393,6 +5028,10 @@ namespace api.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("CommercialName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<int>("ContractCount")
                         .HasColumnType("int");
 
@@ -2402,21 +5041,45 @@ namespace api.Migrations
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
                     b.Property<int?>("InsurerId")
                         .HasColumnType("int");
+
+                    b.Property<bool>("IsOpenToNewBusiness")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsOpenToNewPayments")
+                        .HasColumnType("bit");
 
                     b.Property<bool>("Locked")
                         .HasColumnType("bit");
 
+                    b.Property<DateTime?>("MarketingEndDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("MarketingStartDate")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("ProductCode")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int?>("ProductEnvelopeId")
+                        .HasColumnType("int");
 
                     b.Property<string>("ProductName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<int?>("ProductTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
                         .HasColumnType("int");
 
                     b.Property<int?>("TaxProfileId")
@@ -2427,13 +5090,499 @@ namespace api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("InsurerId");
+                    b.HasIndex("ProductEnvelopeId");
 
                     b.HasIndex("ProductTypeId");
 
                     b.HasIndex("TaxProfileId");
 
+                    b.HasIndex("InsurerId", "ProductCode")
+                        .IsUnique()
+                        .HasFilter("[InsurerId] IS NOT NULL");
+
                     b.ToTable("Products", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.ProductCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("ProductCategories", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Code = "SAVINGS",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Épargne"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Code = "RETIREMENT",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Retraite"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Code = "CAPITALIZATION",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Capitalisation"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Code = "PROTECTION",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Prévoyance / protection"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Code = "INVESTMENT",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Investissement"
+                        });
+                });
+
+            modelBuilder.Entity("api.Models.ProductDocument", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DocumentName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("DocumentType")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsCurrent")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsMandatory")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("ProductVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("PublicationDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("StorageReference")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Version")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductVersionId", "DocumentType", "IsCurrent");
+
+                    b.ToTable("ProductDocuments", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.ProductDocumentAssignment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("IsCurrent")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("LegalDocumentRevisionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime>("ValidFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ValidTo")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LegalDocumentRevisionId");
+
+                    b.HasIndex("ProductId", "Role", "ValidFrom", "ValidTo");
+
+                    b.ToTable("ProductDocumentAssignments", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.ProductEligibilityRule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool?>("BooleanValue")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsBlocking")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("NumericValue")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<int>("ProductVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RuleType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StringValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductVersionId", "RuleType");
+
+                    b.ToTable("ProductEligibilityRules", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.ProductEnvelope", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("AllowsMultipleHolders")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("DefaultTaxProfileId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsCollective")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsIndividual")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("LegalNatureId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("ProductCategoryId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("RequiresInsuredPerson")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("SupportsBeneficiaryClause")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("DefaultTaxProfileId");
+
+                    b.HasIndex("LegalNatureId");
+
+                    b.HasIndex("ProductCategoryId");
+
+                    b.ToTable("ProductEnvelopes", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            AllowsMultipleHolders = false,
+                            Code = "AV",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DefaultTaxProfileId = 1,
+                            IsActive = true,
+                            IsCollective = false,
+                            IsIndividual = true,
+                            LegalNatureId = 1,
+                            Name = "Assurance-vie",
+                            ProductCategoryId = 1,
+                            RequiresInsuredPerson = true,
+                            SupportsBeneficiaryClause = true
+                        },
+                        new
+                        {
+                            Id = 2,
+                            AllowsMultipleHolders = false,
+                            Code = "CAPI",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DefaultTaxProfileId = 2,
+                            IsActive = true,
+                            IsCollective = false,
+                            IsIndividual = true,
+                            LegalNatureId = 2,
+                            Name = "Capitalisation",
+                            ProductCategoryId = 3,
+                            RequiresInsuredPerson = false,
+                            SupportsBeneficiaryClause = false
+                        },
+                        new
+                        {
+                            Id = 3,
+                            AllowsMultipleHolders = false,
+                            Code = "PERIN",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DefaultTaxProfileId = 3,
+                            IsActive = true,
+                            IsCollective = false,
+                            IsIndividual = true,
+                            LegalNatureId = 3,
+                            Name = "PER individuel",
+                            ProductCategoryId = 2,
+                            RequiresInsuredPerson = false,
+                            SupportsBeneficiaryClause = true
+                        },
+                        new
+                        {
+                            Id = 4,
+                            AllowsMultipleHolders = false,
+                            Code = "PERCOL",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DefaultTaxProfileId = 4,
+                            IsActive = true,
+                            IsCollective = true,
+                            IsIndividual = true,
+                            LegalNatureId = 3,
+                            Name = "PER collectif",
+                            ProductCategoryId = 2,
+                            RequiresInsuredPerson = false,
+                            SupportsBeneficiaryClause = true
+                        },
+                        new
+                        {
+                            Id = 5,
+                            AllowsMultipleHolders = false,
+                            Code = "PERO",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DefaultTaxProfileId = 5,
+                            IsActive = true,
+                            IsCollective = true,
+                            IsIndividual = true,
+                            LegalNatureId = 3,
+                            Name = "PER obligatoire",
+                            ProductCategoryId = 2,
+                            RequiresInsuredPerson = false,
+                            SupportsBeneficiaryClause = true
+                        },
+                        new
+                        {
+                            Id = 6,
+                            AllowsMultipleHolders = false,
+                            Code = "MADELIN",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DefaultTaxProfileId = 6,
+                            IsActive = true,
+                            IsCollective = false,
+                            IsIndividual = true,
+                            LegalNatureId = 1,
+                            Name = "Contrat Madelin",
+                            ProductCategoryId = 2,
+                            RequiresInsuredPerson = false,
+                            SupportsBeneficiaryClause = true
+                        },
+                        new
+                        {
+                            Id = 7,
+                            AllowsMultipleHolders = false,
+                            Code = "ART83",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DefaultTaxProfileId = 7,
+                            IsActive = true,
+                            IsCollective = true,
+                            IsIndividual = true,
+                            LegalNatureId = 4,
+                            Name = "Article 83",
+                            ProductCategoryId = 2,
+                            RequiresInsuredPerson = false,
+                            SupportsBeneficiaryClause = true
+                        },
+                        new
+                        {
+                            Id = 8,
+                            AllowsMultipleHolders = false,
+                            Code = "PEA",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DefaultTaxProfileId = 8,
+                            IsActive = true,
+                            IsCollective = false,
+                            IsIndividual = true,
+                            LegalNatureId = 5,
+                            Name = "PEA",
+                            ProductCategoryId = 5,
+                            RequiresInsuredPerson = false,
+                            SupportsBeneficiaryClause = false
+                        },
+                        new
+                        {
+                            Id = 9,
+                            AllowsMultipleHolders = false,
+                            Code = "PREV",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DefaultTaxProfileId = 9,
+                            IsActive = true,
+                            IsCollective = true,
+                            IsIndividual = true,
+                            LegalNatureId = 4,
+                            Name = "Prévoyance collective",
+                            ProductCategoryId = 4,
+                            RequiresInsuredPerson = true,
+                            SupportsBeneficiaryClause = true
+                        },
+                        new
+                        {
+                            Id = 10,
+                            AllowsMultipleHolders = false,
+                            Code = "DEP",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DefaultTaxProfileId = 10,
+                            IsActive = true,
+                            IsCollective = false,
+                            IsIndividual = true,
+                            LegalNatureId = 1,
+                            Name = "Dépendance",
+                            ProductCategoryId = 4,
+                            RequiresInsuredPerson = true,
+                            SupportsBeneficiaryClause = true
+                        },
+                        new
+                        {
+                            Id = 11,
+                            AllowsMultipleHolders = false,
+                            Code = "HCL",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DefaultTaxProfileId = 11,
+                            IsActive = true,
+                            IsCollective = false,
+                            IsIndividual = false,
+                            LegalNatureId = 1,
+                            Name = "Homme-clé",
+                            ProductCategoryId = 4,
+                            RequiresInsuredPerson = true,
+                            SupportsBeneficiaryClause = true
+                        },
+                        new
+                        {
+                            Id = 12,
+                            AllowsMultipleHolders = false,
+                            Code = "ART39",
+                            CreatedDate = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DefaultTaxProfileId = 12,
+                            IsActive = true,
+                            IsCollective = true,
+                            IsIndividual = true,
+                            LegalNatureId = 4,
+                            Name = "Article 39",
+                            ProductCategoryId = 2,
+                            RequiresInsuredPerson = false,
+                            SupportsBeneficiaryClause = true
+                        });
                 });
 
             modelBuilder.Entity("api.Models.ProductFeature", b =>
@@ -2458,6 +5607,9 @@ namespace api.Migrations
                     b.Property<int>("ProductId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("ProductVersionId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("UpdatedDate")
                         .HasColumnType("datetime2");
 
@@ -2474,9 +5626,176 @@ namespace api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ProductVersionId");
+
                     b.HasIndex("ProductId", "FeatureKey", "ValidFrom");
 
                     b.ToTable("ProductFeatures", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.ProductFeeRule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CalculationMethod")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EffectiveFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FeeType")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("FixedAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<int?>("FreeOperationCount")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("MaximumAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<decimal?>("MinimumAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<int>("ProductVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("Rate")
+                        .HasPrecision(18, 5)
+                        .HasColumnType("decimal(18,5)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductVersionId", "FeeType", "EffectiveFrom", "EffectiveTo");
+
+                    b.ToTable("ProductFeeRules", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.ProductFinancialSupport", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AvailableFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("AvailableTo")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FinancialSupportId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsAvailableForArbitration")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsAvailableForSubscription")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDefaultSupport")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("MaximumAllocationPercentage")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("decimal(9,6)");
+
+                    b.Property<decimal?>("MinimumAllocationPercentage")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("decimal(9,6)");
+
+                    b.Property<int>("ProductVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FinancialSupportId");
+
+                    b.HasIndex("ProductVersionId", "FinancialSupportId")
+                        .IsUnique();
+
+                    b.ToTable("ProductFinancialSupports", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.ProductGuarantee", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CalculationRule")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EligibilityConditions")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("GuaranteeType")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsMandatory")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsOptional")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("MaximumCoverageAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<decimal?>("MaximumRate")
+                        .HasPrecision(18, 5)
+                        .HasColumnType("decimal(18,5)");
+
+                    b.Property<decimal?>("MinimumCoverageAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<decimal?>("MinimumRate")
+                        .HasPrecision(18, 5)
+                        .HasColumnType("decimal(18,5)");
+
+                    b.Property<int>("ProductVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductVersionId", "GuaranteeType");
+
+                    b.ToTable("ProductGuarantees", (string)null);
                 });
 
             modelBuilder.Entity("api.Models.ProductManagementFeePolicy", b =>
@@ -2512,6 +5831,9 @@ namespace api.Migrations
                     b.Property<int>("ProductId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("ProductVersionId")
+                        .HasColumnType("int");
+
                     b.Property<int>("ProrataMethod")
                         .HasColumnType("int");
 
@@ -2523,7 +5845,53 @@ namespace api.Migrations
                     b.HasIndex("ProductId")
                         .IsUnique();
 
+                    b.HasIndex("ProductVersionId");
+
                     b.ToTable("ProductManagementFeePolicies", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.ProductManagementMode", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AvailableFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("AvailableTo")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("ManagementModeType")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductVersionId", "ManagementModeType")
+                        .IsUnique();
+
+                    b.ToTable("ProductManagementModes", (string)null);
                 });
 
             modelBuilder.Entity("api.Models.ProductOperationFeePolicy", b =>
@@ -2562,6 +5930,9 @@ namespace api.Migrations
                     b.Property<int>("ProductId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("ProductVersionId")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("Rate")
                         .HasPrecision(18, 5)
                         .HasColumnType("decimal(18,5)");
@@ -2571,10 +5942,124 @@ namespace api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ProductVersionId");
+
                     b.HasIndex("ProductId", "FeeType", "ApplyOn")
                         .IsUnique();
 
                     b.ToTable("ProductOperationFeePolicies");
+                });
+
+            modelBuilder.Entity("api.Models.ProductOperationRule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Conditions")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsAllowed")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("MaximumAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<decimal?>("MaximumPercentage")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("decimal(9,6)");
+
+                    b.Property<decimal?>("MinimumAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<int?>("MinimumHoldingPeriodInMonths")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("MinimumRemainingAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<int>("OperationType")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ProcessingDelayInBusinessDays")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("RequiresApproval")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("RequiresSupportingDocument")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductVersionId", "OperationType")
+                        .IsUnique();
+
+                    b.ToTable("ProductOperationRules", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.ProductPaymentRule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("Frequency")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsAllowed")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("MaximumAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<decimal?>("MinimumAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<int>("PaymentType")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ProcessingDelayInBusinessDays")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("RequiresManualApproval")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductVersionId", "PaymentType", "Frequency")
+                        .IsUnique()
+                        .HasFilter("[Frequency] IS NOT NULL");
+
+                    b.ToTable("ProductPaymentRules", (string)null);
                 });
 
             modelBuilder.Entity("api.Models.ProductTaxOverride", b =>
@@ -2608,6 +6093,9 @@ namespace api.Migrations
                     b.Property<int>("ProductId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("ProductVersionId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("UpdatedDate")
                         .HasColumnType("datetime2");
 
@@ -2618,6 +6106,8 @@ namespace api.Migrations
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ProductVersionId");
 
                     b.HasIndex("ProductId", "ParameterKey", "ValidFrom");
 
@@ -2781,6 +6271,92 @@ namespace api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("api.Models.ProductVersion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("MaximumSubscriptionAge")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("MinimumAdditionalPayment")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<decimal?>("MinimumInitialPayment")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<decimal?>("MinimumPartialWithdrawal")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<decimal?>("MinimumRemainingBalance")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<decimal?>("MinimumScheduledPayment")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<int?>("MinimumSubscriptionAge")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("TaxProfileId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("VersionCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("VersionName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TaxProfileId");
+
+                    b.HasIndex("ProductId", "VersionCode")
+                        .IsUnique();
+
+                    b.HasIndex("ProductId", "Status", "EffectiveFrom", "EffectiveTo");
+
+                    b.ToTable("ProductVersions", (string)null);
+                });
+
             modelBuilder.Entity("api.Models.PsHistory", b =>
                 {
                     b.Property<int>("Id")
@@ -2841,6 +6417,12 @@ namespace api.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("PrivilegeRank")
+                        .HasColumnType("int");
+
                     b.Property<string>("RoleCode")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -2848,12 +6430,18 @@ namespace api.Migrations
 
                     b.Property<string>("RoleName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<DateTime?>("UpdatedDate")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RoleCode")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Roles_RoleCode")
+                        .HasFilter("[RoleCode] <> ''");
 
                     b.ToTable("Roles", (string)null);
                 });
@@ -4149,6 +7737,222 @@ namespace api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("api.Models.TaxReceipt", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BeneficiaryOrganizationId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CerfaCode")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("CerfaVersion")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("DocumentArtifactId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DonationId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("GeneratedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("GeneratedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("GeneratedFileName")
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<string>("GenerationRequestKey")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("LastEmailStatus")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("PdfHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("ReceiptNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<int?>("ReplacementReceiptId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SentToEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocumentArtifactId");
+
+                    b.HasIndex("DonationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_TaxReceipts_ActiveDonation")
+                        .HasFilter("[Status] IN ('Ready', 'Generated', 'Sent', 'EmailFailed')");
+
+                    b.HasIndex("GenerationRequestKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_TaxReceipts_GenerationRequestKey")
+                        .HasFilter("[GenerationRequestKey] IS NOT NULL");
+
+                    b.HasIndex("ReceiptNumber")
+                        .IsUnique()
+                        .HasDatabaseName("UX_TaxReceipts_ReceiptNumber");
+
+                    b.HasIndex("ReplacementReceiptId");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("IX_TaxReceipts_Status");
+
+                    b.HasIndex("BeneficiaryOrganizationId", "ReceiptNumber")
+                        .IsUnique()
+                        .HasDatabaseName("UX_TaxReceipts_Organization_ReceiptNumber");
+
+                    b.ToTable("TaxReceipts", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.TaxReceiptDelivery", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeliveryStatus")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("DeliveryType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime?>("LastAttemptAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("RecipientEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("TaxReceiptId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TaxReceiptId")
+                        .HasDatabaseName("IX_TaxReceiptDeliveries_ReceiptId");
+
+                    b.HasIndex("TaxReceiptId", "DeliveryType", "RecipientEmail", "CreatedAt")
+                        .HasDatabaseName("IX_TaxReceiptDeliveries_Receipt_Type_Email_Date");
+
+                    b.ToTable("TaxReceiptDeliveries", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.TaxReceiptEmailHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("RecipientEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)");
+
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<int>("TaxReceiptId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TaxReceiptId", "CreatedAt")
+                        .HasDatabaseName("IX_TaxReceiptEmailHistory_Receipt_CreatedAt");
+
+                    b.ToTable("TaxReceiptEmailHistory", (string)null);
+                });
+
             modelBuilder.Entity("api.Models.TaxRuleVersion", b =>
                 {
                     b.Property<int>("Id")
@@ -4210,13 +8014,112 @@ namespace api.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("AccountExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
+
+                    b.Property<bool>("EmailConfirmed")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("EmailConfirmedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FailedLoginAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("LastActivityAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LastEmailConfirmationSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LastLoginAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("LockedUntil")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("MustChangePassword")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
+
+                    b.Property<string>("NormalizedUsername")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("PasswordChangedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTime?>("PrivacyPolicyAcceptedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RevocationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("SessionVersion")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("SessionsInvalidatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime?>("SuspendedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("SuspensionEndsAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SuspensionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Username")
                         .IsRequired()
@@ -4224,6 +8127,17 @@ namespace api.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("NormalizedEmail")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Users_NormalizedEmail");
+
+                    b.HasIndex("NormalizedUsername")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Users_NormalizedUsername");
+
+                    b.HasIndex("Status", "EmailConfirmed")
+                        .HasDatabaseName("IX_Users_Status_EmailConfirmed");
 
                     b.ToTable("Users", (string)null);
                 });
@@ -4241,6 +8155,54 @@ namespace api.Migrations
                     b.HasIndex("RoleId");
 
                     b.ToTable("UserRoles", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.UserSecurityToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedByIpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("TokenType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenType", "ExpiresAt")
+                        .HasDatabaseName("IX_UserSecurityTokens_Type_ExpiresAt");
+
+                    b.HasIndex("UserId", "TokenType", "TokenHash")
+                        .HasDatabaseName("IX_UserSecurityTokens_User_Type_Hash");
+
+                    b.ToTable("UserSecurityTokens", (string)null);
                 });
 
             modelBuilder.Entity("api.Models.WithdrawalDetail", b =>
@@ -4267,6 +8229,603 @@ namespace api.Migrations
                     b.ToTable("WithdrawalDetails", (string)null);
                 });
 
+            modelBuilder.Entity("api.Models.Workflow.ProcessDefinition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("Domain")
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("OwnerName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.HasIndex("IsDeleted");
+
+                    b.ToTable("ProcessDefinitions", "workflow");
+                });
+
+            modelBuilder.Entity("api.Models.Workflow.ProcessInstance", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BusinessKey")
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ContextJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("CurrentTaskId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProcessVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("StartedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CurrentTaskId");
+
+                    b.HasIndex("ProcessVersionId");
+
+                    b.ToTable("ProcessInstances", "workflow");
+                });
+
+            modelBuilder.Entity("api.Models.Workflow.ProcessVersion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal?>("CanvasHeight")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("CanvasWidth")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<bool>("IsCurrent")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("LaneOrientation")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int>("ProcessDefinitionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PublishedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ViewportJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsDeleted");
+
+                    b.HasIndex("ProcessDefinitionId")
+                        .IsUnique()
+                        .HasFilter("[IsCurrent] = 1 AND [IsDeleted] = 0");
+
+                    b.HasIndex("ProcessDefinitionId", "VersionNumber")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("ProcessVersions", "workflow");
+                });
+
+            modelBuilder.Entity("api.Models.Workflow.WorkflowEventLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("PayloadJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ProcessInstanceId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("WorkflowTaskInstanceId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkflowTaskInstanceId");
+
+                    b.HasIndex("ProcessInstanceId", "CreatedAt");
+
+                    b.ToTable("WorkflowEventLogs", "workflow");
+                });
+
+            modelBuilder.Entity("api.Models.Workflow.WorkflowLane", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ActorRefId")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("ActorType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<decimal>("Height")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("OrderIndex")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProcessVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("StyleJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<decimal>("Width")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("X")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("Y")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsDeleted");
+
+                    b.HasIndex("ProcessVersionId", "Code")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("WorkflowLanes", "workflow");
+                });
+
+            modelBuilder.Entity("api.Models.Workflow.WorkflowTask", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ApplicationRefId")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("AssignmentExpression")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("AssignmentType")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("ConfigurationJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("ExecutionMode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int?>("ExpectedDurationMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Height")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("IsBlocking")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("ProcessVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int?>("SlaMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StyleJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TaskKind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<decimal>("Width")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("WorkflowLaneId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("X")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("Y")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsDeleted");
+
+                    b.HasIndex("WorkflowLaneId");
+
+                    b.HasIndex("ProcessVersionId", "Code")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.HasIndex("ProcessVersionId", "WorkflowLaneId");
+
+                    b.ToTable("WorkflowTasks", "workflow");
+                });
+
+            modelBuilder.Entity("api.Models.Workflow.WorkflowTaskInstance", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AssignedTo")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ProcessInstanceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ResultJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int>("WorkflowTaskId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcessInstanceId");
+
+                    b.HasIndex("WorkflowTaskId");
+
+                    b.ToTable("WorkflowTaskInstances", "workflow");
+                });
+
+            modelBuilder.Entity("api.Models.Workflow.WorkflowTransition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("ConditionExpression")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("ConditionLabel")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("OrderIndex")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PointsJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ProcessVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("SourceTaskId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StyleJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TargetTaskId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TransitionKind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsDeleted");
+
+                    b.HasIndex("ProcessVersionId");
+
+                    b.HasIndex("TargetTaskId");
+
+                    b.HasIndex("SourceTaskId", "TargetTaskId", "TransitionKind")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("WorkflowTransitions", "workflow");
+                });
+
+            modelBuilder.Entity("api.Models.Advance", b =>
+                {
+                    b.HasOne("api.Models.Contract", "Contract")
+                        .WithMany("Advances")
+                        .HasForeignKey("ContractId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Contract");
+                });
+
             modelBuilder.Entity("api.Models.AdvanceDetail", b =>
                 {
                     b.HasOne("api.Models.Advance", "Advance")
@@ -4283,17 +8842,6 @@ namespace api.Migrations
                     b.Navigation("Advance");
 
                     b.Navigation("Operation");
-                });
-
-            modelBuilder.Entity("api.Models.Advance", b =>
-                {
-                    b.HasOne("api.Models.Contract", "Contract")
-                        .WithMany("Advances")
-                        .HasForeignKey("ContractId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Contract");
                 });
 
             modelBuilder.Entity("api.Models.AdvanceTransaction", b =>
@@ -4353,6 +8901,17 @@ namespace api.Migrations
                     b.Navigation("Person");
                 });
 
+            modelBuilder.Entity("api.Models.ClauseRevision", b =>
+                {
+                    b.HasOne("api.Models.ClauseDefinition", "ClauseDefinition")
+                        .WithMany("Revisions")
+                        .HasForeignKey("ClauseDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ClauseDefinition");
+                });
+
             modelBuilder.Entity("api.Models.ClientTypeCompliance", b =>
                 {
                     b.HasOne("api.Models.FinancialSupport", "FinancialSupport")
@@ -4362,6 +8921,179 @@ namespace api.Migrations
                         .IsRequired();
 
                     b.Navigation("FinancialSupport");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.CartographyDomainDocumentSection", b =>
+                {
+                    b.HasOne("api.Models.Cmdb.CartographyDomainDocument", "CartographyDomainDocument")
+                        .WithMany("Sections")
+                        .HasForeignKey("CartographyDomainDocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CartographyDomainDocument");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.CartographyNodeLayout", b =>
+                {
+                    b.HasOne("api.Models.Cmdb.ConfigurationItem", "ConfigurationItem")
+                        .WithMany("CartographyLayouts")
+                        .HasForeignKey("ConfigurationItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ConfigurationItem");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.CiAttributeValue", b =>
+                {
+                    b.HasOne("api.Models.Cmdb.CiAttributeDefinition", "AttributeDefinition")
+                        .WithMany("Values")
+                        .HasForeignKey("AttributeDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.Cmdb.ConfigurationItem", "ConfigurationItem")
+                        .WithMany("AttributeValues")
+                        .HasForeignKey("ConfigurationItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AttributeDefinition");
+
+                    b.Navigation("ConfigurationItem");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.CiSupportAssignment", b =>
+                {
+                    b.HasOne("api.Models.Cmdb.ConfigurationItem", "ConfigurationItem")
+                        .WithMany("SupportAssignments")
+                        .HasForeignKey("ConfigurationItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ConfigurationItem");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.CmdbRelationship", b =>
+                {
+                    b.HasOne("api.Models.Cmdb.CmdbRelationshipType", "RelationshipType")
+                        .WithMany("Relationships")
+                        .HasForeignKey("RelationshipTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.Cmdb.ConfigurationItem", "SourceCi")
+                        .WithMany("OutgoingRelationships")
+                        .HasForeignKey("SourceCiId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.Cmdb.ConfigurationItem", "TargetCi")
+                        .WithMany("IncomingRelationships")
+                        .HasForeignKey("TargetCiId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("RelationshipType");
+
+                    b.Navigation("SourceCi");
+
+                    b.Navigation("TargetCi");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.ConfigurationItemApplicationProfile", b =>
+                {
+                    b.HasOne("api.Models.Cmdb.ConfigurationItem", "ConfigurationItem")
+                        .WithOne("ApplicationProfile")
+                        .HasForeignKey("api.Models.Cmdb.ConfigurationItemApplicationProfile", "ConfigurationItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ConfigurationItem");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.ExchangePattern", b =>
+                {
+                    b.HasOne("api.Models.Cmdb.IntegrationTechnology", "DefaultTechnology")
+                        .WithMany("ExchangePatterns")
+                        .HasForeignKey("DefaultTechnologyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("DefaultTechnology");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.FlowRouteStep", b =>
+                {
+                    b.HasOne("api.Models.Cmdb.ConfigurationItem", "ConfigurationItem")
+                        .WithMany()
+                        .HasForeignKey("ConfigurationItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("api.Models.Cmdb.IntegrationFlow", "IntegrationFlow")
+                        .WithMany("RouteSteps")
+                        .HasForeignKey("IntegrationFlowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.Cmdb.IntegrationTechnology", "Technology")
+                        .WithMany()
+                        .HasForeignKey("TechnologyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ConfigurationItem");
+
+                    b.Navigation("IntegrationFlow");
+
+                    b.Navigation("Technology");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.IntegrationFlow", b =>
+                {
+                    b.HasOne("api.Models.Cmdb.ConfigurationItem", "BrokerCi")
+                        .WithMany()
+                        .HasForeignKey("BrokerCiId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("api.Models.Cmdb.CmdbRelationship", "CmdbRelationship")
+                        .WithMany()
+                        .HasForeignKey("CmdbRelationshipId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("api.Models.Cmdb.ExchangePattern", "ExchangePattern")
+                        .WithMany("IntegrationFlows")
+                        .HasForeignKey("ExchangePatternId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.Cmdb.ConfigurationItem", "SourceCi")
+                        .WithMany()
+                        .HasForeignKey("SourceCiId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.Cmdb.ConfigurationItem", "TargetCi")
+                        .WithMany()
+                        .HasForeignKey("TargetCiId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.Cmdb.IntegrationTechnology", "Technology")
+                        .WithMany("IntegrationFlows")
+                        .HasForeignKey("TechnologyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("BrokerCi");
+
+                    b.Navigation("CmdbRelationship");
+
+                    b.Navigation("ExchangePattern");
+
+                    b.Navigation("SourceCi");
+
+                    b.Navigation("TargetCi");
+
+                    b.Navigation("Technology");
                 });
 
             modelBuilder.Entity("api.Models.Compartment", b =>
@@ -4385,9 +9117,49 @@ namespace api.Migrations
                         .WithMany()
                         .HasForeignKey("ProductId");
 
+                    b.HasOne("api.Models.ProductVersion", "ProductVersion")
+                        .WithMany("Contracts")
+                        .HasForeignKey("ProductVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Person");
 
                     b.Navigation("Product");
+
+                    b.Navigation("ProductVersion");
+                });
+
+            modelBuilder.Entity("api.Models.ContractDocumentInstance", b =>
+                {
+                    b.HasOne("api.Models.LegalDocumentRevision", "ApplicableGeneralTermsRevision")
+                        .WithMany()
+                        .HasForeignKey("ApplicableGeneralTermsRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("api.Models.Contract", "Contract")
+                        .WithMany()
+                        .HasForeignKey("ContractId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.DocumentArtifact", "PdfArtifact")
+                        .WithMany()
+                        .HasForeignKey("PdfArtifactId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("api.Models.LegalDocumentRevision", "TemplateRevision")
+                        .WithMany()
+                        .HasForeignKey("TemplateRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ApplicableGeneralTermsRevision");
+
+                    b.Navigation("Contract");
+
+                    b.Navigation("PdfArtifact");
+
+                    b.Navigation("TemplateRevision");
                 });
 
             modelBuilder.Entity("api.Models.ContractInsuredPerson", b =>
@@ -4567,6 +9339,97 @@ namespace api.Migrations
                     b.Navigation("Contract");
                 });
 
+            modelBuilder.Entity("api.Models.DocumentArtifact", b =>
+                {
+                    b.HasOne("api.Models.ContractDocumentInstance", "ContractDocumentInstance")
+                        .WithMany()
+                        .HasForeignKey("ContractDocumentInstanceId");
+
+                    b.HasOne("api.Models.LegalDocumentRevision", "LegalDocumentRevision")
+                        .WithMany("Artifacts")
+                        .HasForeignKey("LegalDocumentRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ContractDocumentInstance");
+
+                    b.Navigation("LegalDocumentRevision");
+                });
+
+            modelBuilder.Entity("api.Models.DocumentAuditEvent", b =>
+                {
+                    b.HasOne("api.Models.LegalDocumentDefinition", "LegalDocumentDefinition")
+                        .WithMany()
+                        .HasForeignKey("LegalDocumentDefinitionId");
+
+                    b.HasOne("api.Models.LegalDocumentNode", "LegalDocumentNode")
+                        .WithMany()
+                        .HasForeignKey("LegalDocumentNodeId");
+
+                    b.HasOne("api.Models.LegalDocumentRevision", "LegalDocumentRevision")
+                        .WithMany()
+                        .HasForeignKey("LegalDocumentRevisionId");
+
+                    b.Navigation("LegalDocumentDefinition");
+
+                    b.Navigation("LegalDocumentNode");
+
+                    b.Navigation("LegalDocumentRevision");
+                });
+
+            modelBuilder.Entity("api.Models.Donation", b =>
+                {
+                    b.HasOne("api.Models.Donor", "Donor")
+                        .WithMany("Donations")
+                        .HasForeignKey("DonorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.BeneficiaryOrganization", "Organization")
+                        .WithMany("Donations")
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Donor");
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("api.Models.DonationDonorSnapshot", b =>
+                {
+                    b.HasOne("api.Models.Donation", "Donation")
+                        .WithOne("DonorSnapshot")
+                        .HasForeignKey("api.Models.DonationDonorSnapshot", "DonationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Donation");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("api.Models.Donor", b =>
+                {
+                    b.HasOne("api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("api.Models.ESGDetail", b =>
                 {
                     b.HasOne("api.Models.FinancialSupport", "FinancialSupport")
@@ -4600,6 +9463,11 @@ namespace api.Migrations
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade);
 
+                    b.HasOne("api.Models.ProductVersion", "ProductVersion")
+                        .WithMany()
+                        .HasForeignKey("ProductVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Compartment");
 
                     b.Navigation("Contract");
@@ -4607,6 +9475,8 @@ namespace api.Migrations
                     b.Navigation("FinancialSupport");
 
                     b.Navigation("Product");
+
+                    b.Navigation("ProductVersion");
                 });
 
             modelBuilder.Entity("api.Models.FinancialSupportAllocation", b =>
@@ -4687,6 +9557,73 @@ namespace api.Migrations
                     b.Navigation("TaxGeneration");
                 });
 
+            modelBuilder.Entity("api.Models.LegalDocumentDefinition", b =>
+                {
+                    b.HasOne("api.Models.LegalDocumentRevision", "CurrentDraftRevision")
+                        .WithMany()
+                        .HasForeignKey("CurrentDraftRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("api.Models.LegalDocumentRevision", "CurrentPublishedRevision")
+                        .WithMany()
+                        .HasForeignKey("CurrentPublishedRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CurrentDraftRevision");
+
+                    b.Navigation("CurrentPublishedRevision");
+                });
+
+            modelBuilder.Entity("api.Models.LegalDocumentNode", b =>
+                {
+                    b.HasOne("api.Models.LegalDocumentRevision", "LegalDocumentRevision")
+                        .WithMany("Nodes")
+                        .HasForeignKey("LegalDocumentRevisionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.LegalDocumentNode", "ParentNode")
+                        .WithMany("Children")
+                        .HasForeignKey("ParentNodeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("api.Models.ClauseRevision", "SourceClauseRevision")
+                        .WithMany()
+                        .HasForeignKey("SourceClauseRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("LegalDocumentRevision");
+
+                    b.Navigation("ParentNode");
+
+                    b.Navigation("SourceClauseRevision");
+                });
+
+            modelBuilder.Entity("api.Models.LegalDocumentRevision", b =>
+                {
+                    b.HasOne("api.Models.LegalDocumentRevision", "BasedOnRevision")
+                        .WithMany()
+                        .HasForeignKey("BasedOnRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("api.Models.DocumentLayoutTemplate", "DocumentLayoutTemplate")
+                        .WithMany()
+                        .HasForeignKey("DocumentLayoutTemplateId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("api.Models.LegalDocumentDefinition", "LegalDocumentDefinition")
+                        .WithMany("Revisions")
+                        .HasForeignKey("LegalDocumentDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BasedOnRevision");
+
+                    b.Navigation("DocumentLayoutTemplate");
+
+                    b.Navigation("LegalDocumentDefinition");
+                });
+
             modelBuilder.Entity("api.Models.MarketingTarget", b =>
                 {
                     b.HasOne("api.Models.FinancialSupport", "FinancialSupport")
@@ -4754,6 +9691,28 @@ namespace api.Migrations
                     b.Navigation("Support");
                 });
 
+            modelBuilder.Entity("api.Models.OrganizationBankAccount", b =>
+                {
+                    b.HasOne("api.Models.BeneficiaryOrganization", "BeneficiaryOrganization")
+                        .WithMany("BankAccounts")
+                        .HasForeignKey("BeneficiaryOrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BeneficiaryOrganization");
+                });
+
+            modelBuilder.Entity("api.Models.PaymentAttempt", b =>
+                {
+                    b.HasOne("api.Models.Donation", "Donation")
+                        .WithMany("PaymentAttempts")
+                        .HasForeignKey("DonationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Donation");
+                });
+
             modelBuilder.Entity("api.Models.PaymentDetail", b =>
                 {
                     b.HasOne("api.Models.Operation", "Operation")
@@ -4789,6 +9748,11 @@ namespace api.Migrations
                         .WithMany()
                         .HasForeignKey("InsurerId");
 
+                    b.HasOne("api.Models.ProductEnvelope", "ProductEnvelope")
+                        .WithMany("Products")
+                        .HasForeignKey("ProductEnvelopeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("api.Models.ProductType", "ProductType")
                         .WithMany("Products")
                         .HasForeignKey("ProductTypeId")
@@ -4801,9 +9765,78 @@ namespace api.Migrations
 
                     b.Navigation("Insurer");
 
+                    b.Navigation("ProductEnvelope");
+
                     b.Navigation("ProductType");
 
                     b.Navigation("TaxProfile");
+                });
+
+            modelBuilder.Entity("api.Models.ProductDocument", b =>
+                {
+                    b.HasOne("api.Models.ProductVersion", "ProductVersion")
+                        .WithMany("Documents")
+                        .HasForeignKey("ProductVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProductVersion");
+                });
+
+            modelBuilder.Entity("api.Models.ProductDocumentAssignment", b =>
+                {
+                    b.HasOne("api.Models.LegalDocumentRevision", "LegalDocumentRevision")
+                        .WithMany()
+                        .HasForeignKey("LegalDocumentRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LegalDocumentRevision");
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("api.Models.ProductEligibilityRule", b =>
+                {
+                    b.HasOne("api.Models.ProductVersion", "ProductVersion")
+                        .WithMany("EligibilityRules")
+                        .HasForeignKey("ProductVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProductVersion");
+                });
+
+            modelBuilder.Entity("api.Models.ProductEnvelope", b =>
+                {
+                    b.HasOne("api.Models.TaxProfile", "DefaultTaxProfile")
+                        .WithMany()
+                        .HasForeignKey("DefaultTaxProfileId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("api.Models.LegalNature", "LegalNature")
+                        .WithMany("ProductEnvelopes")
+                        .HasForeignKey("LegalNatureId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.ProductCategory", "ProductCategory")
+                        .WithMany("ProductEnvelopes")
+                        .HasForeignKey("ProductCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("DefaultTaxProfile");
+
+                    b.Navigation("LegalNature");
+
+                    b.Navigation("ProductCategory");
                 });
 
             modelBuilder.Entity("api.Models.ProductFeature", b =>
@@ -4814,7 +9847,55 @@ namespace api.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("api.Models.ProductVersion", "ProductVersion")
+                        .WithMany()
+                        .HasForeignKey("ProductVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Product");
+
+                    b.Navigation("ProductVersion");
+                });
+
+            modelBuilder.Entity("api.Models.ProductFeeRule", b =>
+                {
+                    b.HasOne("api.Models.ProductVersion", "ProductVersion")
+                        .WithMany("FeeRules")
+                        .HasForeignKey("ProductVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProductVersion");
+                });
+
+            modelBuilder.Entity("api.Models.ProductFinancialSupport", b =>
+                {
+                    b.HasOne("api.Models.FinancialSupport", "FinancialSupport")
+                        .WithMany()
+                        .HasForeignKey("FinancialSupportId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.ProductVersion", "ProductVersion")
+                        .WithMany("FinancialSupports")
+                        .HasForeignKey("ProductVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FinancialSupport");
+
+                    b.Navigation("ProductVersion");
+                });
+
+            modelBuilder.Entity("api.Models.ProductGuarantee", b =>
+                {
+                    b.HasOne("api.Models.ProductVersion", "ProductVersion")
+                        .WithMany("Guarantees")
+                        .HasForeignKey("ProductVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProductVersion");
                 });
 
             modelBuilder.Entity("api.Models.ProductManagementFeePolicy", b =>
@@ -4825,7 +9906,25 @@ namespace api.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("api.Models.ProductVersion", "ProductVersion")
+                        .WithMany()
+                        .HasForeignKey("ProductVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Product");
+
+                    b.Navigation("ProductVersion");
+                });
+
+            modelBuilder.Entity("api.Models.ProductManagementMode", b =>
+                {
+                    b.HasOne("api.Models.ProductVersion", "ProductVersion")
+                        .WithMany("ManagementModes")
+                        .HasForeignKey("ProductVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProductVersion");
                 });
 
             modelBuilder.Entity("api.Models.ProductOperationFeePolicy", b =>
@@ -4836,7 +9935,36 @@ namespace api.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("api.Models.ProductVersion", "ProductVersion")
+                        .WithMany()
+                        .HasForeignKey("ProductVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Product");
+
+                    b.Navigation("ProductVersion");
+                });
+
+            modelBuilder.Entity("api.Models.ProductOperationRule", b =>
+                {
+                    b.HasOne("api.Models.ProductVersion", "ProductVersion")
+                        .WithMany("OperationRules")
+                        .HasForeignKey("ProductVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProductVersion");
+                });
+
+            modelBuilder.Entity("api.Models.ProductPaymentRule", b =>
+                {
+                    b.HasOne("api.Models.ProductVersion", "ProductVersion")
+                        .WithMany("PaymentRules")
+                        .HasForeignKey("ProductVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProductVersion");
                 });
 
             modelBuilder.Entity("api.Models.ProductTaxOverride", b =>
@@ -4847,7 +9975,14 @@ namespace api.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("api.Models.ProductVersion", "ProductVersion")
+                        .WithMany()
+                        .HasForeignKey("ProductVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Product");
+
+                    b.Navigation("ProductVersion");
                 });
 
             modelBuilder.Entity("api.Models.ProductType", b =>
@@ -4858,6 +9993,24 @@ namespace api.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("DefaultTaxProfile");
+                });
+
+            modelBuilder.Entity("api.Models.ProductVersion", b =>
+                {
+                    b.HasOne("api.Models.Product", "Product")
+                        .WithMany("Versions")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.TaxProfile", "TaxProfile")
+                        .WithMany()
+                        .HasForeignKey("TaxProfileId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Product");
+
+                    b.Navigation("TaxProfile");
                 });
 
             modelBuilder.Entity("api.Models.PsHistory", b =>
@@ -5106,6 +10259,61 @@ namespace api.Migrations
                     b.Navigation("TaxLaw");
                 });
 
+            modelBuilder.Entity("api.Models.TaxReceipt", b =>
+                {
+                    b.HasOne("api.Models.BeneficiaryOrganization", "BeneficiaryOrganization")
+                        .WithMany("TaxReceipts")
+                        .HasForeignKey("BeneficiaryOrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.DocumentArtifact", "DocumentArtifact")
+                        .WithMany()
+                        .HasForeignKey("DocumentArtifactId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("api.Models.Donation", "Donation")
+                        .WithMany("TaxReceipts")
+                        .HasForeignKey("DonationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.TaxReceipt", "ReplacementReceipt")
+                        .WithMany()
+                        .HasForeignKey("ReplacementReceiptId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("BeneficiaryOrganization");
+
+                    b.Navigation("DocumentArtifact");
+
+                    b.Navigation("Donation");
+
+                    b.Navigation("ReplacementReceipt");
+                });
+
+            modelBuilder.Entity("api.Models.TaxReceiptDelivery", b =>
+                {
+                    b.HasOne("api.Models.TaxReceipt", "TaxReceipt")
+                        .WithMany()
+                        .HasForeignKey("TaxReceiptId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TaxReceipt");
+                });
+
+            modelBuilder.Entity("api.Models.TaxReceiptEmailHistory", b =>
+                {
+                    b.HasOne("api.Models.TaxReceipt", "TaxReceipt")
+                        .WithMany("EmailHistory")
+                        .HasForeignKey("TaxReceiptId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TaxReceipt");
+                });
+
             modelBuilder.Entity("api.Models.UserRole", b =>
                 {
                     b.HasOne("api.Models.Role", "Role")
@@ -5125,6 +10333,17 @@ namespace api.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("api.Models.UserSecurityToken", b =>
+                {
+                    b.HasOne("api.Models.User", "User")
+                        .WithMany("SecurityTokens")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("api.Models.WithdrawalDetail", b =>
                 {
                     b.HasOne("api.Models.Operation", "Operation")
@@ -5136,14 +10355,203 @@ namespace api.Migrations
                     b.Navigation("Operation");
                 });
 
+            modelBuilder.Entity("api.Models.Workflow.ProcessInstance", b =>
+                {
+                    b.HasOne("api.Models.Workflow.WorkflowTask", "CurrentTask")
+                        .WithMany()
+                        .HasForeignKey("CurrentTaskId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("api.Models.Workflow.ProcessVersion", "ProcessVersion")
+                        .WithMany("Instances")
+                        .HasForeignKey("ProcessVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CurrentTask");
+
+                    b.Navigation("ProcessVersion");
+                });
+
+            modelBuilder.Entity("api.Models.Workflow.ProcessVersion", b =>
+                {
+                    b.HasOne("api.Models.Workflow.ProcessDefinition", "ProcessDefinition")
+                        .WithMany("Versions")
+                        .HasForeignKey("ProcessDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProcessDefinition");
+                });
+
+            modelBuilder.Entity("api.Models.Workflow.WorkflowEventLog", b =>
+                {
+                    b.HasOne("api.Models.Workflow.ProcessInstance", "ProcessInstance")
+                        .WithMany("EventLogs")
+                        .HasForeignKey("ProcessInstanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.Workflow.WorkflowTaskInstance", "WorkflowTaskInstance")
+                        .WithMany()
+                        .HasForeignKey("WorkflowTaskInstanceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ProcessInstance");
+
+                    b.Navigation("WorkflowTaskInstance");
+                });
+
+            modelBuilder.Entity("api.Models.Workflow.WorkflowLane", b =>
+                {
+                    b.HasOne("api.Models.Workflow.ProcessVersion", "ProcessVersion")
+                        .WithMany("Lanes")
+                        .HasForeignKey("ProcessVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProcessVersion");
+                });
+
+            modelBuilder.Entity("api.Models.Workflow.WorkflowTask", b =>
+                {
+                    b.HasOne("api.Models.Workflow.ProcessVersion", "ProcessVersion")
+                        .WithMany("Tasks")
+                        .HasForeignKey("ProcessVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.Workflow.WorkflowLane", "WorkflowLane")
+                        .WithMany("Tasks")
+                        .HasForeignKey("WorkflowLaneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ProcessVersion");
+
+                    b.Navigation("WorkflowLane");
+                });
+
+            modelBuilder.Entity("api.Models.Workflow.WorkflowTaskInstance", b =>
+                {
+                    b.HasOne("api.Models.Workflow.ProcessInstance", "ProcessInstance")
+                        .WithMany("TaskInstances")
+                        .HasForeignKey("ProcessInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.Workflow.WorkflowTask", "WorkflowTask")
+                        .WithMany()
+                        .HasForeignKey("WorkflowTaskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ProcessInstance");
+
+                    b.Navigation("WorkflowTask");
+                });
+
+            modelBuilder.Entity("api.Models.Workflow.WorkflowTransition", b =>
+                {
+                    b.HasOne("api.Models.Workflow.ProcessVersion", "ProcessVersion")
+                        .WithMany("Transitions")
+                        .HasForeignKey("ProcessVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.Workflow.WorkflowTask", "SourceTask")
+                        .WithMany("OutgoingTransitions")
+                        .HasForeignKey("SourceTaskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.Workflow.WorkflowTask", "TargetTask")
+                        .WithMany("IncomingTransitions")
+                        .HasForeignKey("TargetTaskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ProcessVersion");
+
+                    b.Navigation("SourceTask");
+
+                    b.Navigation("TargetTask");
+                });
+
             modelBuilder.Entity("ContractOptionType", b =>
                 {
                     b.Navigation("ContractOptions");
                 });
 
+            modelBuilder.Entity("api.Models.Advance", b =>
+                {
+                    b.Navigation("Transactions");
+                });
+
             modelBuilder.Entity("api.Models.BeneficiaryClause", b =>
                 {
                     b.Navigation("Beneficiaries");
+                });
+
+            modelBuilder.Entity("api.Models.BeneficiaryOrganization", b =>
+                {
+                    b.Navigation("BankAccounts");
+
+                    b.Navigation("Donations");
+
+                    b.Navigation("TaxReceipts");
+                });
+
+            modelBuilder.Entity("api.Models.ClauseDefinition", b =>
+                {
+                    b.Navigation("Revisions");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.CartographyDomainDocument", b =>
+                {
+                    b.Navigation("Sections");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.CiAttributeDefinition", b =>
+                {
+                    b.Navigation("Values");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.CmdbRelationshipType", b =>
+                {
+                    b.Navigation("Relationships");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.ConfigurationItem", b =>
+                {
+                    b.Navigation("ApplicationProfile");
+
+                    b.Navigation("AttributeValues");
+
+                    b.Navigation("CartographyLayouts");
+
+                    b.Navigation("IncomingRelationships");
+
+                    b.Navigation("OutgoingRelationships");
+
+                    b.Navigation("SupportAssignments");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.ExchangePattern", b =>
+                {
+                    b.Navigation("IntegrationFlows");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.IntegrationFlow", b =>
+                {
+                    b.Navigation("RouteSteps");
+                });
+
+            modelBuilder.Entity("api.Models.Cmdb.IntegrationTechnology", b =>
+                {
+                    b.Navigation("ExchangePatterns");
+
+                    b.Navigation("IntegrationFlows");
                 });
 
             modelBuilder.Entity("api.Models.Compartment", b =>
@@ -5183,6 +10591,20 @@ namespace api.Migrations
                     b.Navigation("PsHistoryItems");
                 });
 
+            modelBuilder.Entity("api.Models.Donation", b =>
+                {
+                    b.Navigation("DonorSnapshot");
+
+                    b.Navigation("PaymentAttempts");
+
+                    b.Navigation("TaxReceipts");
+                });
+
+            modelBuilder.Entity("api.Models.Donor", b =>
+                {
+                    b.Navigation("Donations");
+                });
+
             modelBuilder.Entity("api.Models.FinancialSupport", b =>
                 {
                     b.Navigation("Distributions");
@@ -5202,9 +10624,26 @@ namespace api.Migrations
                     b.Navigation("Valuations");
                 });
 
-            modelBuilder.Entity("api.Models.Advance", b =>
+            modelBuilder.Entity("api.Models.LegalDocumentDefinition", b =>
                 {
-                    b.Navigation("Transactions");
+                    b.Navigation("Revisions");
+                });
+
+            modelBuilder.Entity("api.Models.LegalDocumentNode", b =>
+                {
+                    b.Navigation("Children");
+                });
+
+            modelBuilder.Entity("api.Models.LegalDocumentRevision", b =>
+                {
+                    b.Navigation("Artifacts");
+
+                    b.Navigation("Nodes");
+                });
+
+            modelBuilder.Entity("api.Models.LegalNature", b =>
+                {
+                    b.Navigation("ProductEnvelopes");
                 });
 
             modelBuilder.Entity("api.Models.Operation", b =>
@@ -5243,11 +10682,44 @@ namespace api.Migrations
                     b.Navigation("ManagementFeePolicy");
 
                     b.Navigation("TaxOverrides");
+
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("api.Models.ProductCategory", b =>
+                {
+                    b.Navigation("ProductEnvelopes");
+                });
+
+            modelBuilder.Entity("api.Models.ProductEnvelope", b =>
+                {
+                    b.Navigation("Products");
                 });
 
             modelBuilder.Entity("api.Models.ProductType", b =>
                 {
                     b.Navigation("Products");
+                });
+
+            modelBuilder.Entity("api.Models.ProductVersion", b =>
+                {
+                    b.Navigation("Contracts");
+
+                    b.Navigation("Documents");
+
+                    b.Navigation("EligibilityRules");
+
+                    b.Navigation("FeeRules");
+
+                    b.Navigation("FinancialSupports");
+
+                    b.Navigation("Guarantees");
+
+                    b.Navigation("ManagementModes");
+
+                    b.Navigation("OperationRules");
+
+                    b.Navigation("PaymentRules");
                 });
 
             modelBuilder.Entity("api.Models.Role", b =>
@@ -5257,9 +10729,51 @@ namespace api.Migrations
                     b.Navigation("UserRoles");
                 });
 
+            modelBuilder.Entity("api.Models.TaxReceipt", b =>
+                {
+                    b.Navigation("EmailHistory");
+                });
+
             modelBuilder.Entity("api.Models.User", b =>
                 {
+                    b.Navigation("SecurityTokens");
+
                     b.Navigation("UserRoles");
+                });
+
+            modelBuilder.Entity("api.Models.Workflow.ProcessDefinition", b =>
+                {
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("api.Models.Workflow.ProcessInstance", b =>
+                {
+                    b.Navigation("EventLogs");
+
+                    b.Navigation("TaskInstances");
+                });
+
+            modelBuilder.Entity("api.Models.Workflow.ProcessVersion", b =>
+                {
+                    b.Navigation("Instances");
+
+                    b.Navigation("Lanes");
+
+                    b.Navigation("Tasks");
+
+                    b.Navigation("Transitions");
+                });
+
+            modelBuilder.Entity("api.Models.Workflow.WorkflowLane", b =>
+                {
+                    b.Navigation("Tasks");
+                });
+
+            modelBuilder.Entity("api.Models.Workflow.WorkflowTask", b =>
+                {
+                    b.Navigation("IncomingTransitions");
+
+                    b.Navigation("OutgoingTransitions");
                 });
 #pragma warning restore 612, 618
         }

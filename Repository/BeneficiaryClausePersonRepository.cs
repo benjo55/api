@@ -4,6 +4,7 @@ using api.Helpers;
 using api.Interfaces;
 using api.Models;
 using api.Dtos.BeneficiaryClause;
+using api.Mappers;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
@@ -156,13 +157,19 @@ namespace api.Repository
             return true;
         }
 
-        public async Task<List<BeneficiaryClausePerson>> GetByPersonIdAsync(int personId)
+        public async Task<List<BeneficiaryClausePersonDto>> GetByPersonIdAsync(int personId)
         {
-            return await _context.BeneficiaryClausePersons
+            var relations = await _context.BeneficiaryClausePersons
                 .Include(bcp => bcp.Person)
                 .Include(bcp => bcp.BeneficiaryClause)
+                    .ThenInclude(bc => bc!.Contract)
+                        .ThenInclude(contract => contract!.Person)
                 .Where(bcp => bcp.PersonId == personId && bcp.BeneficiaryClause!.ClauseType == "Nominative")
                 .ToListAsync();
+
+            return relations
+                .Select(bcp => bcp.ToBeneficiaryClausePersonDto())
+                .ToList();
         }
     }
 }

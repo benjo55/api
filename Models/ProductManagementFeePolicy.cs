@@ -12,6 +12,10 @@ namespace api.Models
         [ForeignKey(nameof(ProductId))]
         public Product Product { get; set; } = null!;
 
+        public int? ProductVersionId { get; set; }
+        [ForeignKey(nameof(ProductVersionId))]
+        public ProductVersion? ProductVersion { get; set; }
+
         [Precision(18, 5)]
         public decimal AnnualRate { get; set; }
 

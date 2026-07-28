@@ -32,6 +32,34 @@ namespace api.Repository
         // -------------------- CREATE --------------------
         public async Task<Contract> CreateAsync(Contract contractModel, CreateContractRequestDto dto)
         {
+            if (contractModel.ProductVersionId.HasValue)
+            {
+                var version = await _context.ProductVersions
+                    .FirstOrDefaultAsync(v => v.Id == contractModel.ProductVersionId.Value);
+                if (version == null)
+                    throw new InvalidOperationException("La version de produit sélectionnée est introuvable.");
+                if (contractModel.ProductId.HasValue && version.ProductId != contractModel.ProductId.Value)
+                    throw new InvalidOperationException("La version de produit ne correspond pas au produit sélectionné.");
+                contractModel.ProductId = version.ProductId;
+            }
+            else if (contractModel.ProductId.HasValue)
+            {
+                var targetDate = contractModel.DateEffect == default ? DateTime.UtcNow.Date : contractModel.DateEffect.Date;
+                var version = await _context.ProductVersions
+                    .Where(v => v.ProductId == contractModel.ProductId.Value)
+                    .Where(v => v.Status == api.Models.Enum.ProductVersionStatus.Published || v.Status == api.Models.Enum.ProductVersionStatus.Validated)
+                    .Where(v => v.EffectiveFrom.Date <= targetDate)
+                    .Where(v => !v.EffectiveTo.HasValue || v.EffectiveTo.Value.Date >= targetDate)
+                    .OrderByDescending(v => v.Status == api.Models.Enum.ProductVersionStatus.Published)
+                    .ThenByDescending(v => v.EffectiveFrom)
+                    .FirstOrDefaultAsync();
+
+                if (version != null)
+                {
+                    contractModel.ProductVersionId = version.Id;
+                }
+            }
+
             // Empêche EF de réinsérer les poches liés au modèle
             contractModel.Compartments = new List<Compartment>();
 
@@ -149,6 +177,7 @@ namespace api.Repository
             var contracts = _context.Contracts
                 .Include(c => c.Person)
                 .Include(c => c.Product)
+                .Include(c => c.ProductVersion)
                 .Include(c => c.BeneficiaryClause)
                 .AsQueryable();
 
@@ -448,6 +477,7 @@ namespace api.Repository
                 .Include(c => c.Person)
                 .Include(c => c.Product)
                     .ThenInclude(p => p!.ManagementFeePolicy)
+                .Include(c => c.ProductVersion)
                 .Include(c => c.BeneficiaryClause)
                 .Include(c => c.Options).ThenInclude(o => o.ContractOptionType)
                 .Include(c => c.Documents)
@@ -810,6 +840,7 @@ namespace api.Repository
                 var contract = await _context.Contracts
                     .Include(c => c.Person)
                     .Include(c => c.Product)
+                    .Include(c => c.ProductVersion)
                     .FirstOrDefaultAsync(c => c.Id == id);
 
                 if (contract == null)

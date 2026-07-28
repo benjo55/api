@@ -87,9 +87,17 @@ namespace api.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateContractRequestDto createContractRequestDto)
         {
-            // Création enrichie : ajout des relations
-            var contractModel = createContractRequestDto.ToContractFromCreateDto();
-            var createdContract = await _contractRepository.CreateAsync(contractModel, createContractRequestDto);
+            Contract createdContract;
+            try
+            {
+                // Création enrichie : ajout des relations
+                var contractModel = createContractRequestDto.ToContractFromCreateDto();
+                createdContract = await _contractRepository.CreateAsync(contractModel, createContractRequestDto);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
 
             // Vérifier si ProductId est défini
             if (createdContract.ProductId == 0)
@@ -97,15 +105,6 @@ namespace api.Controllers
                 return BadRequest("Le ProductId du contrat est requis.");
             }
             var productId = createdContract.ProductId ?? 0;
-
-            // Mettre à jour le contractCount du produit
-            var product = await _productRepository.GetByIdAsync(productId);
-            if (product != null)
-            {
-                product.ContractCount = await _contractRepository.CountContractsByProductIdAsync(productId);
-                var updateProductDto = product.ToUpdateProductRequestDto();
-                await _productRepository.UpdateAsync(product.Id, updateProductDto);
-            }
 
             // Retourne un ContractDto enrichi
             var dto = createdContract.ToContractDto();

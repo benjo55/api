@@ -14,6 +14,6 @@ namespace api.Interfaces
         Task<List<BeneficiaryClausePersonExportDto>> GetAllRawAsync(QueryObject query);
         Task<bool> AssignBeneficiaryAsync(BeneficiaryClausePerson beneficiaryClausePerson);
         Task<bool> RemoveBeneficiaryAsync(int clauseId, int personId);
-        Task<List<BeneficiaryClausePerson>> GetByPersonIdAsync(int personId);
+        Task<List<BeneficiaryClausePersonDto>> GetByPersonIdAsync(int personId);
     }
 }

@@ -31,6 +31,7 @@ namespace api.Repository
             SyncManagementFeePolicy(productModel, null, _context);
             await _context.Products.AddAsync(productModel);
             await _context.SaveChangesAsync();
+            await EnsureInitialVersionAsync(productModel);
             HydrateManagementFeeSettings(productModel);
             return productModel;
         }
@@ -49,6 +50,7 @@ namespace api.Repository
             // Filter products based on search criteria
             var products = _context.Products
                 .Include(p => p.ManagementFeePolicy)
+                .Include(p => p.ProductEnvelope)
                 .Include(p => p.ProductType)
                 .Include(p => p.TaxProfile)
                 .AsQueryable();
@@ -69,12 +71,17 @@ namespace api.Repository
                 .Take(query.PageSize)
                 .ToListAsync();
 
-            // Enrich each product with the contract count
+            var productIds = pagedProducts.Select(p => p.Id).ToList();
+            var contractCounts = await _context.Contracts
+                .Where(c => c.ProductId.HasValue && productIds.Contains(c.ProductId.Value))
+                .GroupBy(c => c.ProductId!.Value)
+                .Select(g => new { ProductId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.ProductId, x => x.Count);
+
+            // Enrich each product with the contract count without N+1 queries
             foreach (var product in pagedProducts)
             {
-                product.ContractCount = await _context.Contracts
-                    .Where(c => c.ProductId == product.Id)
-                    .CountAsync();
+                product.ContractCount = contractCounts.GetValueOrDefault(product.Id);
 
                 HydrateManagementFeeSettings(product);
             }
@@ -97,6 +104,7 @@ namespace api.Repository
         {
             var product = await _context.Products
                 .Include(p => p.ManagementFeePolicy)
+                .Include(p => p.ProductEnvelope)
                 .Include(p => p.ProductType)
                 .Include(p => p.TaxProfile)
                 .FirstOrDefaultAsync(p => p.Id == id);
@@ -378,6 +386,48 @@ namespace api.Repository
             await _entityHistoryService.TrackChangesAsync(original, product, "Admin");
 
             return product;
+        }
+
+        private async Task<ProductVersion> EnsureInitialVersionAsync(Product product)
+        {
+            var existing = await _context.ProductVersions
+                .OrderBy(v => v.EffectiveFrom)
+                .FirstOrDefaultAsync(v => v.ProductId == product.Id);
+
+            if (existing != null)
+            {
+                if (product.ManagementFeePolicy != null && product.ManagementFeePolicy.ProductVersionId == null)
+                {
+                    product.ManagementFeePolicy.ProductVersionId = existing.Id;
+                    await _context.SaveChangesAsync();
+                }
+
+                return existing;
+            }
+
+            var version = new ProductVersion
+            {
+                ProductId = product.Id,
+                VersionCode = "V1",
+                VersionName = "Version initiale",
+                EffectiveFrom = (product.MarketingStartDate ?? product.CreatedDate).Date,
+                EffectiveTo = product.MarketingEndDate?.Date,
+                Status = ProductVersionStatus.Published,
+                TaxProfileId = product.TaxProfileId,
+                CurrencyCode = "EUR",
+                CreatedDate = DateTime.UtcNow,
+            };
+
+            _context.ProductVersions.Add(version);
+            await _context.SaveChangesAsync();
+
+            if (product.ManagementFeePolicy != null && product.ManagementFeePolicy.ProductVersionId == null)
+            {
+                product.ManagementFeePolicy.ProductVersionId = version.Id;
+                await _context.SaveChangesAsync();
+            }
+
+            return version;
         }
 
         private static void HydrateManagementFeeSettings(Product product)

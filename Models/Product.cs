@@ -12,6 +12,8 @@ namespace api.Models
         public int Id { get; set; }
         public string ProductCode { get; set; } = string.Empty;
         public string ProductName { get; set; } = string.Empty;
+        public string? CommercialName { get; set; }
+        public string? Description { get; set; }
         public DateTime CreatedDate { get; set; } = DateTime.Now;
         public DateTime? UpdatedDate { get; set; }
         public int ContractCount { get; set; }
@@ -19,9 +21,18 @@ namespace api.Models
         [ForeignKey("InsurerId")]
         public Insurer? Insurer { get; set; }
         public bool Locked { get; set; } = false;
+        public ProductStatus Status { get; set; } = ProductStatus.Active;
+        public bool IsOpenToNewBusiness { get; set; } = true;
+        public bool IsOpenToNewPayments { get; set; } = true;
+        public DateTime? MarketingStartDate { get; set; }
+        public DateTime? MarketingEndDate { get; set; }
 
         /// <summary>Famille de contrats rattachée à ce produit</summary>
         public ContractFamily? ContractFamily { get; set; }
+
+        public int? ProductEnvelopeId { get; set; }
+        [ForeignKey(nameof(ProductEnvelopeId))]
+        public ProductEnvelope? ProductEnvelope { get; set; }
 
         public int? ProductTypeId { get; set; }
         [ForeignKey("ProductTypeId")]
@@ -33,6 +44,7 @@ namespace api.Models
 
         public ProductManagementFeePolicy? ManagementFeePolicy { get; set; }
         public ICollection<FeePolicy> FeePolicies { get; set; } = new List<FeePolicy>();
+        public ICollection<ProductVersion> Versions { get; set; } = new List<ProductVersion>();
 
         public List<ProductFeature> Features { get; set; } = [];
         public List<ProductTaxOverride> TaxOverrides { get; set; } = [];

@@ -9,6 +9,9 @@ namespace api.Mappers
     {
         public static BeneficiaryClausePersonDto ToBeneficiaryClausePersonDto(this BeneficiaryClausePerson bcp)
         {
+            var contract = bcp.BeneficiaryClause?.Contract;
+            var subscriber = contract?.Person;
+
             return new BeneficiaryClausePersonDto
             {
                 ClauseId = bcp.ClauseId,
@@ -31,7 +34,15 @@ namespace api.Mappers
                     Email2 = bcp.Person.Email2,
                     TaxAddress = bcp.Person.TaxAddress,
                     PostalAddress = bcp.Person.PostalAddress
-                }
+                },
+                ContractId = contract?.Id,
+                ContractNumber = contract?.ContractNumber ?? string.Empty,
+                ContractLabel = contract?.ContractLabel ?? string.Empty,
+                SubscriberPersonId = subscriber?.Id,
+                SubscriberFirstName = subscriber?.FirstName ?? string.Empty,
+                SubscriberLastName = subscriber?.LastName ?? string.Empty,
+                CreatedDate = bcp.CreatedDate,
+                UpdatedDate = bcp.UpdatedDate
             };
         }
 

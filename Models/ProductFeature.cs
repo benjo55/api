@@ -11,6 +11,10 @@ namespace api.Models
         [ForeignKey(nameof(ProductId))]
         public Product Product { get; set; } = null!;
 
+        public int? ProductVersionId { get; set; }
+        [ForeignKey(nameof(ProductVersionId))]
+        public ProductVersion? ProductVersion { get; set; }
+
         [Required, MaxLength(100)]
         public string FeatureKey { get; set; } = string.Empty;
 

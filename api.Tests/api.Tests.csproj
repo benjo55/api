@@ -6,6 +6,20 @@
     <IsPublishable>false</IsPublishable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <DefaultItemExcludes>
+      $(DefaultItemExcludes);
+      bin\**;
+      bin-*\**;
+      obj\**;
+      obj-*\**
+    </DefaultItemExcludes>
+    <DefaultItemExcludesInProjectFolder>
+      $(DefaultItemExcludesInProjectFolder);
+      bin\**;
+      bin-*\**;
+      obj\**;
+      obj-*\**
+    </DefaultItemExcludesInProjectFolder>
   </PropertyGroup>
 
   <ItemGroup>

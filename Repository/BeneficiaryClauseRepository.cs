@@ -122,6 +122,7 @@ namespace api.Repository
                 .Include(c => c.Beneficiaries)
                     .ThenInclude(b => b.Person)
                 .Include(c => c.Contract)
+                    .ThenInclude(contract => contract!.Person)
                 .FirstOrDefaultAsync(c => c.Id == id);
         }
 

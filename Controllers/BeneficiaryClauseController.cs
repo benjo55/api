@@ -132,6 +132,7 @@ namespace api.Controllers
                 .Include(c => c.Beneficiaries)
                     .ThenInclude(b => b.Person)
                 .Include(c => c.Contract)
+                    .ThenInclude(contract => contract!.Person)
                 .FirstOrDefaultAsync(c => c.Id == clause.Id);
 
             return Ok(updatedClauseWithRelations?.ToBeneficiaryClauseDto());

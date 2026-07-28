@@ -4,7 +4,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using api.Models;
 using api.Models.Configurations;
+using api.Models.Cmdb;
 using api.Models.Enum;
+using api.Models.Workflow;
 using Microsoft.EntityFrameworkCore;
 
 namespace api.Data
@@ -22,6 +24,18 @@ namespace api.Data
         public DbSet<Notary> Notaries { get; set; }
         public DbSet<Contract> Contracts { get; set; }
         public DbSet<Product> Products { get; set; }
+        public DbSet<ProductCategory> ProductCategories { get; set; }
+        public DbSet<LegalNature> LegalNatures { get; set; }
+        public DbSet<ProductEnvelope> ProductEnvelopes { get; set; }
+        public DbSet<ProductVersion> ProductVersions { get; set; }
+        public DbSet<ProductEligibilityRule> ProductEligibilityRules { get; set; }
+        public DbSet<ProductOperationRule> ProductOperationRules { get; set; }
+        public DbSet<ProductPaymentRule> ProductPaymentRules { get; set; }
+        public DbSet<ProductFeeRule> ProductFeeRules { get; set; }
+        public DbSet<ProductGuarantee> ProductGuarantees { get; set; }
+        public DbSet<ProductManagementMode> ProductManagementModes { get; set; }
+        public DbSet<ProductFinancialSupport> ProductFinancialSupports { get; set; }
+        public DbSet<ProductDocument> ProductDocuments { get; set; }
         public DbSet<ProductType> ProductTypes { get; set; }
         public DbSet<ProductFeature> ProductFeatures { get; set; }
         public DbSet<ProductTaxOverride> ProductTaxOverrides { get; set; }
@@ -32,6 +46,8 @@ namespace api.Data
         public DbSet<ContractSupportFeeApplication> ContractSupportFeeApplications { get; set; }
         public DbSet<Brand> Brands { get; set; }
         public DbSet<User> Users { get; set; }
+        public DbSet<UserSecurityToken> UserSecurityTokens { get; set; }
+        public DbSet<AdminAuditEvent> AdminAuditEvents { get; set; }
         public DbSet<Role> Roles { get; set; }
         public DbSet<UserRole> UserRoles { get; set; }
         public DbSet<Permission> Permissions { get; set; }
@@ -60,6 +76,16 @@ namespace api.Data
         public DbSet<SupportHistoricalData> SupportHistoricalDatas { get; set; }
         public DbSet<SupportFeeDetail> SupportFeeDetails { get; set; }
         public DbSet<Document> Documents { get; set; }
+        public DbSet<LegalDocumentDefinition> LegalDocumentDefinitions { get; set; }
+        public DbSet<LegalDocumentRevision> LegalDocumentRevisions { get; set; }
+        public DbSet<LegalDocumentNode> LegalDocumentNodes { get; set; }
+        public DbSet<ClauseDefinition> ClauseDefinitions { get; set; }
+        public DbSet<ClauseRevision> ClauseRevisions { get; set; }
+        public DbSet<DocumentLayoutTemplate> DocumentLayoutTemplates { get; set; }
+        public DbSet<DocumentArtifact> DocumentArtifacts { get; set; }
+        public DbSet<ProductDocumentAssignment> ProductDocumentAssignments { get; set; }
+        public DbSet<ContractDocumentInstance> ContractDocumentInstances { get; set; }
+        public DbSet<DocumentAuditEvent> DocumentAuditEvents { get; set; }
         public DbSet<FinancialSupportAllocation> FinancialSupportAllocations { get; set; }
         public DbSet<ContractOption> ContractOptions { get; set; }
         public DbSet<ContractOptionType> ContractOptionTypes { get; set; }
@@ -89,10 +115,46 @@ namespace api.Data
         public DbSet<PsHistory> PsHistoryItems { get; set; }
         public DbSet<TaxEvent> TaxEvents { get; set; }
         public DbSet<TaxCalculationAudit> TaxCalculationAudits { get; set; }
+        public DbSet<CmdbImportRun> CmdbImportRuns { get; set; }
+        public DbSet<ConfigurationItem> ConfigurationItems { get; set; }
+        public DbSet<CartographyNodeLayout> CartographyNodeLayouts { get; set; }
+        public DbSet<CartographyDomainDocument> CartographyDomainDocuments { get; set; }
+        public DbSet<CartographyDomainDocumentSection> CartographyDomainDocumentSections { get; set; }
+        public DbSet<ConfigurationItemApplicationProfile> ConfigurationItemApplicationProfiles { get; set; }
+        public DbSet<CiAttributeDefinition> CiAttributeDefinitions { get; set; }
+        public DbSet<CiAttributeValue> CiAttributeValues { get; set; }
+        public DbSet<CmdbRelationshipType> CmdbRelationshipTypes { get; set; }
+        public DbSet<CmdbRelationship> CmdbRelationships { get; set; }
+        public DbSet<CiSupportAssignment> CiSupportAssignments { get; set; }
+        public DbSet<IntegrationTechnology> IntegrationTechnologies { get; set; }
+        public DbSet<ExchangePattern> ExchangePatterns { get; set; }
+        public DbSet<IntegrationFlow> IntegrationFlows { get; set; }
+        public DbSet<FlowRouteStep> FlowRouteSteps { get; set; }
+        public DbSet<ProcessDefinition> ProcessDefinitions { get; set; }
+        public DbSet<ProcessVersion> ProcessVersions { get; set; }
+        public DbSet<WorkflowLane> WorkflowLanes { get; set; }
+        public DbSet<WorkflowTask> WorkflowTasks { get; set; }
+        public DbSet<WorkflowTransition> WorkflowTransitions { get; set; }
+        public DbSet<ProcessInstance> ProcessInstances { get; set; }
+        public DbSet<WorkflowTaskInstance> WorkflowTaskInstances { get; set; }
+        public DbSet<WorkflowEventLog> WorkflowEventLogs { get; set; }
+        public DbSet<Donor> Donors { get; set; }
+        public DbSet<Donation> Donations { get; set; }
+        public DbSet<DonationDonorSnapshot> DonationDonorSnapshots { get; set; }
+        public DbSet<BeneficiaryOrganization> BeneficiaryOrganizations { get; set; }
+        public DbSet<OrganizationBankAccount> OrganizationBankAccounts { get; set; }
+        public DbSet<TaxReceipt> TaxReceipts { get; set; }
+        public DbSet<TaxReceiptEmailHistory> TaxReceiptEmailHistory { get; set; }
+        public DbSet<TaxReceiptDelivery> TaxReceiptDeliveries { get; set; }
+        public DbSet<PaymentAttempt> PaymentAttempts { get; set; }
+        public DbSet<PaymentWebhookInbox> PaymentWebhookInbox { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            modelBuilder.HasSequence<long>("TaxReceiptNumberSequence")
+                .StartsAt(1)
+                .IncrementsBy(1);
 
             // 🔹 Convention de nommage pluriel pour toutes les tables
             modelBuilder.Entity<Person>().ToTable("Persons");
@@ -108,6 +170,18 @@ namespace api.Data
             modelBuilder.Entity<Contract>().Property(c => c.ExitFeesRate).HasPrecision(5, 2);
             modelBuilder.Entity<Contract>().Property(c => c.ScheduledPayment).HasPrecision(20, 7);
             modelBuilder.Entity<Product>().ToTable("Products");
+            modelBuilder.Entity<ProductCategory>().ToTable("ProductCategories");
+            modelBuilder.Entity<LegalNature>().ToTable("LegalNatures");
+            modelBuilder.Entity<ProductEnvelope>().ToTable("ProductEnvelopes");
+            modelBuilder.Entity<ProductVersion>().ToTable("ProductVersions");
+            modelBuilder.Entity<ProductEligibilityRule>().ToTable("ProductEligibilityRules");
+            modelBuilder.Entity<ProductOperationRule>().ToTable("ProductOperationRules");
+            modelBuilder.Entity<ProductPaymentRule>().ToTable("ProductPaymentRules");
+            modelBuilder.Entity<ProductFeeRule>().ToTable("ProductFeeRules");
+            modelBuilder.Entity<ProductGuarantee>().ToTable("ProductGuarantees");
+            modelBuilder.Entity<ProductManagementMode>().ToTable("ProductManagementModes");
+            modelBuilder.Entity<ProductFinancialSupport>().ToTable("ProductFinancialSupports");
+            modelBuilder.Entity<ProductDocument>().ToTable("ProductDocuments");
             modelBuilder.Entity<ProductType>().ToTable("ProductTypes");
             modelBuilder.Entity<ProductFeature>().ToTable("ProductFeatures");
             modelBuilder.Entity<ProductTaxOverride>().ToTable("ProductTaxOverrides");
@@ -116,8 +190,77 @@ namespace api.Data
             modelBuilder.Entity<ContractManagementFeeAccrual>().ToTable("ContractManagementFeeAccruals");
             modelBuilder.Entity<ContractSupportFeeApplication>().ToTable("ContractSupportFeeApplications");
             modelBuilder.Entity<Brand>().ToTable("Brands");
-            modelBuilder.Entity<User>().ToTable("Users");
-            modelBuilder.Entity<Role>().ToTable("Roles");
+            modelBuilder.Entity<User>(entity =>
+            {
+                entity.ToTable("Users");
+                entity.Property(u => u.FirstName).HasMaxLength(100).IsRequired();
+                entity.Property(u => u.LastName).HasMaxLength(100).IsRequired();
+                entity.Property(u => u.Username).HasMaxLength(100).IsRequired();
+                entity.Property(u => u.NormalizedUsername).HasMaxLength(100).IsRequired();
+                entity.Property(u => u.Email).HasMaxLength(254).IsRequired();
+                entity.Property(u => u.NormalizedEmail).HasMaxLength(254).IsRequired();
+                entity.Property(u => u.PhoneNumber).HasMaxLength(32).IsRequired();
+                entity.Property(u => u.CreatedDate).IsRequired();
+                entity.Property(u => u.EmailConfirmed).IsRequired();
+                entity.Property(u => u.Status).HasConversion<string>().HasMaxLength(40).IsRequired();
+                entity.Property(u => u.SuspensionReason).HasMaxLength(500);
+                entity.Property(u => u.RevocationReason).HasMaxLength(500);
+                entity.Property(u => u.RowVersion).IsRowVersion();
+
+                entity.HasIndex(u => u.NormalizedUsername)
+                    .IsUnique()
+                    .HasDatabaseName("UX_Users_NormalizedUsername");
+
+                entity.HasIndex(u => u.NormalizedEmail)
+                    .IsUnique()
+                    .HasDatabaseName("UX_Users_NormalizedEmail");
+
+                entity.HasIndex(u => new { u.Status, u.EmailConfirmed })
+                    .HasDatabaseName("IX_Users_Status_EmailConfirmed");
+            });
+            modelBuilder.Entity<UserSecurityToken>(entity =>
+            {
+                entity.ToTable("UserSecurityTokens");
+                entity.Property(t => t.TokenType).HasMaxLength(40).IsRequired();
+                entity.Property(t => t.TokenHash).HasMaxLength(128).IsRequired();
+                entity.Property(t => t.CreatedByIpAddress).HasMaxLength(64);
+                entity.Property(t => t.CreatedAt).IsRequired();
+                entity.Property(t => t.ExpiresAt).IsRequired();
+
+                entity.HasOne(t => t.User)
+                    .WithMany(u => u.SecurityTokens)
+                    .HasForeignKey(t => t.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(t => new { t.UserId, t.TokenType, t.TokenHash })
+                    .HasDatabaseName("IX_UserSecurityTokens_User_Type_Hash");
+
+                entity.HasIndex(t => new { t.TokenType, t.ExpiresAt })
+                    .HasDatabaseName("IX_UserSecurityTokens_Type_ExpiresAt");
+            });
+            modelBuilder.Entity<AdminAuditEvent>(entity =>
+            {
+                entity.ToTable("AdminAuditEvents");
+                entity.Property(e => e.Action).HasMaxLength(80).IsRequired();
+                entity.Property(e => e.ActingUsername).HasMaxLength(100);
+                entity.Property(e => e.Reason).HasMaxLength(500);
+                entity.Property(e => e.ResultCode).HasMaxLength(60);
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.HasIndex(e => new { e.TargetUserId, e.CreatedAt })
+                    .HasDatabaseName("IX_AdminAuditEvents_TargetUser_Date");
+                entity.HasIndex(e => new { e.Action, e.CreatedAt })
+                    .HasDatabaseName("IX_AdminAuditEvents_Action_Date");
+            });
+            modelBuilder.Entity<Role>(entity =>
+            {
+                entity.ToTable("Roles");
+                entity.Property(r => r.RoleCode).HasMaxLength(50).IsRequired();
+                entity.Property(r => r.RoleName).HasMaxLength(100).IsRequired();
+                entity.HasIndex(r => r.RoleCode)
+                    .IsUnique()
+                    .HasDatabaseName("UX_Roles_RoleCode")
+                    .HasFilter("[RoleCode] <> ''");
+            });
             modelBuilder.Entity<UserRole>().ToTable("UserRoles");
             modelBuilder.Entity<Permission>().ToTable("Permissions");
             modelBuilder.Entity<RolePermission>().ToTable("RolePermissions");
@@ -140,6 +283,11 @@ namespace api.Data
                     .HasForeignKey<ProductManagementFeePolicy>(p => p.ProductId)
                     .OnDelete(DeleteBehavior.Cascade);
 
+                entity.HasOne(p => p.ProductVersion)
+                    .WithMany()
+                    .HasForeignKey(p => p.ProductVersionId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
                 entity.HasIndex(p => p.ProductId)
                     .IsUnique();
 
@@ -152,6 +300,11 @@ namespace api.Data
                     .WithMany()
                     .HasForeignKey(p => p.ProductId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(p => p.ProductVersion)
+                    .WithMany()
+                    .HasForeignKey(p => p.ProductVersionId)
+                    .OnDelete(DeleteBehavior.Restrict);
 
                 entity.HasIndex(p => new { p.ProductId, p.FeeType, p.ApplyOn })
                     .IsUnique();
@@ -171,6 +324,11 @@ namespace api.Data
                     .WithMany(p => p.FeePolicies)
                     .HasForeignKey(p => p.ProductId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(p => p.ProductVersion)
+                    .WithMany()
+                    .HasForeignKey(p => p.ProductVersionId)
+                    .OnDelete(DeleteBehavior.Restrict);
 
                 entity.HasOne(p => p.Contract)
                     .WithMany(c => c.FeePolicies)
@@ -193,6 +351,7 @@ namespace api.Data
                     p.FeeType,
                     p.Scope,
                     p.ProductId,
+                    p.ProductVersionId,
                     p.ContractId,
                     p.CompartmentId,
                     p.FinancialSupportId,
@@ -210,8 +369,57 @@ namespace api.Data
                     .OnDelete(DeleteBehavior.Restrict);
             });
 
+            modelBuilder.Entity<ProductCategory>(entity =>
+            {
+                entity.HasIndex(x => x.Code).IsUnique();
+                entity.Property(x => x.Code).HasMaxLength(50).IsRequired();
+                entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            });
+
+            modelBuilder.Entity<LegalNature>(entity =>
+            {
+                entity.HasIndex(x => x.Code).IsUnique();
+                entity.Property(x => x.Code).HasMaxLength(50).IsRequired();
+                entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            });
+
+            modelBuilder.Entity<ProductEnvelope>(entity =>
+            {
+                entity.HasIndex(x => x.Code).IsUnique();
+                entity.Property(x => x.Code).HasMaxLength(50).IsRequired();
+                entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+
+                entity.HasOne(x => x.ProductCategory)
+                    .WithMany(x => x.ProductEnvelopes)
+                    .HasForeignKey(x => x.ProductCategoryId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(x => x.LegalNature)
+                    .WithMany(x => x.ProductEnvelopes)
+                    .HasForeignKey(x => x.LegalNatureId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(x => x.DefaultTaxProfile)
+                    .WithMany()
+                    .HasForeignKey(x => x.DefaultTaxProfileId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
             modelBuilder.Entity<Product>(entity =>
             {
+                entity.Property(p => p.ProductCode).HasMaxLength(50).IsRequired();
+                entity.Property(p => p.ProductName).HasMaxLength(200).IsRequired();
+                entity.Property(p => p.CommercialName).HasMaxLength(200);
+                entity.Property(p => p.Description).HasMaxLength(2000);
+                entity.HasIndex(p => new { p.InsurerId, p.ProductCode })
+                    .IsUnique()
+                    .HasFilter("[InsurerId] IS NOT NULL");
+
+                entity.HasOne(p => p.ProductEnvelope)
+                    .WithMany(e => e.Products)
+                    .HasForeignKey(p => p.ProductEnvelopeId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
                 entity.HasOne(p => p.ProductType)
                     .WithMany(t => t.Products)
                     .HasForeignKey(p => p.ProductTypeId)
@@ -223,6 +431,109 @@ namespace api.Data
                     .OnDelete(DeleteBehavior.Restrict);
             });
 
+            modelBuilder.Entity<ProductVersion>(entity =>
+            {
+                entity.Property(x => x.VersionCode).HasMaxLength(50).IsRequired();
+                entity.Property(x => x.VersionName).HasMaxLength(200);
+                entity.Property(x => x.CurrencyCode).HasMaxLength(3).IsRequired();
+                entity.HasIndex(x => new { x.ProductId, x.VersionCode }).IsUnique();
+                entity.HasIndex(x => new { x.ProductId, x.Status, x.EffectiveFrom, x.EffectiveTo });
+
+                entity.HasOne(x => x.Product)
+                    .WithMany(x => x.Versions)
+                    .HasForeignKey(x => x.ProductId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(x => x.TaxProfile)
+                    .WithMany()
+                    .HasForeignKey(x => x.TaxProfileId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<Contract>(entity =>
+            {
+                entity.HasOne(c => c.ProductVersion)
+                    .WithMany(v => v.Contracts)
+                    .HasForeignKey(c => c.ProductVersionId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ProductEligibilityRule>(entity =>
+            {
+                entity.HasIndex(x => new { x.ProductVersionId, x.RuleType });
+                entity.HasOne(x => x.ProductVersion)
+                    .WithMany(x => x.EligibilityRules)
+                    .HasForeignKey(x => x.ProductVersionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<ProductOperationRule>(entity =>
+            {
+                entity.HasIndex(x => new { x.ProductVersionId, x.OperationType }).IsUnique();
+                entity.HasOne(x => x.ProductVersion)
+                    .WithMany(x => x.OperationRules)
+                    .HasForeignKey(x => x.ProductVersionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<ProductPaymentRule>(entity =>
+            {
+                entity.HasIndex(x => new { x.ProductVersionId, x.PaymentType, x.Frequency }).IsUnique();
+                entity.HasOne(x => x.ProductVersion)
+                    .WithMany(x => x.PaymentRules)
+                    .HasForeignKey(x => x.ProductVersionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<ProductFeeRule>(entity =>
+            {
+                entity.HasIndex(x => new { x.ProductVersionId, x.FeeType, x.EffectiveFrom, x.EffectiveTo });
+                entity.HasOne(x => x.ProductVersion)
+                    .WithMany(x => x.FeeRules)
+                    .HasForeignKey(x => x.ProductVersionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<ProductGuarantee>(entity =>
+            {
+                entity.HasIndex(x => new { x.ProductVersionId, x.GuaranteeType });
+                entity.HasOne(x => x.ProductVersion)
+                    .WithMany(x => x.Guarantees)
+                    .HasForeignKey(x => x.ProductVersionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<ProductManagementMode>(entity =>
+            {
+                entity.HasIndex(x => new { x.ProductVersionId, x.ManagementModeType }).IsUnique();
+                entity.HasOne(x => x.ProductVersion)
+                    .WithMany(x => x.ManagementModes)
+                    .HasForeignKey(x => x.ProductVersionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<ProductFinancialSupport>(entity =>
+            {
+                entity.HasIndex(x => new { x.ProductVersionId, x.FinancialSupportId }).IsUnique();
+                entity.HasOne(x => x.ProductVersion)
+                    .WithMany(x => x.FinancialSupports)
+                    .HasForeignKey(x => x.ProductVersionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(x => x.FinancialSupport)
+                    .WithMany()
+                    .HasForeignKey(x => x.FinancialSupportId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ProductDocument>(entity =>
+            {
+                entity.HasIndex(x => new { x.ProductVersionId, x.DocumentType, x.IsCurrent });
+                entity.HasOne(x => x.ProductVersion)
+                    .WithMany(x => x.Documents)
+                    .HasForeignKey(x => x.ProductVersionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
             modelBuilder.Entity<ProductFeature>(entity =>
             {
                 entity.HasIndex(f => new { f.ProductId, f.FeatureKey, f.ValidFrom });
@@ -231,6 +542,11 @@ namespace api.Data
                     .WithMany(p => p.Features)
                     .HasForeignKey(f => f.ProductId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(f => f.ProductVersion)
+                    .WithMany()
+                    .HasForeignKey(f => f.ProductVersionId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<ProductTaxOverride>(entity =>
@@ -241,6 +557,11 @@ namespace api.Data
                     .WithMany(p => p.TaxOverrides)
                     .HasForeignKey(o => o.ProductId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(o => o.ProductVersion)
+                    .WithMany()
+                    .HasForeignKey(o => o.ProductVersionId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
             modelBuilder.Entity<ContractManagementFeeAccrual>(entity =>
             {
@@ -699,6 +1020,17 @@ namespace api.Data
                 .HasIndex(t => t.Code)
                 .IsUnique();
 
+            modelBuilder.Entity<Permission>()
+                .Property(p => p.PermissionCode)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            modelBuilder.Entity<Permission>()
+                .HasIndex(p => p.PermissionCode)
+                .IsUnique()
+                .HasDatabaseName("UX_Permissions_PermissionCode")
+                .HasFilter("[PermissionCode] <> ''");
+
             // 🔹 Configuration des relations Many-to-Many et composite keys
             modelBuilder.Entity<RolePermission>()
                 .HasKey(rp => new { rp.RoleId, rp.PermissionId });
@@ -813,6 +1145,49 @@ namespace api.Data
             modelBuilder.ApplyConfiguration(new SupportHistoricalDataConfiguration());
             modelBuilder.ApplyConfiguration(new SupportFeeDetailConfiguration());
             modelBuilder.ApplyConfiguration(new SupportLookthroughAssetConfiguration());
+            modelBuilder.ApplyConfiguration(new LegalDocumentDefinitionConfiguration());
+            modelBuilder.ApplyConfiguration(new LegalDocumentRevisionConfiguration());
+            modelBuilder.ApplyConfiguration(new LegalDocumentNodeConfiguration());
+            modelBuilder.ApplyConfiguration(new ClauseDefinitionConfiguration());
+            modelBuilder.ApplyConfiguration(new ClauseRevisionConfiguration());
+            modelBuilder.ApplyConfiguration(new DocumentLayoutTemplateConfiguration());
+            modelBuilder.ApplyConfiguration(new DocumentArtifactConfiguration());
+            modelBuilder.ApplyConfiguration(new ProductDocumentAssignmentConfiguration());
+            modelBuilder.ApplyConfiguration(new ContractDocumentInstanceConfiguration());
+            modelBuilder.ApplyConfiguration(new DocumentAuditEventConfiguration());
+            modelBuilder.ApplyConfiguration(new CmdbImportRunConfiguration());
+            modelBuilder.ApplyConfiguration(new ConfigurationItemConfiguration());
+            modelBuilder.ApplyConfiguration(new CartographyNodeLayoutConfiguration());
+            modelBuilder.ApplyConfiguration(new CartographyDomainDocumentConfiguration());
+            modelBuilder.ApplyConfiguration(new CartographyDomainDocumentSectionConfiguration());
+            modelBuilder.ApplyConfiguration(new ConfigurationItemApplicationProfileConfiguration());
+            modelBuilder.ApplyConfiguration(new CiAttributeDefinitionConfiguration());
+            modelBuilder.ApplyConfiguration(new CiAttributeValueConfiguration());
+            modelBuilder.ApplyConfiguration(new CmdbRelationshipTypeConfiguration());
+            modelBuilder.ApplyConfiguration(new CmdbRelationshipConfiguration());
+            modelBuilder.ApplyConfiguration(new CiSupportAssignmentConfiguration());
+            modelBuilder.ApplyConfiguration(new IntegrationTechnologyConfiguration());
+            modelBuilder.ApplyConfiguration(new ExchangePatternConfiguration());
+            modelBuilder.ApplyConfiguration(new IntegrationFlowConfiguration());
+            modelBuilder.ApplyConfiguration(new FlowRouteStepConfiguration());
+            modelBuilder.ApplyConfiguration(new ProcessDefinitionConfiguration());
+            modelBuilder.ApplyConfiguration(new ProcessVersionConfiguration());
+            modelBuilder.ApplyConfiguration(new WorkflowLaneConfiguration());
+            modelBuilder.ApplyConfiguration(new WorkflowTaskConfiguration());
+            modelBuilder.ApplyConfiguration(new WorkflowTransitionConfiguration());
+            modelBuilder.ApplyConfiguration(new ProcessInstanceConfiguration());
+            modelBuilder.ApplyConfiguration(new WorkflowTaskInstanceConfiguration());
+            modelBuilder.ApplyConfiguration(new WorkflowEventLogConfiguration());
+            modelBuilder.ApplyConfiguration(new DonorConfiguration());
+            modelBuilder.ApplyConfiguration(new DonationConfiguration());
+            modelBuilder.ApplyConfiguration(new DonationDonorSnapshotConfiguration());
+            modelBuilder.ApplyConfiguration(new BeneficiaryOrganizationConfiguration());
+            modelBuilder.ApplyConfiguration(new OrganizationBankAccountConfiguration());
+            modelBuilder.ApplyConfiguration(new TaxReceiptConfiguration());
+            modelBuilder.ApplyConfiguration(new TaxReceiptEmailHistoryConfiguration());
+            modelBuilder.ApplyConfiguration(new TaxReceiptDeliveryConfiguration());
+            modelBuilder.ApplyConfiguration(new PaymentAttemptConfiguration());
+            modelBuilder.ApplyConfiguration(new PaymentWebhookInboxConfiguration());
 
             // 📌 Seed du catalogue d’options
             Data.Seed.ContractOptionTypeSeeder.Seed(modelBuilder);
@@ -826,6 +1201,8 @@ namespace api.Data
             Data.Seed.TaxGenerationSeeder.Seed(modelBuilder);
             // 📌 Seed des types de produit (AV, CAPI, PERIN, PERCOL, PERO, Madelin, Art83, PEA…)
             Data.Seed.ProductTypeSeeder.Seed(modelBuilder);
+            // 📌 Seed du nouveau référentiel ProductEnvelope compatible avec les ProductTypes historiques
+            Data.Seed.ProductEnvelopeSeeder.Seed(modelBuilder);
         }
 
         public override int SaveChanges()

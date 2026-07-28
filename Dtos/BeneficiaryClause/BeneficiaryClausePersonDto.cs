@@ -10,6 +10,12 @@ namespace api.Dtos.BeneficiaryClause
         public string RelationWithClause { get; set; } = string.Empty;
         public decimal Percentage { get; set; }
         public PersonDto? Person { get; set; }
+        public int? ContractId { get; set; }
+        public string ContractNumber { get; set; } = string.Empty;
+        public string ContractLabel { get; set; } = string.Empty;
+        public int? SubscriberPersonId { get; set; }
+        public string SubscriberFirstName { get; set; } = string.Empty;
+        public string SubscriberLastName { get; set; } = string.Empty;
         public DateTime CreatedDate { get; set; }
         public DateTime? UpdatedDate { get; set; }
     }

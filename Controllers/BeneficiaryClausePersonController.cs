@@ -83,7 +83,7 @@ namespace api.Controllers
         }
 
         [HttpGet("byPerson/{personId:int}")]
-        public async Task<ActionResult<List<BeneficiaryClausePerson>>> GetByPersonId(int personId)
+        public async Task<ActionResult<List<BeneficiaryClausePersonDto>>> GetByPersonId(int personId)
         {
             var clauses = await _repository.GetByPersonIdAsync(personId);
             return Ok(clauses);

@@ -17,6 +17,10 @@ namespace api.Models
         [ForeignKey(nameof(ProductId))]
         public Product? Product { get; set; }
 
+        public int? ProductVersionId { get; set; }
+        [ForeignKey(nameof(ProductVersionId))]
+        public ProductVersion? ProductVersion { get; set; }
+
         public int? ContractId { get; set; }
         [ForeignKey(nameof(ContractId))]
         public Contract? Contract { get; set; }

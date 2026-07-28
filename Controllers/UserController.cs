@@ -48,6 +48,15 @@ namespace api.Controllers
             if (await _userRepository.UsernameExistsAsync(user.Username))
                 return BadRequest("Ce nom d'utilisateur existe déjà.");
 
+            user.Username = user.Username.Trim();
+            user.Email = user.Email.Trim();
+            user.PhoneNumber = user.PhoneNumber.Trim();
+            user.NormalizedUsername = user.Username.ToUpperInvariant();
+            user.NormalizedEmail = user.Email.ToUpperInvariant();
+            user.CreatedDate = DateTime.UtcNow;
+            user.EmailConfirmed = true;
+            user.EmailConfirmedAt = DateTime.UtcNow;
+            user.Status = UserStatus.Active;
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(user.PasswordHash); // Hash du mot de passe
             var createdUser = await _userRepository.CreateAsync(user);
             return CreatedAtAction(nameof(GetUserById), new { id = createdUser.Id }, createdUser);

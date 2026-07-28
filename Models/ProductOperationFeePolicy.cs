@@ -12,6 +12,10 @@ namespace api.Models
         [ForeignKey(nameof(ProductId))]
         public Product Product { get; set; } = null!;
 
+        public int? ProductVersionId { get; set; }
+        [ForeignKey(nameof(ProductVersionId))]
+        public ProductVersion? ProductVersion { get; set; }
+
         public OperationFeeType FeeType { get; set; } = OperationFeeType.Entry;
         public FeeAmountMode Mode { get; set; } = FeeAmountMode.Percentage;
 

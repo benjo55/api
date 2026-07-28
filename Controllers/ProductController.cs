@@ -7,6 +7,7 @@ using api.Dtos.Product;
 using Microsoft.AspNetCore.Mvc;
 using api.Helpers;
 using api.Mappers;
+using api.Dtos.Generic;
 
 namespace api.Controllers
 {
@@ -26,7 +27,14 @@ namespace api.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
             var products = await _productRepository.GetAllAsync(query);
-            return Ok(products);
+            return Ok(new PagedResult<ProductDto>
+            {
+                Items = products.Items.Select(p => p.ToProductDto()).ToList(),
+                TotalCount = products.TotalCount,
+                TotalPages = products.TotalPages,
+                HasNextPage = products.HasNextPage,
+                CurrentPage = products.CurrentPage
+            });
         }
 
         [HttpGet("{id:int}")]
@@ -34,7 +42,7 @@ namespace api.Controllers
         {
             var product = await _productRepository.GetByIdAsync(id);
             if (product == null) return NotFound();
-            return Ok(product);
+            return Ok(product.ToProductDto());
         }
 
         [HttpPost]
@@ -42,7 +50,7 @@ namespace api.Controllers
         {
             var productModel = productDto.ToProductFromCreateDto();
             await _productRepository.CreateAsync(productModel);
-            return CreatedAtAction(nameof(GetById), new { Id = productModel.Id }, productModel);
+            return CreatedAtAction(nameof(GetById), new { Id = productModel.Id }, productModel.ToProductDto());
 
         }
 
@@ -52,7 +60,7 @@ namespace api.Controllers
             if (!ModelState.IsValid) return BadRequest(ModelState);
             var updatedProduct = await _productRepository.UpdateAsync(id, productDto);
             if (updatedProduct == null) return NotFound();
-            return Ok(updatedProduct);
+            return Ok(updatedProduct.ToProductDto());
         }
 
         [HttpDelete("{id:int}")]
@@ -77,7 +85,7 @@ namespace api.Controllers
             if (updatedProduct == null)
                 return NotFound();
 
-            return Ok(updatedProduct);
+            return Ok(updatedProduct.ToProductDto());
         }
 
         [HttpGet("{id:int}/tax")]

@@ -47,6 +47,17 @@ namespace api.Repository
 
         public async Task<Permission> CreateAsync(Permission permission)
         {
+            var normalizedCode = permission.PermissionCode?.Trim();
+            if (!string.IsNullOrWhiteSpace(normalizedCode))
+            {
+                var existingPermission = await _context.Permissions
+                    .FirstOrDefaultAsync(p => p.PermissionCode.ToLower() == normalizedCode.ToLower());
+
+                if (existingPermission != null) return existingPermission;
+
+                permission.PermissionCode = normalizedCode;
+            }
+
             _context.Permissions.Add(permission);
             await _context.SaveChangesAsync();
             return permission;

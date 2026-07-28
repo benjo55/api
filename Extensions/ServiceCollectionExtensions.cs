@@ -8,6 +8,14 @@ using api.Configuration;
 using api.Middleware;
 using api.Services.Pdf;
 using api.Services.Pdf.Templates;
+using api.Services.LegalDocuments;
+using api.Services.Cmdb;
+using api.Services.Workflow;
+using api.Services.TaxReceipts;
+using api.Services.Payments;
+using api.Services.Jobs;
+using api.Services.PersonalDashboard;
+using api.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -41,7 +49,10 @@ namespace api.Extensions
         {
             services.AddCors(options =>
                 options.AddPolicy("AllowAllHeaders", policy =>
-                    policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()
+                    policy.AllowAnyOrigin()
+                        .AllowAnyHeader()
+                        .AllowAnyMethod()
+                        .WithExposedHeaders("Content-Disposition")
                 )
             );
             return services;
@@ -66,6 +77,8 @@ namespace api.Extensions
             services.AddEndpointsApiExplorer();
             services.AddSwaggerGen(c =>
             {
+                c.CustomSchemaIds(type => type.FullName?.Replace("+", ".") ?? type.Name);
+
                 c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
                 {
                     Description = "Entrer 'Bearer' suivi d'un espace et du token JWT",
@@ -156,11 +169,67 @@ namespace api.Extensions
                                 context.HttpContext.User?.Identity?.Name ?? "anonymous");
 
                             return Task.CompletedTask;
+                        },
+                        OnTokenValidated = async context =>
+                        {
+                            var userIdValue = context.Principal?.FindFirst("userId")?.Value;
+                            var sessionVersionValue = context.Principal?.FindFirst("sessionVersion")?.Value;
+
+                            if (!int.TryParse(userIdValue, out var userId)
+                                || !int.TryParse(sessionVersionValue, out var tokenSessionVersion))
+                            {
+                                context.Fail("Token de session invalide.");
+                                return;
+                            }
+
+                            var db = context.HttpContext.RequestServices
+                                .GetRequiredService<ApplicationDBContext>();
+                            var user = await db.Users
+                                .AsNoTracking()
+                                .FirstOrDefaultAsync(u => u.Id == userId);
+
+                            if (user == null || user.SessionVersion != tokenSessionVersion)
+                            {
+                                context.Fail("Session révoquée.");
+                                return;
+                            }
+
+                            if (user.Status is UserStatus.Suspended or UserStatus.Revoked or UserStatus.Locked)
+                            {
+                                context.Fail("Compte non autorisé.");
+                            }
                         }
                     };
                 });
             services.AddAuthorization(options =>
             {
+                options.AddPolicy(AuthorizationPolicies.ViewUsers, policy =>
+                    policy.RequireClaim("permission", SystemPermissions.UsersView));
+                options.AddPolicy(AuthorizationPolicies.ManageUsers, policy =>
+                    policy.RequireAssertion(context =>
+                        context.User.HasClaim("permission", SystemPermissions.UsersCreate)
+                        || context.User.HasClaim("permission", SystemPermissions.UsersUpdate)));
+                options.AddPolicy(AuthorizationPolicies.ManageUserRoles, policy =>
+                    policy.RequireClaim("permission", SystemPermissions.UsersAssignRoles));
+                options.AddPolicy(AuthorizationPolicies.SuspendUsers, policy =>
+                    policy.RequireAssertion(context =>
+                        context.User.HasClaim("permission", SystemPermissions.UsersSuspend)
+                        || context.User.HasClaim("permission", SystemPermissions.UsersReactivate)));
+                options.AddPolicy(AuthorizationPolicies.RevokeUsers, policy =>
+                    policy.RequireAssertion(context =>
+                        context.User.HasClaim("permission", SystemPermissions.UsersRevoke)
+                        || context.User.HasClaim("permission", SystemPermissions.UsersRestore)));
+                options.AddPolicy(AuthorizationPolicies.ViewRoles, policy =>
+                    policy.RequireClaim("permission", SystemPermissions.RolesView));
+                options.AddPolicy(AuthorizationPolicies.ManageRoles, policy =>
+                    policy.RequireAssertion(context =>
+                        context.User.HasClaim("permission", SystemPermissions.RolesCreate)
+                        || context.User.HasClaim("permission", SystemPermissions.RolesUpdate)
+                        || context.User.HasClaim("permission", SystemPermissions.RolesDelete)
+                        || context.User.HasClaim("permission", SystemPermissions.RolesAssignPermissions)));
+                options.AddPolicy(AuthorizationPolicies.ViewSecurityAudit, policy =>
+                    policy.RequireClaim("permission", SystemPermissions.AuditView));
+
                 options.FallbackPolicy = new AuthorizationPolicyBuilder()
                     .RequireAuthenticatedUser()
                     .Build();
@@ -172,14 +241,16 @@ namespace api.Extensions
         public static IServiceCollection AddApiDbContext(this IServiceCollection services, IConfiguration config)
         {
             var connection = config.GetConnectionString("DefaultConnection");
+            services.AddSingleton<SqlServerSessionOptionsInterceptor>();
 
             // Pool utilisé partout (thread-safe)
-            services.AddPooledDbContextFactory<ApplicationDBContext>(options =>
+            services.AddPooledDbContextFactory<ApplicationDBContext>((serviceProvider, options) =>
             {
                 options.UseSqlServer(
                     connection,
                     sqlOptions => sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)
                 );
+                options.AddInterceptors(serviceProvider.GetRequiredService<SqlServerSessionOptionsInterceptor>());
             });
 
             // Fournit un contexte “normal” via la fabrique
@@ -195,6 +266,7 @@ namespace api.Extensions
         {
 
             QuestPDF.Settings.License = LicenseType.Community;
+            services.AddMemoryCache();
 
             services.AddScoped<IPersonRepository, PersonRepository>();
             services.AddScoped<IInsurerRepository, InsurerRepository>();
@@ -202,6 +274,7 @@ namespace api.Extensions
             services.AddScoped<ICompartmentRepository, CompartmentRepository>();
             services.AddScoped<IContractRepository, ContractRepository>();
             services.AddScoped<IProductRepository, ProductRepository>();
+            services.AddScoped<IProductCatalogRepository, ProductCatalogRepository>();
             services.AddScoped<IBrandRepository, BrandRepository>();
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<IRoleRepository, RoleRepository>();
@@ -241,13 +314,96 @@ namespace api.Extensions
             services.AddScoped<ITaxEngineService, TaxEngineService>();
             services.AddScoped<IPdfDocumentService, PdfDocumentService>();
             services.AddScoped<IPdfBusinessDocumentService, PdfBusinessDocumentService>();
+            services.AddScoped<IDocumentStructureService, DocumentStructureService>();
+            services.AddScoped<ILegalDocumentImportService, LegalDocumentImportService>();
+            services.AddScoped<IDocumentNumberingService, DocumentNumberingService>();
+            services.AddScoped<IDocumentVersioningService, DocumentVersioningService>();
+            services.AddScoped<IDocumentWorkflowService, DocumentWorkflowService>();
+            services.AddScoped<IDocumentValidationService, DocumentValidationService>();
+            services.AddScoped<IDocumentRenderService, DocumentRenderService>();
+            services.AddScoped<IPdfGenerationService, PdfGenerationService>();
+            services.AddScoped<IDocumentVariableResolver, DocumentVariableResolver>();
+            services.AddScoped<IDocumentConditionEvaluator, DocumentConditionEvaluator>();
+            services.AddScoped<IClauseCatalogService, ClauseCatalogService>();
+            services.AddScoped<IDocumentComparisonService, DocumentComparisonService>();
+            services.AddScoped<IDocumentAuditService, DocumentAuditService>();
+            services.AddScoped<IDocumentBinaryStorage, DocumentBinaryStorage>();
+            services.AddScoped<IProductDocumentAssignmentService, ProductDocumentAssignmentService>();
+            services.AddScoped<ICmdbImportService, CmdbImportService>();
+            services.AddScoped<IArchiMateFlowImportService, ArchiMateFlowImportService>();
+            services.AddScoped<ICartographyDocumentService, CartographyDocumentService>();
+            services.AddScoped<IProcessValidationService, ProcessValidationService>();
+            services.AddScoped<IWorkflowRuntimeService, WorkflowRuntimeService>();
+            services.AddScoped<IDonorService, DonorService>();
+            services.AddScoped<IDonationService, DonationService>();
+            services.AddScoped<IBeneficiaryOrganizationService, BeneficiaryOrganizationService>();
+            services.AddScoped<ITaxReceiptService, TaxReceiptService>();
+            services.AddScoped<ITaxReceiptNumberGenerator, TaxReceiptNumberGenerator>();
+            services.AddScoped<IAmountToWordsService, AmountToWordsService>();
+            services.AddScoped<ITaxReceiptPdfGenerator, TaxReceiptPdfGenerator2041Rd>();
+            services.AddScoped<ITaxReceiptEmailService, TaxReceiptEmailService>();
+            services.AddScoped<IHelloAssoTokenProvider, HelloAssoTokenProvider>();
+            services.AddScoped<IPaymentProvider, HelloAssoPaymentProvider>();
+            services.AddScoped<IBankAccountProtector, BankAccountProtector>();
+            services.AddScoped<IIbanValidator, IbanValidator>();
+            services.AddScoped<IDonationPaidProcessor, DonationPaidProcessor>();
+            services.AddScoped<IPaymentReconciliationService, PaymentReconciliationService>();
+            services.AddScoped<IMeDonationPaymentService, MeDonationPaymentService>();
+            services.AddScoped<IDonationReceiptAccessTokenService, DonationReceiptAccessTokenService>();
+            services.AddScoped<ISmtpMailSender, SmtpMailSender>();
+            services.AddScoped<IPublicDonationService, PublicDonationService>();
+            services.AddScoped<IMeProfileService, MeProfileService>();
+            services.AddScoped<IMeDonationsService, MeDonationsService>();
+            services.AddScoped<DemoNewsProvider>();
+            services.AddScoped<RssNewsProvider>();
+            services.AddScoped<INewsProvider>(sp =>
+            {
+                var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<ExternalFeedsOptions>>().Value;
+                return string.Equals(options.News.Provider, "Rss", StringComparison.OrdinalIgnoreCase)
+                    ? sp.GetRequiredService<RssNewsProvider>()
+                    : sp.GetRequiredService<DemoNewsProvider>();
+            });
+            services.AddScoped<DemoFinancialMarketProvider>();
+            services.AddScoped<EodFinancialMarketProvider>();
+            services.AddScoped<IFinancialMarketProvider>(sp =>
+            {
+                var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<ExternalFeedsOptions>>().Value;
+                return string.Equals(options.FinancialMarkets.Provider, "Eod", StringComparison.OrdinalIgnoreCase)
+                    ? sp.GetRequiredService<EodFinancialMarketProvider>()
+                    : sp.GetRequiredService<DemoFinancialMarketProvider>();
+            });
+            services.AddScoped<INewsFeedService, NewsFeedService>();
+            services.AddScoped<IFinancialMarketService, FinancialMarketService>();
+            services.AddScoped<IEmailService, SmtpEmailService>();
+            services.AddScoped<IAuthenticationAccountService, AuthenticationAccountService>();
+            services.AddScoped<IUserAdministrationService, UserAdministrationService>();
+            services.AddScoped<AuthorizationSeedService>();
+            services.AddScoped<SendTaxReceiptEmailJob>();
             services.AddSingleton<IPdfTemplate, BusinessPdfTemplate>();
             services.AddSingleton<IPdfTemplate, ContractSheetPdfTemplate>();
             services.AddHttpClient("pdf-assets");
+            services.AddHttpClient("personal-dashboard-news", client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(8);
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("LifePersonalDashboard/1.0");
+            });
+            services.AddHttpClient("helloasso-auth", (sp, client) =>
+            {
+                var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<HelloAssoOptions>>().Value;
+                client.BaseAddress = new Uri(options.TokenBaseUrl);
+                client.Timeout = TimeSpan.FromSeconds(options.HttpTimeoutSeconds);
+            });
+            services.AddHttpClient("helloasso-api", (sp, client) =>
+            {
+                var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<HelloAssoOptions>>().Value;
+                client.BaseAddress = new Uri(options.ApiBaseUrl);
+                client.Timeout = TimeSpan.FromSeconds(options.HttpTimeoutSeconds);
+            });
 
             // Hosted services
             services.AddHostedService<ContractValuationCronService>();
             services.AddHostedService<EodBulkImportCronService>();
+            services.AddHostedService<PaymentWebhookBackgroundService>();
 
             // Validation générique
             services.AddScoped(typeof(IValidationService<>), typeof(ValidationService<>));
@@ -264,6 +420,36 @@ namespace api.Extensions
 
             // Configuration des options
             services.Configure<EodSettings>(config.GetSection("EodSettings"));
+            services.Configure<MailSettings>(config.GetSection("MailSettings"));
+            services.Configure<AuthenticationOptions>(config.GetSection("Authentication"));
+            services
+                .AddOptions<ExternalFeedsOptions>()
+                .Bind(config.GetSection("ExternalFeeds"))
+                .Validate(o => o.News.DefaultLimit is >= 1 and <= 12, "ExternalFeeds:News:DefaultLimit doit etre entre 1 et 12")
+                .Validate(o => o.News.MaxLimit is >= 1 and <= 30, "ExternalFeeds:News:MaxLimit doit etre entre 1 et 30")
+                .Validate(o => o.FinancialMarkets.Symbols.Length > 0, "ExternalFeeds:FinancialMarkets:Symbols doit contenir au moins un symbole")
+                .ValidateOnStart();
+            services
+                .AddOptions<PaymentsOptions>()
+                .Bind(config.GetSection(PaymentsOptions.SectionName))
+                .ValidateDataAnnotations()
+                .Validate(o => !o.PayPal.Enabled || !string.IsNullOrWhiteSpace(o.PayPal.ClientId), "Payments:PayPal:ClientId obligatoire si PayPal est actif")
+                .Validate(o => !o.PayPal.Enabled || !string.IsNullOrWhiteSpace(o.PayPal.ClientSecret), "Payments:PayPal:ClientSecret obligatoire si PayPal est actif")
+                .Validate(o => !o.PayPal.Enabled || !string.IsNullOrWhiteSpace(o.PayPal.WebhookId), "Payments:PayPal:WebhookId obligatoire si PayPal est actif")
+                .Validate(o => !o.BankTransfersEnabled || !string.IsNullOrWhiteSpace(o.BankEncryptionKey), "Payments:BankEncryptionKey doit etre defini via user-secrets ou variable d'environnement avant d'activer les virements")
+                .ValidateOnStart();
+            services
+                .AddOptions<HelloAssoOptions>()
+                .Bind(config.GetSection(HelloAssoOptions.SectionName))
+                .ValidateDataAnnotations()
+                .Validate(o => !o.Enabled || o.HasAnyCredentials, "Payments:HelloAsso doit contenir des credentials globaux ou au moins un alias complet")
+                .ValidateOnStart();
+            services
+                .AddOptions<DonationCheckoutOptions>()
+                .Bind(config.GetSection(DonationCheckoutOptions.SectionName))
+                .ValidateDataAnnotations()
+                .Validate(o => o.MaxAmountEur >= o.MinAmountEur, "DonationCheckout:MaxAmountEur doit etre >= MinAmountEur")
+                .ValidateOnStart();
 
             return services;
         }

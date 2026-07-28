@@ -26,6 +26,7 @@ namespace api.Dtos.Contract
 
         public int PersonId { get; set; }
         public int ProductId { get; set; }
+        public int? ProductVersionId { get; set; }
 
         public decimal InitialPremium { get; set; }
         public decimal TotalPaidPremiums { get; set; }

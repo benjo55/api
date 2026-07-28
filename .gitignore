@@ -2,11 +2,18 @@
 # .NET
 # =====================
 bin/
+bin-*/
 obj/
+obj-*/
+publish/
+publish-*/
+publish_check*/
 *.user
 *.suo
 *.cache
+*.lscache
 *.log
+*.binlog
 *.bak
 Data/*.bak
 
@@ -19,6 +26,12 @@ build/
 .vite/
 .next/
 .out/
+
+# =====================
+# Python
+# =====================
+__pycache__/
+*.py[cod]
 
 # =====================
 # OS / IDE
@@ -39,3 +52,8 @@ Thumbs.db
 # =====================
 *.bak
 Data/*.bak
+App_Data/document-artifacts/
+artifacts/
+tmp/
+logs/
+.tools/

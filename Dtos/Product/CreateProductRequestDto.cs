@@ -10,9 +10,17 @@ namespace api.Dtos.Product
     {
         public string ProductCode { get; set; } = string.Empty;
         public string ProductName { get; set; } = string.Empty;
+        public string? CommercialName { get; set; }
+        public string? Description { get; set; }
         public int InsurerId { get; set; }
         public DateTime CreatedDate { get; set; } = DateTime.Now;
         public DateTime? UpdatedDate { get; set; }
+        public ProductStatus Status { get; set; } = ProductStatus.Active;
+        public bool IsOpenToNewBusiness { get; set; } = true;
+        public bool IsOpenToNewPayments { get; set; } = true;
+        public DateTime? MarketingStartDate { get; set; }
+        public DateTime? MarketingEndDate { get; set; }
+        public int? ProductEnvelopeId { get; set; }
         public ContractFamily? ContractFamily { get; set; }
         public int? ProductTypeId { get; set; }
         public int? TaxProfileId { get; set; }
