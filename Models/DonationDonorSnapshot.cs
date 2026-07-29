@@ -9,6 +9,7 @@ namespace api.Models
         public User? User { get; set; }
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;
+        public DateTime? BirthDate { get; set; }
         public string Email { get; set; } = string.Empty;
         public string AddressLine1 { get; set; } = string.Empty;
         public string? AddressLine2 { get; set; }

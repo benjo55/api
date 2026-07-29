@@ -43,7 +43,7 @@ $JwtKey = "MaSuperCleSecreteTresLongue123456789"
 
 # Mailjet.
 $MailjetApiKey = "cd9e5aca591b25395f76272e468c2258"
-$MailjetSecretKey = "3aff4bf6dba48d218daaf4cd3f6a425c"
+$MailjetSecretKey = "07edaa4e0f06e0e2700850808720c2e0"
 
 # EOD Historical Data.
 $EodApiKey = "684f34554390c3.19045690"

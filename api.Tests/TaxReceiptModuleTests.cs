@@ -319,6 +319,7 @@ public sealed class TaxReceiptModuleTests
                 DonationDate = new DateTime(2026, 5, 12),
                 Amount = 125.50m,
                 DonationForm = DonationForm.PrivateDeed,
+                Purpose = "Affectation test",
                 DonationNature = DonationNature.Cash,
                 PaymentMethod = DonationPaymentMethod.BankTransfer,
                 TaxRegime = DonationTaxRegime.Article200,

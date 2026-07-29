@@ -58,6 +58,7 @@ namespace api.Controllers
         }
 
         [HttpPut("{userId:int}")]
+        [HttpPatch("{userId:int}")]
         [Authorize(Policy = AuthorizationPolicies.ManageUsers)]
         public async Task<IActionResult> Update(int userId, [FromBody] AdminUpdateUserRequest request, CancellationToken cancellationToken)
         {

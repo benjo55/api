@@ -93,6 +93,34 @@ public class AuthRegistrationTests
     }
 
     [Fact]
+    public async Task ConfirmEmail_WhenAlreadyConfirmed_ReturnsAlreadyConfirmed()
+    {
+        await using var db = CreateDbContext();
+        var (controller, emailService) = CreateController(db);
+        await RegisterAsync(controller, "benjamin@example.com");
+        var user = await db.Users.SingleAsync();
+        var rawToken = ExtractToken(emailService.SentMessages.Single().HtmlBody);
+
+        await controller.ConfirmEmail(new ConfirmEmailRequestDto
+        {
+            UserId = user.Id,
+            Token = rawToken
+        }, CancellationToken.None);
+
+        var result = await controller.ConfirmEmail(new ConfirmEmailRequestDto
+        {
+            UserId = user.Id,
+            Token = rawToken
+        }, CancellationToken.None);
+
+        var ok = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
+        Assert.Contains(
+            AuthenticationAccountService.EmailAlreadyConfirmedCode,
+            ok.Value?.ToString() ?? "");
+    }
+
+    [Fact]
     public async Task ConfirmEmail_WithExpiredToken_ReturnsBadRequest()
     {
         await using var db = CreateDbContext();

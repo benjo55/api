@@ -26,6 +26,8 @@ namespace api.Dtos.Me
         DonationStatus Status,
         DateTime? PaymentConfirmedAt,
         DonationLegacyLinkStatus LegacyLinkStatus,
+        string? Purpose,
+        string? Comment,
         string DonorFirstName,
         string DonorLastName,
         string DonorEmail,

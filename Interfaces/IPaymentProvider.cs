@@ -31,6 +31,7 @@ namespace api.Interfaces
         string ZipCode,
         string City,
         string Country,
+        DateTime? DateOfBirth,
         IReadOnlyDictionary<string, string> Metadata,
         string? CredentialKey = null);
 

@@ -141,6 +141,7 @@ namespace api.Services.TaxReceipts
                 ["donation.date.day"] = donation.DonationDate.ToString("dd", culture),
                 ["donation.date.month"] = donation.DonationDate.ToString("MM", culture),
                 ["donation.date.year"] = donation.DonationDate.ToString("yyyy", culture),
+                ["donation.purpose"] = donation.Purpose ?? donation.OtherFormDescription ?? string.Empty,
                 ["donation.otherFormDescription"] = donation.OtherFormDescription ?? string.Empty,
                 ["donation.otherNatureDescription"] = donation.OtherNatureDescription ?? string.Empty,
                 ["receipt.generatedAt"] = (receipt.GeneratedAt ?? DateTime.UtcNow).ToString("dd/MM/yyyy", culture),

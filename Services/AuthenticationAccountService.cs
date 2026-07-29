@@ -184,9 +184,7 @@ namespace api.Services
 
             if (user.EmailConfirmed)
             {
-                return new AuthActionResult(
-                    EmailAlreadyConfirmedCode,
-                    "Cette adresse e-mail est déjà confirmée.");
+                return AlreadyConfirmed();
             }
 
             var token = await FindValidTokenAsync(
@@ -209,7 +207,26 @@ namespace api.Services
             {
                 user.Status = UserStatus.Active;
             }
-            await _db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                _db.ChangeTracker.Clear();
+                var currentUser = await _db.Users
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(u => u.Id == request.UserId, cancellationToken);
+
+                if (currentUser?.EmailConfirmed == true)
+                {
+                    _logger.LogInformation("Adresse e-mail déjà confirmée pour UserId={UserId}", user.Id);
+                    return AlreadyConfirmed();
+                }
+
+                _logger.LogWarning("Conflit de confirmation e-mail pour UserId={UserId}", user.Id);
+                return InvalidToken();
+            }
 
             _logger.LogInformation("Adresse e-mail confirmée pour UserId={UserId}", user.Id);
             await SendWelcomeEmailAsync(user, cancellationToken);
@@ -261,10 +278,10 @@ namespace api.Services
                     EmailDelivered: true);
             }
 
-            _logger.LogWarning("E-mail de confirmation non envoyé (SMTP non disponible) pour UserId={UserId}", user.Id);
+            _logger.LogWarning("E-mail de confirmation non envoyé (SMTP/Mailjet indisponible ou mal configuré) pour UserId={UserId}", user.Id);
             return new AuthActionResult(
                 "CONFIRMATION_EMAIL_RESEND_FAILED",
-                "Le message de confirmation n’a pas pu être envoyé. Vérifiez que le service de messagerie de développement est démarré.",
+                "Le message de confirmation n’a pas pu être envoyé. Vérifiez la configuration SMTP/Mailjet et les journaux serveur.",
                 EmailDelivered: false);
         }
 
@@ -628,6 +645,11 @@ namespace api.Services
                 InvalidOrExpiredTokenCode,
                 "Le lien est invalide ou a expiré.",
                 StatusCodes.Status400BadRequest);
+
+        private static AuthActionResult AlreadyConfirmed() =>
+            new(
+                EmailAlreadyConfirmedCode,
+                "Cette adresse e-mail est déjà confirmée.");
     }
 
     public sealed class AuthFunctionalException : Exception

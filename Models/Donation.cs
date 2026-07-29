@@ -25,6 +25,7 @@ namespace api.Models
         public DonationTaxRegime TaxRegime { get; set; }
         public decimal? Article200Amount { get; set; }
         public decimal? Article978Amount { get; set; }
+        public string? Purpose { get; set; }
         public string? ExternalReference { get; set; }
         public string? Comments { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

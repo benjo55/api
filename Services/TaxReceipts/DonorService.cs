@@ -152,6 +152,7 @@ namespace api.Services.TaxReceipts
             donor.LastName = dto.LastName.Trim();
             donor.FirstName = dto.FirstName.Trim();
             donor.CompanyName = Clean(dto.CompanyName);
+            donor.BirthDate = dto.BirthDate?.Date;
             donor.Email = Clean(dto.Email);
             donor.Phone = Clean(dto.Phone);
             donor.AddressLine1 = dto.AddressLine1.Trim();

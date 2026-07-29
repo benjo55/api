@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json;
 using api.Configuration;
 using api.Interfaces;
 using api.Models.Enum;
@@ -165,6 +166,81 @@ public sealed class HelloAssoLot1Tests
         Assert.Equal(50000, result.AmountInCents);
         Assert.Equal("93353", result.ExternalOrderId);
         Assert.Equal("112233", result.ExternalPaymentId);
+    }
+
+    [Fact]
+    public async Task Checkout_payload_sends_payer_birth_date()
+    {
+        string? checkoutPayload = null;
+        var handler = new FakeHttpHandler(request =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/oauth2/token")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"access_token\":\"token-1\",\"expires_in\":3600}", Encoding.UTF8, "application/json"),
+                };
+            }
+
+            var stream = request.Content?.ReadAsStream(CancellationToken.None);
+            if (stream is not null)
+            {
+                using var reader = new StreamReader(stream, Encoding.UTF8);
+                checkoutPayload = reader.ReadToEnd();
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"id\":\"checkout-1\",\"redirectUrl\":\"https://helloasso.example/checkout-1\"}", Encoding.UTF8, "application/json"),
+            };
+        });
+        var client = new HttpClient(handler) { BaseAddress = new Uri("https://api.helloasso-sandbox.com") };
+        var factory = new SingleClientFactory(client);
+        var provider = new HelloAssoPaymentProvider(
+            factory,
+            new HelloAssoTokenProvider(
+                factory,
+                Options.Create(new HelloAssoOptions
+                {
+                    Enabled = true,
+                    BaseUrl = "https://api.helloasso-sandbox.com",
+                    ClientId = "id",
+                    ClientSecret = "secret",
+                    OrganizationSlug = "acic-tests",
+                    RetryCount = 1,
+                }),
+                NullLogger<HelloAssoTokenProvider>.Instance),
+            Options.Create(new HelloAssoOptions
+            {
+                Enabled = true,
+                BaseUrl = "https://api.helloasso-sandbox.com",
+                RetryCount = 1,
+            }),
+            NullLogger<HelloAssoPaymentProvider>.Instance);
+
+        var result = await provider.CreateCheckoutAsync(
+            new CreateCheckoutCommand(
+                "acic-tests",
+                5000,
+                "Don INT-2026-000001",
+                "https://life.example/return",
+                "https://life.example/back",
+                "https://life.example/error",
+                "Alain",
+                "VERSE",
+                "alain@example.com",
+                "5 Rue Truffaut",
+                "75017",
+                "Paris",
+                "FR",
+                new DateTime(1964, 9, 29),
+                new Dictionary<string, string>()),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotNull(checkoutPayload);
+        using var document = JsonDocument.Parse(checkoutPayload!);
+        Assert.Equal("1964-09-29", document.RootElement.GetProperty("payer").GetProperty("dateOfBirth").GetString());
     }
 
     private sealed class SingleClientFactory : IHttpClientFactory

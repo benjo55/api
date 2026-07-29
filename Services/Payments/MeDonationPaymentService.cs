@@ -118,6 +118,7 @@ namespace api.Services.Payments
             await _db.SaveChangesAsync(cancellationToken);
 
             var donor = donation.DonorSnapshot;
+            var birthDate = donor?.BirthDate ?? donation.Donor.BirthDate;
             var credentialKey = ResolveCredentialKey(donation.Organization);
             var metadata = new Dictionary<string, string>
             {
@@ -144,6 +145,7 @@ namespace api.Services.Payments
                     donor?.PostalCode ?? donation.Donor.PostalCode,
                     donor?.City ?? donation.Donor.City,
                     donor?.Country ?? donation.Donor.CountryCode,
+                    birthDate,
                     metadata,
                     credentialKey),
                 cancellationToken);

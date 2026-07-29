@@ -28,6 +28,7 @@
     "donation.date.day": { "page": 2, "x": 182, "y": 383, "fontSize": 10, "width": 16, "align": "center" },
     "donation.date.month": { "page": 2, "x": 210, "y": 383, "fontSize": 10, "width": 16, "align": "center" },
     "donation.date.year": { "page": 2, "x": 238, "y": 383, "fontSize": 10, "width": 32, "align": "center" },
+    "donation.purpose": { "page": 2, "x": 35, "y": 622, "fontSize": 8, "width": 250 },
     "donation.otherFormDescription": { "page": 2, "x": 510, "y": 484, "fontSize": 8, "width": 40 },
     "donation.otherNatureDescription": { "page": 2, "x": 420, "y": 541, "fontSize": 8, "width": 110 },
     "receipt.generatedAt.day": { "page": 2, "x": 306, "y": 643, "fontSize": 10, "width": 17, "align": "center" },

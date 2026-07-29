@@ -31,6 +31,7 @@ public sealed class MeProfileServiceTests
             User = user,
             FirstName = "Alain",
             LastName = "Vie",
+            BirthDate = new DateTime(1964, 9, 29),
             Email = user.Email,
             Phone = user.PhoneNumber,
             AddressLine1 = "1 rue de Paris",

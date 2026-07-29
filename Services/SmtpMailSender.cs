@@ -38,6 +38,18 @@ namespace api.Services
                 return new SmtpMailSendResult(false, "SmtpNotConfigured", "SMTP non configuré.");
             }
 
+            if (RequiresCredentials(host)
+                && (string.IsNullOrWhiteSpace(_settings.UserName)
+                    || string.IsNullOrWhiteSpace(_settings.Password)))
+            {
+                _logger.LogWarning(
+                    "Mail non envoyé: identifiants SMTP manquants. Type={MessageType}, Host={Host}, Recipients={Recipients}",
+                    messageType,
+                    host,
+                    string.Join(", ", recipients));
+                return new SmtpMailSendResult(false, "SmtpCredentialsMissing", "Identifiants SMTP manquants.");
+            }
+
             try
             {
                 if (message.From is null)
@@ -97,5 +109,10 @@ namespace api.Services
             var visible = localPart.Length <= 2 ? localPart : localPart[..2];
             return $"{visible}***@{domainPart}";
         }
+
+        private static bool RequiresCredentials(string host) =>
+            !host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+            && !host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase)
+            && !host.Equals("::1", StringComparison.OrdinalIgnoreCase);
     }
 }

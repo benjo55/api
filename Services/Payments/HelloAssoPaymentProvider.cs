@@ -50,6 +50,7 @@ namespace api.Services.Payments
                     zipCode = command.ZipCode,
                     city = command.City,
                     country = NormalizeCountry(command.Country),
+                    dateOfBirth = FormatDateOfBirth(command.DateOfBirth),
                 },
                 metadata = command.Metadata,
             };
@@ -105,6 +106,9 @@ namespace api.Services.Payments
                 return value;
             }
         }
+
+        private static string? FormatDateOfBirth(DateTime? dateOfBirth) =>
+            dateOfBirth?.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
         public async Task<PaymentReconciliationResult> ReconcilePaymentAsync(PaymentReconciliationCommand command, CancellationToken cancellationToken)
         {

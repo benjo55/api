@@ -11,6 +11,7 @@ namespace api.Services.Payments
 {
     public sealed partial class MeProfileService : IMeProfileService
     {
+        private const int RequiredProfileFieldCount = 7;
         private readonly ApplicationDBContext _db;
 
         public MeProfileService(ApplicationDBContext db)
@@ -34,6 +35,7 @@ namespace api.Services.Payments
             donor.FirstName = CleanRequired(dto.FirstName);
             donor.LastName = CleanRequired(dto.LastName);
             donor.Phone = CleanOptional(dto.Phone);
+            donor.BirthDate = NormalizeBirthDate(dto.BirthDate);
             donor.AddressLine1 = CleanRequired(dto.AddressLine1);
             donor.StreetName = donor.AddressLine1;
             donor.AddressLine2 = CleanOptional(dto.AddressLine2);
@@ -192,13 +194,14 @@ namespace api.Services.Payments
         public static MeProfileDto MapProfile(Donor donor)
         {
             var completed = CountCompletedRequiredFields(donor);
-            var percentage = (int)Math.Round(completed / 6m * 100m, MidpointRounding.AwayFromZero);
+            var percentage = (int)Math.Round(completed / (decimal)RequiredProfileFieldCount * 100m, MidpointRounding.AwayFromZero);
 
             return new MeProfileDto(
                 donor.Id,
                 donor.FirstName,
                 donor.LastName,
                 donor.Phone,
+                donor.BirthDate,
                 donor.AddressLine1,
                 donor.AddressLine2,
                 donor.PostalCode,
@@ -206,13 +209,13 @@ namespace api.Services.Payments
                 donor.CountryCode,
                 donor.CompanyName,
                 FormatAddress(donor),
-                completed == 6,
+                completed == RequiredProfileFieldCount,
                 percentage,
                 donor.CreatedAt,
                 donor.UpdatedAt);
         }
 
-        public static bool IsProfileComplete(Donor donor) => CountCompletedRequiredFields(donor) == 6;
+        public static bool IsProfileComplete(Donor donor) => CountCompletedRequiredFields(donor) == RequiredProfileFieldCount;
 
         public static string FormatAddress(Donor donor)
         {
@@ -227,7 +230,7 @@ namespace api.Services.Payments
 
         private static int CountCompletedRequiredFields(Donor donor)
         {
-            return new[]
+            var completedTextFields = new[]
             {
                 donor.FirstName,
                 donor.LastName,
@@ -236,6 +239,8 @@ namespace api.Services.Payments
                 donor.City,
                 donor.CountryCode
             }.Count(x => !string.IsNullOrWhiteSpace(x));
+
+            return completedTextFields + (donor.BirthDate.HasValue ? 1 : 0);
         }
 
         private static void ValidateProfile(SaveMeProfileDto dto)
@@ -248,6 +253,18 @@ namespace api.Services.Payments
             if (string.IsNullOrWhiteSpace(dto.LastName))
             {
                 throw new BusinessException("Le nom est obligatoire.");
+            }
+
+            if (!dto.BirthDate.HasValue)
+            {
+                throw new BusinessException("La date de naissance est obligatoire.");
+            }
+
+            var birthDate = NormalizeBirthDate(dto.BirthDate)!.Value;
+            var today = DateTime.UtcNow.Date;
+            if (birthDate >= today || birthDate < today.AddYears(-120))
+            {
+                throw new BusinessException("La date de naissance n'est pas valide.");
             }
 
             if (string.IsNullOrWhiteSpace(dto.AddressLine1))
@@ -286,6 +303,8 @@ namespace api.Services.Payments
         private static string? CleanOptional(string? value) =>
             string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+        private static DateTime? NormalizeBirthDate(DateTime? value) => value?.Date;
+
         private static string NormalizeCountry(string? value) =>
             string.IsNullOrWhiteSpace(value) ? "FR" : value.Trim().ToUpperInvariant();
 
@@ -317,7 +336,7 @@ namespace api.Services.Payments
                 items.Add(new MeNewsItemDto(
                     donor.UpdatedAt,
                     "Profil à compléter",
-                    "Votre adresse complète est nécessaire pour préparer correctement vos futurs documents.",
+                    "Votre adresse complète et votre date de naissance sont nécessaires pour préparer correctement vos futurs documents.",
                     "warning",
                     "Compléter mon profil",
                     "/my-space/profile"));

@@ -12,6 +12,7 @@ namespace api.Models
         public string LastName { get; set; } = string.Empty;
         public string FirstName { get; set; } = string.Empty;
         public string? CompanyName { get; set; }
+        public DateTime? BirthDate { get; set; }
         public string? Email { get; set; }
         public string? Phone { get; set; }
         public string AddressLine1 { get; set; } = string.Empty;

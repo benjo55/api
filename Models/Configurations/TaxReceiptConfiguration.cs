@@ -15,6 +15,7 @@ namespace api.Models.Configurations
             entity.Property(x => x.LastName).HasMaxLength(200).IsRequired();
             entity.Property(x => x.FirstName).HasMaxLength(200).IsRequired();
             entity.Property(x => x.CompanyName).HasMaxLength(250);
+            entity.Property(x => x.BirthDate).HasColumnType("date");
             entity.Property(x => x.Email).HasMaxLength(320);
             entity.Property(x => x.Phone).HasMaxLength(40);
             entity.Property(x => x.AddressLine1).HasMaxLength(300).IsRequired();
@@ -55,6 +56,7 @@ namespace api.Models.Configurations
             entity.Property(x => x.OtherNatureDescription).HasMaxLength(500);
             entity.Property(x => x.PaymentMethod).HasConversion<string>().HasMaxLength(50);
             entity.Property(x => x.TaxRegime).HasConversion<string>().HasMaxLength(50);
+            entity.Property(x => x.Purpose).HasMaxLength(500);
             entity.Property(x => x.ExternalReference).HasMaxLength(120);
             entity.Property(x => x.Comments).HasMaxLength(2000);
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(40);
@@ -162,6 +164,7 @@ namespace api.Models.Configurations
             entity.ToTable("DonationDonorSnapshots");
             entity.Property(x => x.FirstName).HasMaxLength(100).IsRequired();
             entity.Property(x => x.LastName).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.BirthDate).HasColumnType("date");
             entity.Property(x => x.Email).HasMaxLength(320).IsRequired();
             entity.Property(x => x.AddressLine1).HasMaxLength(300).IsRequired();
             entity.Property(x => x.AddressLine2).HasMaxLength(300);

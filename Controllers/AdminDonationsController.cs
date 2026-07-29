@@ -110,5 +110,63 @@ namespace api.Controllers
             await _service.ResendReceiptAsync(id, cancellationToken);
             return Ok(new { message = "Renvoi du recu lance." });
         }
+
+        [HttpDelete("{id:int}")]
+        public async Task<IActionResult> Delete([FromRoute] int id, CancellationToken cancellationToken)
+        {
+            var donation = await _db.Donations
+                .Include(x => x.TaxReceipts)
+                .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+            if (donation is null)
+            {
+                return NotFound();
+            }
+
+            var receiptIds = donation.TaxReceipts.Select(x => x.Id).ToList();
+            var artifactIds = donation.TaxReceipts
+                .Where(x => x.DocumentArtifactId.HasValue)
+                .Select(x => x.DocumentArtifactId!.Value)
+                .Distinct()
+                .ToList();
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+
+            if (receiptIds.Count > 0)
+            {
+                var replacementReceipts = await _db.TaxReceipts
+                    .Where(x => x.ReplacementReceiptId.HasValue && receiptIds.Contains(x.ReplacementReceiptId.Value))
+                    .ToListAsync(cancellationToken);
+
+                foreach (var receipt in replacementReceipts)
+                {
+                    receipt.ReplacementReceiptId = null;
+                    receipt.UpdatedAt = DateTime.UtcNow;
+                }
+
+                _db.TaxReceipts.RemoveRange(donation.TaxReceipts);
+            }
+
+            _db.Donations.Remove(donation);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            if (artifactIds.Count > 0)
+            {
+                var orphanArtifacts = await _db.DocumentArtifacts
+                    .Where(x =>
+                        artifactIds.Contains(x.Id)
+                        && x.LegalDocumentRevisionId == null
+                        && x.ContractDocumentInstanceId == null
+                        && !_db.TaxReceipts.Any(r => r.DocumentArtifactId == x.Id))
+                    .ToListAsync(cancellationToken);
+
+                _db.DocumentArtifacts.RemoveRange(orphanArtifacts);
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+
+            return NoContent();
+        }
     }
 }

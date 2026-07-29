@@ -1,9 +1,11 @@
 using System.Net.Mail;
 using System.Text;
+using api.Configuration;
 using api.Dtos.Development;
 using api.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace api.Controllers
 {
@@ -14,11 +16,37 @@ namespace api.Controllers
     {
         private readonly IWebHostEnvironment _environment;
         private readonly ISmtpMailSender _mailSender;
+        private readonly MailSettings _mailSettings;
 
-        public DevelopmentEmailController(IWebHostEnvironment environment, ISmtpMailSender mailSender)
+        public DevelopmentEmailController(
+            IWebHostEnvironment environment,
+            ISmtpMailSender mailSender,
+            IOptions<MailSettings> mailSettings)
         {
             _environment = environment;
             _mailSender = mailSender;
+            _mailSettings = mailSettings.Value;
+        }
+
+        [HttpGet("config")]
+        public IActionResult GetEmailConfiguration()
+        {
+            if (!_environment.IsDevelopment())
+            {
+                return NotFound();
+            }
+
+            return Ok(new
+            {
+                environment = _environment.EnvironmentName,
+                host = _mailSettings.Host,
+                port = _mailSettings.Port,
+                enableSsl = _mailSettings.EnableSsl,
+                fromAddress = _mailSettings.FromAddress,
+                fromName = _mailSettings.FromName,
+                hasUserName = !string.IsNullOrWhiteSpace(_mailSettings.UserName),
+                hasPassword = !string.IsNullOrWhiteSpace(_mailSettings.Password)
+            });
         }
 
         [HttpPost("test")]
@@ -35,10 +63,10 @@ namespace api.Controllers
             }
 
             var timestampUtc = DateTime.UtcNow;
-            var subject = "[Life Development] Test SMTP Mailpit";
-            var body = $"Bonjour,\n\nCeci est un e-mail de test Life envoyé depuis l'environnement Development.\nHorodatage UTC: {timestampUtc:O}\n\nMailpit doit afficher ce message dans son interface web locale.";
+            var subject = "[Life Development] Test SMTP";
+            var body = $"Bonjour,\n\nCeci est un e-mail de test Life envoyé depuis l'environnement Development.\nHorodatage UTC: {timestampUtc:O}";
             var attachmentBytes = Encoding.UTF8.GetBytes(
-                $"Mailpit test attachment\nEnvironment: Development\nTimestampUtc: {timestampUtc:O}\n");
+                $"SMTP test attachment\nEnvironment: Development\nTimestampUtc: {timestampUtc:O}\n");
 
             using var message = new MailMessage
             {
@@ -47,22 +75,24 @@ namespace api.Controllers
                 IsBodyHtml = false
             };
             message.To.Add(request.Recipient.Trim());
-            message.Attachments.Add(new Attachment(new MemoryStream(attachmentBytes), "mailpit-test.txt", "text/plain"));
+            message.Attachments.Add(new Attachment(new MemoryStream(attachmentBytes), "smtp-test.txt", "text/plain"));
 
             var sent = await _mailSender.SendAsync(message, "development-test", cancellationToken);
             if (!sent.Success)
             {
                 return StatusCode(StatusCodes.Status502BadGateway, new
                 {
-                    message = "Le message de test n'a pas pu être envoyé. Vérifiez que Mailpit est démarré.",
+                    message = "Le message de test n'a pas pu être envoyé. Vérifiez la configuration SMTP/Mailjet.",
                     recipient = request.Recipient.Trim(),
+                    errorType = sent.ErrorType,
+                    errorMessage = sent.ErrorMessage,
                     sent = false
                 });
             }
 
             return Ok(new
             {
-                message = "Le message de test a été envoyé à Mailpit.",
+                message = "Le message de test a été envoyé.",
                 recipient = request.Recipient.Trim(),
                 sent = true,
                 timestampUtc

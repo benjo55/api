@@ -119,6 +119,7 @@ namespace api.Services.Payments
                     donor.PostalCode,
                     donor.City,
                     donor.CountryCode,
+                    donor.BirthDate,
                     metadata),
                 cancellationToken);
 

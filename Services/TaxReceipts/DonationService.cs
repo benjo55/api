@@ -223,6 +223,7 @@ namespace api.Services.TaxReceipts
             donation.TaxRegime = dto.TaxRegime;
             donation.Article200Amount = dto.Article200Amount;
             donation.Article978Amount = dto.Article978Amount;
+            donation.Purpose = Clean(dto.Purpose);
             donation.Reference = Clean(dto.Reference);
             donation.ExternalReference = Clean(dto.ExternalReference);
             donation.Comments = Clean(dto.Comments);
