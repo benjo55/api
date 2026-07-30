@@ -10,6 +10,7 @@ namespace api.Controllers
 {
     [ApiController]
     [Route("api/my-space/donations")]
+    [Route("api/donation-space/donations")]
     [Authorize]
     public sealed class MeDonationPaymentsController : ControllerBase
     {

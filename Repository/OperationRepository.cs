@@ -38,6 +38,11 @@ public class OperationRepository : IOperationRepository
             .Include(o => o.Contract)
             .AsQueryable();
 
+        if (query.PersonId.HasValue)
+        {
+            operations = operations.Where(o => o.Contract.PersonId == query.PersonId.Value);
+        }
+
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             operations = operations.Where(o =>

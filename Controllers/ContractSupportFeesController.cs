@@ -1,6 +1,8 @@
 using api.Data;
 using api.Dtos.Contract;
+using api.Interfaces;
 using api.Models.Enum;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,13 +10,18 @@ namespace api.Controllers
 {
     [Route("api/contracts/{contractId:int}/support-fees")]
     [ApiController]
+    [Authorize]
     public class ContractSupportFeesController : ControllerBase
     {
         private readonly ApplicationDBContext _context;
+        private readonly ICurrentUserAccessService _access;
 
-        public ContractSupportFeesController(ApplicationDBContext context)
+        public ContractSupportFeesController(
+            ApplicationDBContext context,
+            ICurrentUserAccessService access)
         {
             _context = context;
+            _access = access;
         }
 
         [HttpGet]
@@ -26,6 +33,9 @@ namespace api.Controllers
             [FromQuery] DateTime? from,
             [FromQuery] DateTime? to)
         {
+            if (!await _access.CanReadContractAsync(contractId))
+                return NotFound();
+
             var query = _context.ContractSupportFeeApplications
                 .AsNoTracking()
                 .Include(x => x.Support)
@@ -96,6 +106,9 @@ namespace api.Controllers
             [FromQuery] DateTime? from,
             [FromQuery] DateTime? to)
         {
+            if (!await _access.CanReadContractAsync(contractId))
+                return NotFound();
+
             var query = _context.ContractSupportFeeApplications
                 .AsNoTracking()
                 .Include(x => x.Support)

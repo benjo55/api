@@ -37,6 +37,7 @@ namespace api.Services
 
             var query = _db.Users
                 .AsNoTracking()
+                .Include(u => u.Person)
                 .Include(u => u.UserRoles)
                     .ThenInclude(ur => ur.Role)
                 .AsQueryable();
@@ -289,6 +290,69 @@ namespace api.Services
             }, cancellationToken);
             await _db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+        }
+
+        public async Task SetUserPersonLinkAsync(
+            int userId,
+            LinkUserPersonRequest request,
+            int? actingUserId,
+            string? actingUsername,
+            CancellationToken cancellationToken = default)
+        {
+            RequireReason(request.Reason);
+            var user = await LoadUserAsync(userId, cancellationToken);
+            await using var transaction = _db.Database.IsRelational()
+                ? await _db.Database.BeginTransactionAsync(cancellationToken)
+                : null;
+
+            var currentPerson = await _db.Persons
+                .FirstOrDefaultAsync(p => p.UserId == user.Id, cancellationToken);
+
+            if (!request.PersonId.HasValue)
+            {
+                if (currentPerson == null)
+                {
+                    throw Functional("USER_PERSON_LINK_NOT_FOUND", "Cet utilisateur n'est rattaché à aucune personne.", StatusCodes.Status404NotFound);
+                }
+
+                currentPerson.UserId = null;
+                currentPerson.UpdatedDate = DateTime.UtcNow;
+                user.UpdatedDate = DateTime.UtcNow;
+                await AddAuditAsync("USER_PERSON_UNLINKED", actingUserId, actingUsername, user.Id, null, request.Reason, new
+                {
+                    personId = currentPerson.Id
+                }, cancellationToken);
+                await _db.SaveChangesAsync(cancellationToken);
+                if (transaction != null) await transaction.CommitAsync(cancellationToken);
+                return;
+            }
+
+            var targetPerson = await _db.Persons
+                .FirstOrDefaultAsync(p => p.Id == request.PersonId.Value, cancellationToken)
+                ?? throw NotFound("PERSON_NOT_FOUND", "Personne introuvable.");
+
+            if (targetPerson.UserId.HasValue && targetPerson.UserId.Value != user.Id)
+            {
+                throw Conflict("PERSON_ALREADY_LINKED", "Cette personne est déjà rattachée à un autre utilisateur.");
+            }
+
+            if (currentPerson != null && currentPerson.Id != targetPerson.Id)
+            {
+                currentPerson.UserId = null;
+                currentPerson.UpdatedDate = DateTime.UtcNow;
+            }
+
+            targetPerson.UserId = user.Id;
+            targetPerson.UpdatedDate = DateTime.UtcNow;
+            user.UpdatedDate = DateTime.UtcNow;
+
+            await AddAuditAsync("USER_PERSON_LINKED", actingUserId, actingUsername, user.Id, null, request.Reason, new
+            {
+                personId = targetPerson.Id,
+                previousPersonId = currentPerson?.Id == targetPerson.Id ? null : currentPerson?.Id
+            }, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+            if (transaction != null) await transaction.CommitAsync(cancellationToken);
         }
 
         public async Task SuspendUserAsync(
@@ -666,6 +730,7 @@ namespace api.Services
 
         private async Task<User> LoadUserAsync(int userId, CancellationToken cancellationToken) =>
             await _db.Users
+                .Include(u => u.Person)
                 .Include(u => u.UserRoles)
                     .ThenInclude(ur => ur.Role)
                         .ThenInclude(r => r!.RolePermissions)
@@ -802,7 +867,8 @@ namespace api.Services
                 user.LastLoginAt,
                 user.LastActivityAt,
                 user.AccountExpiresAt,
-                locked);
+                locked,
+                ToLinkedPerson(user.Person));
         }
 
         private static AdminUserDetailsDto ToDetails(User user)
@@ -853,8 +919,22 @@ namespace api.Services
                 user.FailedLoginAttempts,
                 user.LockedUntil,
                 user.SessionVersion,
-                Convert.ToBase64String(user.RowVersion));
+                Convert.ToBase64String(user.RowVersion),
+                ToLinkedPerson(user.Person));
         }
+
+        private static AdminLinkedPersonDto? ToLinkedPerson(Person? person) =>
+            person == null
+                ? null
+                : new AdminLinkedPersonDto(
+                    person.Id,
+                    person.FirstName,
+                    person.LastName,
+                    $"{person.FirstName} {person.LastName}".Trim(),
+                    string.IsNullOrWhiteSpace(person.Email1) ? null : person.Email1,
+                    string.IsNullOrWhiteSpace(person.PhoneNumber) ? null : person.PhoneNumber,
+                    person.Role,
+                    person.Status);
 
         private void ApplyRowVersion(User user, string rowVersion)
         {

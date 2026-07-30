@@ -88,6 +88,21 @@ namespace api.Controllers
             }
         }
 
+        [HttpPut("{userId:int}/person-link")]
+        [Authorize(Policy = AuthorizationPolicies.ManageUsers)]
+        public async Task<IActionResult> SetPersonLink(int userId, [FromBody] LinkUserPersonRequest request, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await _service.SetUserPersonLinkAsync(userId, request, CurrentUserId(), CurrentUsername(), cancellationToken);
+                return Ok(new AdminActionResult("USER_PERSON_LINK_UPDATED", "Le rattachement personne/utilisateur a été mis à jour."));
+            }
+            catch (AdminFunctionalException ex)
+            {
+                return Functional(ex);
+            }
+        }
+
         [HttpPost("{userId:int}/suspend")]
         [Authorize(Policy = AuthorizationPolicies.SuspendUsers)]
         public Task<IActionResult> Suspend(int userId, [FromBody] SuspendUserRequest request, CancellationToken cancellationToken) =>

@@ -176,7 +176,9 @@ namespace api.Repository
                 Role = p.Role,
                 Status = p.Status,
                 UpdatedDate = p.UpdatedDate,
-                ContractCount = p.Contracts.Count()
+                ContractCount = p.Contracts.Count(),
+                UserId = p.UserId,
+                UserName = p.User != null ? p.User.Username : null
             });
 
             // Tri
@@ -206,6 +208,7 @@ namespace api.Repository
         public async Task<Person?> GetByIdAsync(int id)
         {
             return await _context.Persons
+            .Include(p => p.User)
             .Include(p => p.Contracts)
                 .ThenInclude(c => c.BeneficiaryClause)
             .FirstOrDefaultAsync(p => p.Id == id);

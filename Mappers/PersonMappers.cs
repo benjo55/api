@@ -28,6 +28,16 @@ namespace api.Mappers
                 Email2 = personModel.Email2,
                 TaxAddress = personModel.TaxAddress,
                 PostalAddress = personModel.PostalAddress,
+                UserId = personModel.UserId,
+                User = personModel.User == null
+                    ? null
+                    : new PersonLinkedUserDto(
+                        personModel.User.Id,
+                        personModel.User.Username,
+                        personModel.User.Email,
+                        personModel.User.EmailConfirmed,
+                        personModel.User.Status.ToString(),
+                        personModel.User.LastLoginAt),
                 Contracts = personModel.Contracts.Select(c => c.ToContractDto()).ToList(),
                 BeneficiaryClausePersons = personModel.BeneficiaryClausePersons.Select(bcp => bcp
                 .ToBeneficiaryClausePersonDto())

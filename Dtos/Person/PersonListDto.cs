@@ -18,5 +18,7 @@ namespace api.Dtos.Person
         public string Status { get; set; } = string.Empty;
         public DateTime UpdatedDate { get; set; }
         public int ContractCount { get; set; }
+        public int? UserId { get; set; }
+        public string? UserName { get; set; }
     }
 }

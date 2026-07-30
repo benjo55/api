@@ -68,6 +68,12 @@ namespace api.Repository
         {
             var clauses = _context.BeneficiaryClauses.AsQueryable();
 
+            if (query.PersonId.HasValue)
+            {
+                clauses = clauses.Where(c =>
+                    c.Contract != null && c.Contract.PersonId == query.PersonId.Value);
+            }
+
             clauses = query.SortBy switch
             {
                 "CreatedDate" => query.IsDescending ? clauses.OrderByDescending(c => c.CreatedDate) : clauses.OrderBy(c => c.CreatedDate),

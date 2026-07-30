@@ -122,7 +122,7 @@ namespace api.Services.Payments
             var credentialKey = ResolveCredentialKey(donation.Organization);
             var metadata = new Dictionary<string, string>
             {
-                ["flow"] = "my-space",
+                ["flow"] = "donation-space",
                 ["donationId"] = donation.Id.ToString(),
                 ["paymentAttemptId"] = attempt.Id.ToString(),
                 ["donationReference"] = donation.Reference ?? string.Empty,
@@ -135,9 +135,9 @@ namespace api.Services.Payments
                     organizationSlug,
                     HelloAssoAmountConverter.EuroToCents(donation.Amount),
                     $"Don {donation.Reference ?? donation.PublicId}",
-                    BuildFrontendUrl("/my-space/donations/payment/helloasso/return", donation.PublicId),
-                    BuildFrontendUrl("/my-space/donations/payment/helloasso/back", donation.PublicId),
-                    BuildFrontendUrl("/my-space/donations/payment/helloasso/error", donation.PublicId),
+                    BuildFrontendUrl("/back-office/donation-space/donations/payment/helloasso/return", donation.PublicId),
+                    BuildFrontendUrl("/back-office/donation-space/donations/payment/helloasso/back", donation.PublicId),
+                    BuildFrontendUrl("/back-office/donation-space/donations/payment/helloasso/error", donation.PublicId),
                     donor?.FirstName ?? donation.Donor.FirstName,
                     donor?.LastName ?? donation.Donor.LastName,
                     donor?.Email ?? donation.Donor.Email ?? donation.User?.Email ?? string.Empty,

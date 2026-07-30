@@ -4926,13 +4926,13 @@ namespace api.Migrations
 
                     b.Property<string>("Email1")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
 
                     b.Property<string>("Email2")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
@@ -4975,7 +4975,15 @@ namespace api.Migrations
                     b.Property<DateTime>("UpdatedDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Persons_UserId")
+                        .HasFilter("[UserId] IS NOT NULL");
 
                     b.ToTable("Persons", (string)null);
                 });
@@ -6536,6 +6544,127 @@ namespace api.Migrations
                     b.HasIndex("FinancialSupportId");
 
                     b.ToTable("ShareClasses", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.SubscriptionDraft", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CurrentStep")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<int>("HighestCompletedStep")
+                        .HasColumnType("int");
+
+                    b.Property<string>("InvestmentDataJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("InvestorProfileDataJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ProductType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProjectDataJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ProtectionDataJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RecommendationDataJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("SignedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SituationDataJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("StepStatusesJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("SubmittedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("UserId", "Status", "UpdatedAt")
+                        .HasDatabaseName("IX_SubscriptionDrafts_User_Status_UpdatedAt");
+
+                    b.ToTable("SubscriptionDrafts", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.SubscriptionDraftAuditEvent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("NewStateJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PreviousStateJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RulesVersion")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("StepKey")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<int>("SubscriptionDraftId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubscriptionDraftId", "CreatedAt")
+                        .HasDatabaseName("IX_SubscriptionDraftAuditEvents_Draft_Date");
+
+                    b.ToTable("SubscriptionDraftAuditEvents", (string)null);
                 });
 
             modelBuilder.Entity("api.Models.SupportDistribution", b =>
@@ -9734,6 +9863,16 @@ namespace api.Migrations
                     b.Navigation("Operation");
                 });
 
+            modelBuilder.Entity("api.Models.Person", b =>
+                {
+                    b.HasOne("api.Models.User", "User")
+                        .WithOne("Person")
+                        .HasForeignKey("api.Models.Person", "UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("api.Models.PremiumLot", b =>
                 {
                     b.HasOne("api.Models.ContractTaxState", "ContractTaxState")
@@ -10069,6 +10208,35 @@ namespace api.Migrations
                         .IsRequired();
 
                     b.Navigation("FinancialSupport");
+                });
+
+            modelBuilder.Entity("api.Models.SubscriptionDraft", b =>
+                {
+                    b.HasOne("api.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("api.Models.SubscriptionDraftAuditEvent", b =>
+                {
+                    b.HasOne("api.Models.SubscriptionDraft", "SubscriptionDraft")
+                        .WithMany("AuditEvents")
+                        .HasForeignKey("SubscriptionDraftId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SubscriptionDraft");
                 });
 
             modelBuilder.Entity("api.Models.SupportDistribution", b =>
@@ -10739,6 +10907,11 @@ namespace api.Migrations
                     b.Navigation("UserRoles");
                 });
 
+            modelBuilder.Entity("api.Models.SubscriptionDraft", b =>
+                {
+                    b.Navigation("AuditEvents");
+                });
+
             modelBuilder.Entity("api.Models.TaxReceipt", b =>
                 {
                     b.Navigation("EmailHistory");
@@ -10746,6 +10919,8 @@ namespace api.Migrations
 
             modelBuilder.Entity("api.Models.User", b =>
                 {
+                    b.Navigation("Person");
+
                     b.Navigation("SecurityTokens");
 
                     b.Navigation("UserRoles");

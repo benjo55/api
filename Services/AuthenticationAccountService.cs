@@ -118,8 +118,22 @@ namespace api.Services
                     "email");
             }
 
+            var matchingPersons = await FindUnlinkedPersonsByEmailAsync(email, cancellationToken);
+            if (matchingPersons.Count > 1)
+            {
+                throw new AuthFunctionalException(
+                    "PERSON_EMAIL_AMBIGUOUS",
+                    "Plusieurs fiches personne correspondent à cette adresse e-mail. Un administrateur doit effectuer le rattachement.",
+                    StatusCodes.Status409Conflict,
+                    "email");
+            }
+
             var defaultRole = await _db.Roles
                 .FirstOrDefaultAsync(r => r.RoleCode == "User", cancellationToken);
+
+            await using var transaction = _db.Database.IsRelational()
+                ? await _db.Database.BeginTransactionAsync(cancellationToken)
+                : null;
 
             var now = DateTime.UtcNow;
             var user = new User
@@ -143,6 +157,35 @@ namespace api.Services
             };
 
             _db.Users.Add(user);
+
+            var linkedPerson = matchingPersons.SingleOrDefault();
+            if (linkedPerson == null)
+            {
+                linkedPerson = new Person
+                {
+                    FirstName = firstName,
+                    LastName = lastName,
+                    Email1 = email,
+                    PhoneNumber = normalizedPhoneNumber,
+                    Role = "Client",
+                    Status = "Prospect",
+                    BirthDate = DateTime.UtcNow.Date,
+                    CreatedDate = now,
+                    UpdatedDate = now,
+                    User = user
+                };
+                _db.Persons.Add(linkedPerson);
+            }
+            else
+            {
+                linkedPerson.User = user;
+                linkedPerson.UpdatedDate = now;
+                if (string.IsNullOrWhiteSpace(linkedPerson.FirstName)) linkedPerson.FirstName = firstName;
+                if (string.IsNullOrWhiteSpace(linkedPerson.LastName)) linkedPerson.LastName = lastName;
+                if (string.IsNullOrWhiteSpace(linkedPerson.PhoneNumber)) linkedPerson.PhoneNumber = normalizedPhoneNumber;
+                if (string.IsNullOrWhiteSpace(linkedPerson.Email1)) linkedPerson.Email1 = email;
+            }
+
             await _db.SaveChangesAsync(cancellationToken);
 
             var rawToken = await CreateTokenAsync(
@@ -151,6 +194,8 @@ namespace api.Services
                 EmailConfirmationLifetime,
                 ipAddress,
                 cancellationToken);
+            if (transaction != null) await transaction.CommitAsync(cancellationToken);
+
             var confirmationSent = await SendConfirmationEmailAsync(user, rawToken, cancellationToken);
 
             _logger.LogInformation(
@@ -170,6 +215,19 @@ namespace api.Services
                 user.Email,
                 MaskEmail(user.Email),
                 registrationMessage);
+        }
+
+        private async Task<List<Person>> FindUnlinkedPersonsByEmailAsync(
+            string email,
+            CancellationToken cancellationToken)
+        {
+            var normalizedEmail = Normalize(email);
+            return await _db.Persons
+                .Where(p => p.UserId == null
+                    && ((p.Email1 != null && p.Email1.Trim().ToUpper() == normalizedEmail)
+                        || (p.Email2 != null && p.Email2.Trim().ToUpper() == normalizedEmail)))
+                .Take(2)
+                .ToListAsync(cancellationToken);
         }
 
         public async Task<AuthActionResult> ConfirmEmailAsync(

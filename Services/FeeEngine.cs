@@ -210,6 +210,11 @@ namespace api.Services
                 _ => 1,
             };
 
+            if (periodsPerYear == 1)
+            {
+                return ratePercent;
+            }
+
             var annualRate = Math.Pow(1d + periodicRate, periodsPerYear) - 1d;
             return (decimal)annualRate * 100m;
         }

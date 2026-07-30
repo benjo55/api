@@ -264,6 +264,7 @@ namespace api.Controllers
             Console.WriteLine("🔍 Requête `/me` pour l'utilisateur : " + username);
 
             var dbUser = await _context.Users
+                .Include(u => u.Person)
                 .Include(u => u.UserRoles)
                     .ThenInclude(ur => ur.Role)
                 .FirstOrDefaultAsync(u => u.Username == username);
@@ -283,6 +284,12 @@ namespace api.Controllers
                 username = dbUser.Username,
                 email = dbUser.Email,
                 emailConfirmed = dbUser.EmailConfirmed,
+                personId = dbUser.Person?.Id,
+                accountStatus = dbUser.Status.ToString(),
+                lastLoginAt = dbUser.LastLoginAt,
+                accessibleSpaces = dbUser.Person == null
+                    ? new[] { "Donations" }
+                    : new[] { "PrivateSpace", "Contracts", "Donations" },
                 roles = dbUser.UserRoles
                     .Where(ur => ur.Role != null)
                     .Select(ur => new

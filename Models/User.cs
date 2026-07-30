@@ -94,6 +94,8 @@ namespace api.Models
         public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
 
         public ICollection<UserSecurityToken> SecurityTokens { get; set; } = new List<UserSecurityToken>();
+
+        public Person? Person { get; set; }
     }
 
     public static class UserSecurityTokenTypes

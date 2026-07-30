@@ -4,28 +4,53 @@ using api.Dtos.FinancialSupport;
 using api.Helpers;
 using api.Interfaces;
 using api.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/operations")]
+[Authorize]
 public class OperationController : ControllerBase
 
 {
     private readonly IOperationRepository _repository;
     private readonly IContractRepository _contractRepository;
     private readonly IOperationEngineService _operationEngineService;
+    private readonly ICurrentUserAccessService _access;
 
-    public OperationController(IOperationRepository repository, IContractRepository contractRepository, IOperationEngineService operationEngineService)
+    public OperationController(
+        IOperationRepository repository,
+        IContractRepository contractRepository,
+        IOperationEngineService operationEngineService,
+        ICurrentUserAccessService access)
     {
         _repository = repository;
         _contractRepository = contractRepository;
         _operationEngineService = operationEngineService;
+        _access = access;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] QueryObject query)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
+        var scope = await _access.GetScopeAsync();
+        if (!scope.IsBackOffice)
+        {
+            if (!scope.LinkedPersonId.HasValue)
+            {
+                return Ok(new
+                {
+                    TotalCount = 0,
+                    TotalPages = 0,
+                    HasNextPage = false,
+                    CurrentPage = query.PageNumber,
+                    Items = Array.Empty<OperationDto>()
+                });
+            }
+
+            query.PersonId = scope.LinkedPersonId.Value;
+        }
 
         var operations = await _repository.GetAllAsync(query);
         var dtoList = operations.Items.Select(MapEntityToDto).ToList();
@@ -43,6 +68,7 @@ public class OperationController : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<OperationDto>> Get(int id)
     {
+        if (!await _access.CanReadOperationAsync(id)) return NotFound();
         var op = await _repository.GetByIdAsync(id);
         if (op == null) return NotFound();
         return Ok(MapEntityToDto(op));
@@ -51,6 +77,7 @@ public class OperationController : ControllerBase
     [HttpGet("contract/{contractId}")]
     public async Task<ActionResult<IEnumerable<OperationDto>>> GetByContract(int contractId)
     {
+        if (!await _access.CanReadContractAsync(contractId)) return NotFound();
         var ops = await _repository.GetByContractAsync(contractId);
         return Ok(ops.Select(MapEntityToDto));
     }
@@ -60,6 +87,17 @@ public class OperationController : ControllerBase
     {
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
+
+        var scope = await _access.GetScopeAsync();
+        if (!scope.IsBackOffice)
+        {
+            if (!await _access.CanCreateOperationAsync(dto.Type, dto.ContractId))
+            {
+                return Forbid();
+            }
+
+            SanitizeSelfCareCreate(dto);
+        }
 
         if (TryGetManualScheduleDates(dto, out var manualDates, out var paymentDetails))
         {
@@ -97,6 +135,7 @@ public class OperationController : ControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<OperationDto>> Update(int id, [FromBody] OperationDto dto)
     {
+        if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
         if (id != dto.Id) return BadRequest();
 
         if (TryGetManualScheduleDates(dto, out var manualDates, out var paymentDetails))
@@ -672,6 +711,7 @@ public class OperationController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
+        if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
         await _repository.DeleteAsync(id);
         return NoContent();
     }
@@ -679,6 +719,7 @@ public class OperationController : ControllerBase
     [HttpPost("update-valuations")]
     public async Task<IActionResult> UpdateValuations()
     {
+        if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
         await _operationEngineService.UpdateValuationsAsync();
         return Ok(new { message = "UpdateValuationsAsync exécuté avec succès" });
     }
@@ -686,6 +727,7 @@ public class OperationController : ControllerBase
     [HttpPost("process-pending")]
     public async Task<IActionResult> ProcessPending()
     {
+        if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
         await _operationEngineService.ProcessPendingOperationsAsync();
         return Ok(new { message = "ProcessPendingOperationsAsync exécuté avec succès" });
     }
@@ -693,6 +735,7 @@ public class OperationController : ControllerBase
     [HttpPost("{id}/schedule/suspend")]
     public async Task<IActionResult> SuspendSchedule(int id)
     {
+        if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
         var updated = await _repository.SuspendScheduleAsync(id);
         if (updated == null)
             return NotFound();
@@ -704,6 +747,7 @@ public class OperationController : ControllerBase
     [HttpPost("{id}/schedule/resume")]
     public async Task<IActionResult> ResumeSchedule(int id)
     {
+        if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
         var updated = await _repository.ResumeScheduleAsync(id);
         if (updated == null)
             return NotFound();
@@ -715,6 +759,7 @@ public class OperationController : ControllerBase
     [HttpPost("{id}/schedule/stop")]
     public async Task<IActionResult> StopSchedule(int id)
     {
+        if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
         var updated = await _repository.StopScheduleAsync(id);
         if (updated == null)
             return NotFound();
@@ -773,6 +818,15 @@ public class OperationController : ControllerBase
         };
 
         return dto;
+    }
+
+    private static void SanitizeSelfCareCreate(OperationDto dto)
+    {
+        dto.Id = 0;
+        dto.Status = OperationStatus.Pending;
+        dto.ExecutionDate = null;
+        dto.ExecutedAmount = null;
+        dto.RequestedAmount ??= dto.Amount;
     }
 
 }

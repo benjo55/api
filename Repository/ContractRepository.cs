@@ -191,6 +191,9 @@ namespace api.Repository
             if (query.ProductId.HasValue)
                 contracts = contracts.Where(c => c.ProductId == query.ProductId.Value);
 
+            if (query.PersonId.HasValue)
+                contracts = contracts.Where(c => c.PersonId == query.PersonId.Value);
+
             contracts = query.SortBy switch
             {
                 "ContractNumber" => query.IsDescending ? contracts.OrderByDescending(c => c.ContractNumber) : contracts.OrderBy(c => c.ContractNumber),

@@ -22,14 +22,17 @@ namespace api.Models
         public string Status { get; set; } = string.Empty;
         [MaxLength(30)]
         public string PhoneNumber { get; set; } = string.Empty;
-        [MaxLength(30)]
+        [MaxLength(254)]
         [EmailAddress] // ✅ Validation d'email
         public string Email1 { get; set; } = string.Empty;
-        [MaxLength(30)]
+        [MaxLength(254)]
         [EmailAddress] // ✅ Validation d'email
         public string Email2 { get; set; } = string.Empty;
         public string TaxAddress { get; set; } = string.Empty;
         public string PostalAddress { get; set; } = string.Empty;
+        public int? UserId { get; set; }
+        [ForeignKey(nameof(UserId))]
+        public User? User { get; set; }
         // 🔹 Liste des clauses où cette personne est bénéficiaire
         public List<BeneficiaryClausePerson> BeneficiaryClausePersons { get; set; } = new();
         public List<Contract> Contracts { get; set; } = new List<Contract>();

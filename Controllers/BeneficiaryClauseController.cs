@@ -12,26 +12,31 @@ using System;
 using System.Linq;
 using api.Helpers;
 using Mapster;
+using Microsoft.AspNetCore.Authorization;
 
 namespace api.Controllers
 {
     [Route("api/beneficiaryClauses")]
     [ApiController]
+    [Authorize]
     public class BeneficiaryClauseController : ControllerBase
     {
         private readonly ApplicationDBContext _context;
+        private readonly ICurrentUserAccessService _access;
         private readonly IBeneficiaryClauseRepository _beneficiaryClauseRepository;
         private readonly IBeneficiaryClausePersonRepository _beneficiaryClausePersonRepository;
         private readonly EntityHistoryService _entityHistoryService;
 
         public BeneficiaryClauseController(
             ApplicationDBContext context,
+            ICurrentUserAccessService access,
             IBeneficiaryClauseRepository beneficiaryClauseRepository,
             IBeneficiaryClausePersonRepository beneficiaryClausePersonRepository,
             EntityHistoryService entityHistoryService
         )
         {
             _context = context;
+            _access = access;
             _beneficiaryClauseRepository = beneficiaryClauseRepository;
             _beneficiaryClausePersonRepository = beneficiaryClausePersonRepository;
             _entityHistoryService = entityHistoryService;
@@ -40,6 +45,24 @@ namespace api.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] QueryObject query)
         {
+            var scope = await _access.GetScopeAsync();
+            if (!scope.IsBackOffice)
+            {
+                if (!scope.LinkedPersonId.HasValue)
+                {
+                    return Ok(new
+                    {
+                        Items = Array.Empty<BeneficiaryClauseListItemDto>(),
+                        TotalCount = 0,
+                        TotalPages = 0,
+                        HasNextPage = false,
+                        CurrentPage = query.PageNumber
+                    });
+                }
+
+                query.PersonId = scope.LinkedPersonId.Value;
+            }
+
             var clauses = await _beneficiaryClauseRepository.GetAllAsync(query);
             return Ok(clauses);
         }
@@ -49,12 +72,20 @@ namespace api.Controllers
         {
             var clause = await _beneficiaryClauseRepository.GetByIdAsync(id);
             if (clause == null) return NotFound();
+            if (clause.ContractId.HasValue && !await _access.CanReadContractAsync(clause.ContractId.Value))
+                return NotFound();
+
+            if (!clause.ContractId.HasValue && !(await _access.GetScopeAsync()).IsBackOffice)
+                return NotFound();
+
             return Ok(clause.ToBeneficiaryClauseDto());
         }
 
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateBeneficiaryClauseRequestDto clauseDto)
         {
+            if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
+
             var existingClause = await _context.BeneficiaryClauses
                 .FirstOrDefaultAsync(c => c.ContractId == clauseDto.ContractId);
 
@@ -89,6 +120,8 @@ namespace api.Controllers
         [FromRoute] int id,
         [FromBody] UpdateBeneficiaryClauseRequestDto updateDto)
         {
+            if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
+
             // 1. Charger la clause existante avec ses relations
             var clause = await _context.BeneficiaryClauses
                 .Include(c => c.Beneficiaries)
@@ -141,6 +174,8 @@ namespace api.Controllers
         [HttpPost("{id:int}/lock")]
         public async Task<IActionResult> LockClause(int id)
         {
+            if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
+
             var clause = await _beneficiaryClauseRepository.GetByIdAsync(id);
             if (clause == null) return NotFound();
             if (clause.Locked) return BadRequest("Déjà verrouillée.");
@@ -160,6 +195,8 @@ namespace api.Controllers
         [HttpPost("{id:int}/unlock")]
         public async Task<IActionResult> UnlockClause(int id)
         {
+            if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
+
             var clause = await _beneficiaryClauseRepository.GetByIdAsync(id);
             if (clause == null) return NotFound();
             if (!clause.Locked) return BadRequest("Déjà déverrouillée.");
@@ -178,6 +215,8 @@ namespace api.Controllers
         [HttpPatch("{id:int}/locked")]
         public async Task<IActionResult> PatchLocked(int id, [FromBody] bool locked)
         {
+            if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
+
             var updatedClause = await _beneficiaryClauseRepository.PatchLockedAsync(id, locked);
 
             if (updatedClause == null)
@@ -189,6 +228,8 @@ namespace api.Controllers
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
+            if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
+
             var clause = await _beneficiaryClauseRepository.DeleteAsync(id);
             if (clause == null)
                 return NotFound();

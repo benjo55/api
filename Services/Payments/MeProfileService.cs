@@ -89,7 +89,7 @@ namespace api.Services.Payments
                     "DONATION",
                     $"{FormatAmount(x.Amount)} vers {x.Organization.Name}",
                     x.Status.ToString(),
-                    $"/my-space/donations/{x.PublicId}"))
+                    $"/back-office/donation-space/donations/{x.PublicId}"))
                 .ToList();
 
             if (donor.UpdatedAt > donor.CreatedAt)
@@ -126,8 +126,141 @@ namespace api.Services.Payments
                         x.Currency,
                         x.Status,
                         x.Organization.Name,
-                        $"/my-space/donations/{x.PublicId}"))
+                        $"/back-office/donation-space/donations/{x.PublicId}"))
                     .ToList());
+        }
+
+        public async Task<MePrivateSpaceDto> GetPrivateSpaceAsync(int userId, CancellationToken cancellationToken = default)
+        {
+            var user = await _db.Users
+                .AsNoTracking()
+                .Include(u => u.Person)
+                .FirstOrDefaultAsync(x => x.Id == userId, cancellationToken)
+                ?? throw new BusinessException("Utilisateur introuvable.");
+
+            var donationSummary = await BuildDonationSummaryAsync(userId, cancellationToken);
+            if (user.Person == null)
+            {
+                return new MePrivateSpaceDto(
+                    null,
+                    new MePrivateSpaceMetricsDto(0, 0m, 0m, 0m, 0, 0, null),
+                    Array.Empty<MeContractSummaryDto>(),
+                    Array.Empty<MeOperationSummaryDto>(),
+                    Array.Empty<MeDocumentSummaryDto>(),
+                    donationSummary,
+                    new[]
+                    {
+                        new MeNewsItemDto(
+                            DateTime.UtcNow,
+                            "Rattachement personne requis",
+                            "Votre compte n'est pas encore rattaché à une fiche personne. Un administrateur doit finaliser le lien pour afficher vos contrats.",
+                            "warning",
+                            null,
+                            null)
+                    });
+            }
+
+            var personId = user.Person.Id;
+            var contracts = await _db.Contracts
+                .AsNoTracking()
+                .Where(c => c.PersonId == personId)
+                .OrderBy(c => c.ContractNumber)
+                .Select(c => new MeContractSummaryDto(
+                    c.Id,
+                    c.ContractNumber,
+                    c.ContractLabel,
+                    c.ContractType,
+                    c.Status,
+                    c.Currency,
+                    c.CurrentValue,
+                    c.TotalPaidPremiums,
+                    c.NetInvested,
+                    c.PerformancePercent,
+                    c.DateEffect,
+                    c.DateMaturity,
+                    c.Product != null ? c.Product.ProductName : null,
+                    c.HasAlert,
+                    c.Documents.Count(),
+                    c.Operations.Count()))
+                .ToListAsync(cancellationToken);
+
+            var recentOperationRows = await _db.Operations
+                .AsNoTracking()
+                .Where(o => o.Contract.PersonId == personId)
+                .OrderByDescending(o => o.OperationDate)
+                .ThenByDescending(o => o.Id)
+                .Take(8)
+                .Select(o => new
+                {
+                    o.Id,
+                    o.ContractId,
+                    o.Contract.ContractNumber,
+                    o.Type,
+                    o.Status,
+                    o.OperationDate,
+                    o.ExecutionDate,
+                    o.Amount,
+                    o.Currency
+                })
+                .ToListAsync(cancellationToken);
+
+            var recentOperations = recentOperationRows
+                .Select(o => new MeOperationSummaryDto(
+                    o.Id,
+                    o.ContractId,
+                    o.ContractNumber,
+                    o.Type.ToString(),
+                    o.Status.ToString(),
+                    o.OperationDate,
+                    o.ExecutionDate,
+                    o.Amount,
+                    o.Currency))
+                .ToList();
+
+            var recentDocuments = await _db.Documents
+                .AsNoTracking()
+                .Where(d => d.Contract != null && d.Contract.PersonId == personId)
+                .OrderByDescending(d => d.UploadedAt)
+                .ThenByDescending(d => d.Id)
+                .Take(8)
+                .Select(d => new MeDocumentSummaryDto(
+                    d.Id,
+                    d.ContractId,
+                    d.Contract != null ? d.Contract.ContractNumber : null,
+                    d.FileName,
+                    d.FileType,
+                    d.UploadedAt,
+                    d.Url))
+                .ToListAsync(cancellationToken);
+
+            var metrics = new MePrivateSpaceMetricsDto(
+                contracts.Count,
+                contracts.Sum(c => c.CurrentValue),
+                contracts.Sum(c => c.TotalPaidPremiums),
+                contracts.Sum(c => c.NetInvested),
+                contracts.Count(c => c.HasAlert),
+                contracts.Sum(c => c.DocumentCount),
+                recentOperations.Select(o => (DateTime?)o.OperationDate).FirstOrDefault());
+
+            var alerts = BuildPrivateSpaceAlerts(user, contracts, donationSummary);
+
+            return new MePrivateSpaceDto(
+                new MePersonAccessDto(
+                    user.Person.Id,
+                    user.Person.FirstName,
+                    user.Person.LastName,
+                    $"{user.Person.FirstName} {user.Person.LastName}".Trim(),
+                    string.IsNullOrWhiteSpace(user.Person.Email1) ? null : user.Person.Email1,
+                    string.IsNullOrWhiteSpace(user.Person.PhoneNumber) ? null : user.Person.PhoneNumber,
+                    user.Person.BirthDate == default ? null : user.Person.BirthDate.Date,
+                    user.Person.Role,
+                    user.Person.Status),
+                metrics,
+                contracts,
+                recentOperations,
+                recentDocuments,
+                donationSummary,
+                alerts);
         }
 
         public async Task<IReadOnlyList<DonationOrganizationOptionDto>> GetDonationOrganizationsAsync(CancellationToken cancellationToken = default)
@@ -189,6 +322,33 @@ namespace api.Services.Payments
                     x.UserId == userId
                     || x.Donor.UserId == userId
                     || (x.DonorSnapshot != null && x.DonorSnapshot.UserId == userId));
+        }
+
+        private async Task<MeDonationSummaryDto> BuildDonationSummaryAsync(
+            int userId,
+            CancellationToken cancellationToken)
+        {
+            var donationCount = await BuildScopedDonationQuery(userId).CountAsync(cancellationToken);
+            var confirmedTotal = await BuildScopedDonationQuery(userId)
+                .Where(x =>
+                    x.Status == DonationStatus.Paid
+                    || x.Status == DonationStatus.ReceiptGenerated
+                    || x.Status == DonationStatus.Completed)
+                .SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
+            var lastDonationDate = await BuildScopedDonationQuery(userId)
+                .OrderByDescending(x => x.DonationDate)
+                .Select(x => (DateTime?)x.DonationDate)
+                .FirstOrDefaultAsync(cancellationToken);
+            var documentCount = await BuildScopedDonationQuery(userId)
+                .SelectMany(x => x.TaxReceipts)
+                .CountAsync(
+                    x =>
+                        x.Status == TaxReceiptStatus.Generated
+                        || x.Status == TaxReceiptStatus.Sent
+                        || x.Status == TaxReceiptStatus.EmailFailed,
+                    cancellationToken);
+
+            return new MeDonationSummaryDto(donationCount, confirmedTotal, documentCount, lastDonationDate);
         }
 
         public static MeProfileDto MapProfile(Donor donor)
@@ -350,7 +510,7 @@ namespace api.Services.Payments
                     "Vous pouvez enregistrer une intention de don. Aucun paiement ne sera déclenché à cette étape.",
                     "info",
                     "Faire un don",
-                    "/my-space/donations/new"));
+                    "/back-office/donation-space/donations/new"));
             }
 
             if (documentCount > 0)
@@ -361,7 +521,7 @@ namespace api.Services.Payments
                     $"{documentCount} reçu(s) fiscal(aux) sont disponibles dans votre historique.",
                     "success",
                     "Consulter mes dons",
-                    "/my-space/donations"));
+                    "/back-office/donation-space/donations"));
             }
 
             if (items.Count == 0)
@@ -372,7 +532,44 @@ namespace api.Services.Payments
                     "Votre compte est opérationnel. Retrouvez ici vos dons, reçus et prochaines actions.",
                     "success",
                     "Voir mes dons",
-                    "/my-space/donations"));
+                    "/back-office/donation-space/donations"));
+            }
+
+            return items.Take(4).ToList();
+        }
+
+        private static IReadOnlyList<MeNewsItemDto> BuildPrivateSpaceAlerts(
+            User user,
+            IReadOnlyList<MeContractSummaryDto> contracts,
+            MeDonationSummaryDto donationSummary)
+        {
+            var now = DateTime.UtcNow;
+            var items = new List<MeNewsItemDto>();
+
+            if (!user.EmailConfirmed)
+            {
+                items.Add(new MeNewsItemDto(now, "Adresse e-mail à confirmer", "Confirmez votre adresse e-mail pour sécuriser l'accès à vos informations.", "warning", null, null));
+            }
+
+            var alertCount = contracts.Count(c => c.HasAlert);
+            if (alertCount > 0)
+            {
+                items.Add(new MeNewsItemDto(now, "Contrats à suivre", $"{alertCount} contrat(s) comportent une alerte de suivi.", "warning", null, null));
+            }
+
+            if (contracts.Count == 0)
+            {
+                items.Add(new MeNewsItemDto(now, "Aucun contrat visible", "Aucun contrat n'est actuellement rattaché à votre fiche personne.", "info", null, null));
+            }
+
+            if (donationSummary.AvailableDocumentCount > 0)
+            {
+                items.Add(new MeNewsItemDto(now, "Reçus fiscaux disponibles", $"{donationSummary.AvailableDocumentCount} document(s) de don sont disponibles.", "success", "Voir mes dons", "/back-office/donation-space/donations"));
+            }
+
+            if (items.Count == 0)
+            {
+                items.Add(new MeNewsItemDto(now, "Espace à jour", "Vos contrats et vos informations personnelles sont accessibles depuis cet espace.", "success", null, null));
             }
 
             return items.Take(4).ToList();

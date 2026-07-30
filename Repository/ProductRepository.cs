@@ -57,7 +57,17 @@ namespace api.Repository
             if (!string.IsNullOrWhiteSpace(query.Search))
             {
                 products = products.Where(p =>
-                    p.ProductCode.Contains(query.Search) || p.ProductName.Contains(query.Search));
+                    p.ProductCode.Contains(query.Search) ||
+                    p.ProductName.Contains(query.Search) ||
+                    (p.CommercialName != null && p.CommercialName.Contains(query.Search)) ||
+                    (p.ProductEnvelope != null && p.ProductEnvelope.Name.Contains(query.Search)) ||
+                    (p.ProductEnvelope != null && p.ProductEnvelope.Code.Contains(query.Search)));
+            }
+
+            if (query.ContractFamily.HasValue)
+            {
+                products = products.Where(p =>
+                    p.ContractFamily.HasValue && (int)p.ContractFamily.Value == query.ContractFamily.Value);
             }
 
             products = products.OrderByDescending(p => p.CreatedDate);

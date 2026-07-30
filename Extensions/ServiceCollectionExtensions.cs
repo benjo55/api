@@ -107,6 +107,7 @@ namespace api.Extensions
         // --- CONFIG AUTHENTICATION ---
         public static IServiceCollection AddApiAuthentication(this IServiceCollection services, IConfiguration config)
         {
+            services.AddHttpContextAccessor();
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
                 {
@@ -377,6 +378,8 @@ namespace api.Extensions
             services.AddScoped<IEmailService, SmtpEmailService>();
             services.AddScoped<IAuthenticationAccountService, AuthenticationAccountService>();
             services.AddScoped<IUserAdministrationService, UserAdministrationService>();
+            services.AddScoped<ICurrentUserAccessService, CurrentUserAccessService>();
+            services.AddScoped<ISubscriptionDraftService, SubscriptionDraftService>();
             services.AddScoped<AuthorizationSeedService>();
             services.AddScoped<SendTaxReceiptEmailJob>();
             services.AddSingleton<IPdfTemplate, BusinessPdfTemplate>();

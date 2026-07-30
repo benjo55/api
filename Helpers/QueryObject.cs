@@ -15,6 +15,7 @@ namespace api.Helpers
         public string? Search { get; set; } = null;
         public string? BirthCountry { get; set; } = null;
         public int? ProductId { get; set; } = null;
+        public int? ContractFamily { get; set; } = null;
         [FromQuery(Name = "personId")]
         public int? PersonId { get; set; } = null;
         public string? SortBy { get; set; } = null;

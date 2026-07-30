@@ -30,6 +30,18 @@ namespace api.Controllers
             return Ok(await _profileService.GetDashboardAsync(userId.Value, cancellationToken));
         }
 
+        [HttpGet("private-space")]
+        public async Task<IActionResult> GetPrivateSpace(CancellationToken cancellationToken)
+        {
+            var userId = CurrentUserId();
+            if (!userId.HasValue)
+            {
+                return Unauthorized(new { message = "Utilisateur non authentifié." });
+            }
+
+            return Ok(await _profileService.GetPrivateSpaceAsync(userId.Value, cancellationToken));
+        }
+
         [HttpGet("profile")]
         public async Task<IActionResult> GetProfile(CancellationToken cancellationToken)
         {

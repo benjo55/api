@@ -34,6 +34,13 @@ namespace api.Interfaces
             string? actingUsername,
             CancellationToken cancellationToken = default);
 
+        Task SetUserPersonLinkAsync(
+            int userId,
+            LinkUserPersonRequest request,
+            int? actingUserId,
+            string? actingUsername,
+            CancellationToken cancellationToken = default);
+
         Task SuspendUserAsync(
             int userId,
             SuspendUserRequest request,

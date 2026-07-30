@@ -34,7 +34,18 @@ namespace api.Dtos.Admin
         DateTime? LastLoginAt,
         DateTime? LastActivityAt,
         DateTime? AccountExpiresAt,
-        bool Locked);
+        bool Locked,
+        AdminLinkedPersonDto? LinkedPerson);
+
+    public sealed record AdminLinkedPersonDto(
+        int Id,
+        string FirstName,
+        string LastName,
+        string FullName,
+        string? Email,
+        string? PhoneNumber,
+        string Role,
+        string Status);
 
     public sealed record AdminRoleSummaryDto(
         int Id,
@@ -77,7 +88,8 @@ namespace api.Dtos.Admin
         int FailedLoginAttempts,
         DateTime? LockedUntil,
         int SessionVersion,
-        string RowVersion);
+        string RowVersion,
+        AdminLinkedPersonDto? LinkedPerson);
 
     public sealed class AdminCreateUserRequest
     {
@@ -125,6 +137,11 @@ namespace api.Dtos.Admin
 
         [Required]
         public string RowVersion { get; set; } = string.Empty;
+    }
+
+    public sealed class LinkUserPersonRequest : ReasonedUserActionRequest
+    {
+        public int? PersonId { get; set; }
     }
 
     public class ReasonedUserActionRequest

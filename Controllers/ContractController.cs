@@ -8,14 +8,21 @@ using Microsoft.AspNetCore.Mvc;
 using api.Helpers;
 using api.Dtos.Operation;
 using api.Dtos.FinancialSupport;
+using api.Data;
 using api.Models;
+using api.Security;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 
 namespace api.Controllers
 {
     [Route("api/contracts")]
     [ApiController]
+    [Authorize]
     public class ContractController : ControllerBase
     {
+        private readonly ApplicationDBContext _db;
+        private readonly ICurrentUserAccessService _access;
         private readonly IContractRepository _contractRepository;
         private readonly IProductRepository _productRepository;
         private readonly IOperationEngineService _operationEngineService;
@@ -25,7 +32,9 @@ namespace api.Controllers
         private readonly IContractAuditService _contractAuditService;
 
         public ContractController(
+            ApplicationDBContext db,
             IContractRepository contractRepository,
+            ICurrentUserAccessService access,
             IProductRepository productRepository,
             IOperationEngineService operationEngineService,
             IOperationRepository operationRepository,
@@ -33,6 +42,8 @@ namespace api.Controllers
             IManagementFeePolicyResolver managementFeePolicyResolver,
             IContractAuditService contractAuditService)
         {
+            _db = db;
+            _access = access;
             _contractRepository = contractRepository;
             _productRepository = productRepository;
             _operationEngineService = operationEngineService;
@@ -46,6 +57,22 @@ namespace api.Controllers
         public async Task<IActionResult> GetAll([FromQuery] QueryObject query)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
+            var scope = await _access.GetScopeAsync();
+            if (!scope.IsBackOffice)
+            {
+                if (!scope.LinkedPersonId.HasValue)
+                {
+                    return Ok(new
+                    {
+                        TotalCount = 0,
+                        TotalPages = 0,
+                        HasNextPage = false,
+                        CurrentPage = query.PageNumber,
+                        Items = Array.Empty<ContractDto>()
+                    });
+                }
+                query.PersonId = scope.LinkedPersonId.Value;
+            }
 
             var contracts = await _contractRepository.GetAllAsync(query);
             var contractDtos = contracts.Items.Select(s => s.ToContractDto()).ToList();
@@ -63,6 +90,7 @@ namespace api.Controllers
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById([FromRoute] int id)
         {
+            if (!await _access.CanReadContractAsync(id)) return NotFound();
             var contract = await _contractRepository.GetByIdAsync(id);
             if (contract == null) return NotFound();
 
@@ -74,6 +102,7 @@ namespace api.Controllers
         [HttpGet("{id:int}/reconciliation")]
         public async Task<IActionResult> GetReconciliation([FromRoute] int id)
         {
+            if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
             try
             {
                 return Ok(await _contractAuditService.GetReconciliationAsync(id));
@@ -87,6 +116,7 @@ namespace api.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateContractRequestDto createContractRequestDto)
         {
+            if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
             Contract createdContract;
             try
             {
@@ -115,6 +145,7 @@ namespace api.Controllers
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update([FromRoute] int id, [FromBody] UpdateContractRequestDto updateContractDto)
         {
+            if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
             try
             {
                 var contractModel = await _contractRepository.UpdateAsync(id, updateContractDto);
@@ -133,6 +164,7 @@ namespace api.Controllers
         [HttpPatch("{id}/beneficiaryClauseId")]
         public async Task<IActionResult> PatchBeneficiaryClauseId(int id, [FromBody] int clauseId)
         {
+            if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
             var contract = await _contractRepository.PatchBeneficiaryClauseIdAsync(id, clauseId);
             if (contract == null)
                 return NotFound();
@@ -142,6 +174,7 @@ namespace api.Controllers
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete([FromRoute] int id)
         {
+            if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
             try
             {
                 var contractModel = await _contractRepository.DeleteAsync(id);
@@ -163,6 +196,7 @@ namespace api.Controllers
         [HttpPatch("{id:int}/locked")]
         public async Task<IActionResult> PatchLocked(int id, [FromBody] bool locked)
         {
+            if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
             var updatedContract = await _contractRepository.PatchLockedAsync(id, locked);
             if (updatedContract == null)
                 return NotFound();
@@ -173,6 +207,7 @@ namespace api.Controllers
         [HttpGet("{id:int}/available-supports")]
         public async Task<IActionResult> GetAvailableSupports([FromRoute] int id, [FromQuery] int? compartmentId)
         {
+            if (!await _access.CanReadContractAsync(id)) return NotFound();
             // 🔹 On récupère les allocations du contrat (avec filtre optionnel)
             var supports = await _contractRepository.GetAvailableSupportsAsync(id, compartmentId);
 
@@ -208,6 +243,7 @@ namespace api.Controllers
         [HttpPost("{id}/recalculate-value")]
         public async Task<IActionResult> RecalculateValue(int id)
         {
+            if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
             var result = await _contractRepository.RecalculateValueAsync(id, _valuationService, source: "ContractController - RecalculateValue (recalculate-value endpoint)");
 
             // Try to read a 'message' property if the returned object has one (anonymous object or DTO)
@@ -221,6 +257,7 @@ namespace api.Controllers
         [HttpGet("{id}/holdings")]
         public async Task<IActionResult> GetHoldings(int id)
         {
+            if (!await _access.CanReadContractAsync(id)) return NotFound();
             var holdings = await _contractRepository.GetHoldingsByContractAsync(id);
             if (holdings == null || !holdings.Any())
                 return NotFound($"Aucun holding trouvé pour le contrat {id}");
@@ -257,6 +294,7 @@ namespace api.Controllers
         [HttpGet("{id}/operations")]
         public async Task<ActionResult<IEnumerable<OperationDto>>> GetOperationsByContract(int id)
         {
+            if (!await _access.CanReadContractAsync(id)) return NotFound();
             var operations = await _operationRepository.GetByContractIdAsync(id);
             if (operations == null || !operations.Any())
                 return NotFound();
@@ -267,6 +305,7 @@ namespace api.Controllers
         [HttpPost("{id}/rebuild-holdings")]
         public async Task<IActionResult> RebuildHoldings(int id)
         {
+            if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
             try
             {
                 var result = await _contractRepository.RebuildHoldingsAsync(id);
@@ -281,6 +320,7 @@ namespace api.Controllers
         [HttpPost("{id:int}/rebuild")]
         public async Task<IActionResult> Rebuild(int id)
         {
+            if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
             var engine = HttpContext.RequestServices.GetRequiredService<IOperationEngineService>();
 
             await engine.RebuildContractAsync(id);
@@ -299,6 +339,7 @@ namespace api.Controllers
         [HttpPost("{id:int}/recalculate-fees")]
         public async Task<IActionResult> RecalculateFees(int id)
         {
+            if (!(await _access.GetScopeAsync()).IsBackOffice) return Forbid();
             var result = await _operationEngineService.RecalculateContractFeesAsync(id);
             return Ok(new
             {

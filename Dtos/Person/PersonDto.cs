@@ -24,10 +24,20 @@ namespace api.Dtos.Person
         public string Email2 { get; set; } = string.Empty;
         public string TaxAddress { get; set; } = string.Empty;
         public string PostalAddress { get; set; } = string.Empty;
+        public int? UserId { get; set; }
+        public PersonLinkedUserDto? User { get; set; }
         public List<ContractDto>? Contracts { get; set; }
         public List<BeneficiaryClausePersonDto>? BeneficiaryClausePersons { get; set; }
         public DateTime CreatedDate { get; set; } = DateTime.Now;
         public DateTime? UpdatedDate { get; set; }
         public bool Locked { get; set; }
     }
+
+    public sealed record PersonLinkedUserDto(
+        int Id,
+        string UserName,
+        string Email,
+        bool EmailConfirmed,
+        string Status,
+        DateTime? LastLoginAt);
 }

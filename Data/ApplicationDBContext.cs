@@ -148,6 +148,8 @@ namespace api.Data
         public DbSet<TaxReceiptDelivery> TaxReceiptDeliveries { get; set; }
         public DbSet<PaymentAttempt> PaymentAttempts { get; set; }
         public DbSet<PaymentWebhookInbox> PaymentWebhookInbox { get; set; }
+        public DbSet<SubscriptionDraft> SubscriptionDrafts { get; set; }
+        public DbSet<SubscriptionDraftAuditEvent> SubscriptionDraftAuditEvents { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -157,7 +159,20 @@ namespace api.Data
                 .IncrementsBy(1);
 
             // 🔹 Convention de nommage pluriel pour toutes les tables
-            modelBuilder.Entity<Person>().ToTable("Persons");
+            modelBuilder.Entity<Person>(entity =>
+            {
+                entity.ToTable("Persons");
+                entity.Property(p => p.Email1).HasMaxLength(254);
+                entity.Property(p => p.Email2).HasMaxLength(254);
+                entity.HasOne(p => p.User)
+                    .WithOne(u => u.Person)
+                    .HasForeignKey<Person>(p => p.UserId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                entity.HasIndex(p => p.UserId)
+                    .IsUnique()
+                    .HasFilter("[UserId] IS NOT NULL")
+                    .HasDatabaseName("UX_Persons_UserId");
+            });
             modelBuilder.Entity<Insurer>().ToTable("Insurers");
             modelBuilder.Entity<Notary>().ToTable("Notaries");
             modelBuilder.Entity<Contract>().ToTable("Contracts");
@@ -1188,6 +1203,44 @@ namespace api.Data
             modelBuilder.ApplyConfiguration(new TaxReceiptDeliveryConfiguration());
             modelBuilder.ApplyConfiguration(new PaymentAttemptConfiguration());
             modelBuilder.ApplyConfiguration(new PaymentWebhookInboxConfiguration());
+            modelBuilder.Entity<SubscriptionDraft>(entity =>
+            {
+                entity.ToTable("SubscriptionDrafts");
+                entity.Property(d => d.CurrentStep).HasMaxLength(40).IsRequired();
+                entity.Property(d => d.Status).HasConversion<string>().HasMaxLength(40).IsRequired();
+                entity.Property(d => d.ProductType).HasConversion<int?>();
+                entity.Property(d => d.ProjectDataJson).HasColumnType("nvarchar(max)");
+                entity.Property(d => d.SituationDataJson).HasColumnType("nvarchar(max)");
+                entity.Property(d => d.InvestorProfileDataJson).HasColumnType("nvarchar(max)");
+                entity.Property(d => d.RecommendationDataJson).HasColumnType("nvarchar(max)");
+                entity.Property(d => d.InvestmentDataJson).HasColumnType("nvarchar(max)");
+                entity.Property(d => d.ProtectionDataJson).HasColumnType("nvarchar(max)");
+                entity.Property(d => d.StepStatusesJson).HasColumnType("nvarchar(max)");
+                entity.HasOne(d => d.User)
+                    .WithMany()
+                    .HasForeignKey(d => d.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(d => d.Product)
+                    .WithMany()
+                    .HasForeignKey(d => d.ProductId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(d => new { d.UserId, d.Status, d.UpdatedAt })
+                    .HasDatabaseName("IX_SubscriptionDrafts_User_Status_UpdatedAt");
+            });
+
+            modelBuilder.Entity<SubscriptionDraftAuditEvent>(entity =>
+            {
+                entity.ToTable("SubscriptionDraftAuditEvents");
+                entity.Property(e => e.EventType).HasMaxLength(80).IsRequired();
+                entity.Property(e => e.StepKey).HasMaxLength(40);
+                entity.Property(e => e.RulesVersion).HasMaxLength(40).IsRequired();
+                entity.HasOne(e => e.SubscriptionDraft)
+                    .WithMany(d => d.AuditEvents)
+                    .HasForeignKey(e => e.SubscriptionDraftId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasIndex(e => new { e.SubscriptionDraftId, e.CreatedAt })
+                    .HasDatabaseName("IX_SubscriptionDraftAuditEvents_Draft_Date");
+            });
 
             // 📌 Seed du catalogue d’options
             Data.Seed.ContractOptionTypeSeeder.Seed(modelBuilder);
