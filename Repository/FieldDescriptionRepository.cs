@@ -3,13 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using api.Data;
-using api.Dtos.Contract;
 using api.Dtos.Generic;
 using api.Helpers;
 using api.Interfaces;
 using api.Models;
-using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace api.Repository
@@ -29,15 +26,20 @@ namespace api.Repository
 
             // Gestion de la recherche simple sur entityName ou fieldName
             if (!string.IsNullOrWhiteSpace(query.Search))
+            {
+                var search = query.Search.Trim();
                 entities = entities.Where(e =>
-                    e.EntityName.Contains(query.Search) ||
-                    e.FieldName.Contains(query.Search));
+                    e.EntityName.Contains(search) ||
+                    e.FieldName.Contains(search) ||
+                    e.Description.Contains(search));
+            }
 
             var totalCount = await entities.CountAsync();
             var totalPages = (int)Math.Ceiling((double)totalCount / query.PageSize);
 
             var items = await entities
-                .OrderBy(e => e.Id)
+                .OrderBy(e => e.EntityName)
+                .ThenBy(e => e.FieldName)
                 .Skip((query.PageNumber - 1) * query.PageSize)
                 .Take(query.PageSize)
                 .ToListAsync();
@@ -58,16 +60,25 @@ namespace api.Repository
 
         public async Task<IEnumerable<FieldDescription>> GetByEntityNameAsync(string entityName)
         {
+            var normalizedEntityName = NormalizeKey(entityName);
             return await _context.FieldDescriptions
-                .Where(f => f.EntityName.ToLower() == entityName.ToLower())
+                .Where(f => f.EntityName.ToLower() == normalizedEntityName.ToLower())
+                .OrderBy(f => f.FieldName)
                 .ToListAsync();
         }
 
         public async Task<FieldDescription> CreateAsync(FieldDescription fieldDescription)
         {
+            fieldDescription.EntityName = NormalizeKey(fieldDescription.EntityName);
+            fieldDescription.FieldName = NormalizeKey(fieldDescription.FieldName);
+            fieldDescription.Description = fieldDescription.Description.Trim();
+            fieldDescription.CreatedDate = DateTime.UtcNow;
+            fieldDescription.UpdatedDate = DateTime.UtcNow;
+
             var duplicate = await _context.FieldDescriptions
-                .AnyAsync(f => f.EntityName == fieldDescription.EntityName &&
-                               f.FieldName == fieldDescription.FieldName);
+                .AnyAsync(f =>
+                    f.EntityName.ToLower() == fieldDescription.EntityName.ToLower() &&
+                    f.FieldName.ToLower() == fieldDescription.FieldName.ToLower());
             if (duplicate)
                 throw new InvalidOperationException(
                     $"Une description existe déjà pour {fieldDescription.EntityName}.{fieldDescription.FieldName}.");
@@ -81,9 +92,24 @@ namespace api.Repository
         {
             var existing = await _context.FieldDescriptions.FindAsync(id);
             if (existing == null) return null;
-            existing.Description = fieldDescription.Description;
-            existing.FieldName = fieldDescription.FieldName;
-            existing.EntityName = fieldDescription.EntityName;
+            var entityName = NormalizeKey(fieldDescription.EntityName);
+            var fieldName = NormalizeKey(fieldDescription.FieldName);
+            var duplicate = await _context.FieldDescriptions
+                .AnyAsync(f =>
+                    f.Id != id &&
+                    f.EntityName.ToLower() == entityName.ToLower() &&
+                    f.FieldName.ToLower() == fieldName.ToLower());
+            if (duplicate)
+            {
+                throw new InvalidOperationException(
+                    $"Une description existe déjà pour {entityName}.{fieldName}.");
+            }
+
+            existing.Description = fieldDescription.Description.Trim();
+            existing.FieldName = fieldName;
+            existing.EntityName = entityName;
+            existing.UpdatedDate = DateTime.UtcNow;
+            existing.Locked = fieldDescription.Locked;
             await _context.SaveChangesAsync();
             return existing;
         }
@@ -95,6 +121,11 @@ namespace api.Repository
             _context.FieldDescriptions.Remove(existing);
             await _context.SaveChangesAsync();
             return existing;
+        }
+
+        private static string NormalizeKey(string value)
+        {
+            return value.Trim();
         }
     }
 }

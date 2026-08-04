@@ -1,17 +1,8 @@
-
-using api.Data;
-using api.Dtos.Person;
 using api.Helpers;
 using api.Interfaces;
-using api.Mappers;
 using api.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.ViewComponents;
 using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Identity.Client;
-using Microsoft.Extensions.Configuration;
-using System.Collections.Generic;
 
 namespace api.Controllers
 {
@@ -62,9 +53,16 @@ namespace api.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, FieldDescription fieldDescription)
         {
-            var updated = await _repository.UpdateAsync(id, fieldDescription);
-            if (updated == null) return NotFound();
-            return Ok(updated);
+            try
+            {
+                var updated = await _repository.UpdateAsync(id, fieldDescription);
+                if (updated == null) return NotFound();
+                return Ok(updated);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { message = ex.Message });
+            }
         }
 
         [HttpDelete("{id}")]

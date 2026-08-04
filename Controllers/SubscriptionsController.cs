@@ -12,10 +12,23 @@ namespace api.Controllers
     public sealed class SubscriptionsController : ControllerBase
     {
         private readonly ISubscriptionDraftService _service;
+        private readonly ISubscriptionDocumentService _documentService;
+        private readonly ISubscriptionMfaService _mfaService;
+        private readonly ISubscriptionPaymentPreparationService _paymentService;
+        private readonly ISubscriptionSignatureService _signatureService;
 
-        public SubscriptionsController(ISubscriptionDraftService service)
+        public SubscriptionsController(
+            ISubscriptionDraftService service,
+            ISubscriptionDocumentService documentService,
+            ISubscriptionMfaService mfaService,
+            ISubscriptionPaymentPreparationService paymentService,
+            ISubscriptionSignatureService signatureService)
         {
             _service = service;
+            _documentService = documentService;
+            _mfaService = mfaService;
+            _paymentService = paymentService;
+            _signatureService = signatureService;
         }
 
         [HttpGet("current")]
@@ -87,6 +100,144 @@ namespace api.Controllers
         [HttpGet("{id:int}/summary")]
         public Task<IActionResult> GetSummary(int id, CancellationToken cancellationToken) =>
             GetById(id, cancellationToken);
+
+        [HttpGet("{id:int}/documents")]
+        public async Task<IActionResult> GetDocuments(int id, CancellationToken cancellationToken)
+        {
+            var userId = CurrentUserId();
+            if (!userId.HasValue) return Unauthorized(new { message = "Utilisateur non authentifié." });
+            try
+            {
+                return Ok(await _documentService.GetDossierAsync(userId.Value, id, cancellationToken));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("{id:int}/documents/generate")]
+        public async Task<IActionResult> GenerateDocuments(int id, CancellationToken cancellationToken)
+        {
+            var userId = CurrentUserId();
+            if (!userId.HasValue) return Unauthorized(new { message = "Utilisateur non authentifié." });
+            try
+            {
+                return Ok(await _documentService.GenerateDossierAsync(userId.Value, id, User.Identity?.Name, cancellationToken));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("{id:int}/documents/{artifactId:int}/download")]
+        public async Task<IActionResult> DownloadDocument(int id, int artifactId, CancellationToken cancellationToken)
+        {
+            var userId = CurrentUserId();
+            if (!userId.HasValue) return Unauthorized(new { message = "Utilisateur non authentifié." });
+            try
+            {
+                var file = await _documentService.GetDocumentFileAsync(userId.Value, id, artifactId, cancellationToken);
+                return File(file.Content, file.ContentType, file.FileName);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("{id:int}/payment/prepare")]
+        public async Task<IActionResult> PreparePayment(int id, CancellationToken cancellationToken)
+        {
+            var userId = CurrentUserId();
+            if (!userId.HasValue) return Unauthorized(new { message = "Utilisateur non authentifié." });
+            try
+            {
+                return Ok(await _paymentService.PrepareAsync(userId.Value, id, cancellationToken));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("{id:int}/mfa/challenge")]
+        public async Task<IActionResult> CreateMfaChallenge(int id, CancellationToken cancellationToken)
+        {
+            var userId = CurrentUserId();
+            if (!userId.HasValue) return Unauthorized(new { message = "Utilisateur non authentifié." });
+            try
+            {
+                return Ok(await _mfaService.CreateChallengeAsync(userId.Value, id, HttpContext.Connection.RemoteIpAddress?.ToString(), cancellationToken));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("{id:int}/mfa/totp/setup")]
+        public async Task<IActionResult> CreateTotpSetup(int id, CancellationToken cancellationToken)
+        {
+            var userId = CurrentUserId();
+            if (!userId.HasValue) return Unauthorized(new { message = "Utilisateur non authentifié." });
+            try
+            {
+                return Ok(await _mfaService.CreateTotpSetupAsync(userId.Value, id, cancellationToken));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("{id:int}/mfa/verify")]
+        public async Task<IActionResult> VerifyMfa(int id, [FromBody] SubscriptionMfaVerifyRequestDto request, CancellationToken cancellationToken)
+        {
+            var userId = CurrentUserId();
+            if (!userId.HasValue) return Unauthorized(new { message = "Utilisateur non authentifié." });
+            try
+            {
+                var result = await _mfaService.VerifyAsync(userId.Value, id, request.Code, cancellationToken);
+                return result.Verified ? Ok(result) : BadRequest(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("{id:int}/signature/envelope")]
+        public async Task<IActionResult> PrepareSignatureEnvelope(int id, CancellationToken cancellationToken)
+        {
+            var userId = CurrentUserId();
+            if (!userId.HasValue) return Unauthorized(new { message = "Utilisateur non authentifié." });
+            try
+            {
+                return Ok(await _signatureService.PrepareEnvelopeAsync(userId.Value, id, User.Identity?.Name, cancellationToken));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
 
         [HttpPost("{id:int}/submit")]
         public async Task<IActionResult> Submit(int id, CancellationToken cancellationToken)

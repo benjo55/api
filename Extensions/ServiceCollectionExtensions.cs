@@ -380,11 +380,38 @@ namespace api.Extensions
             services.AddScoped<IUserAdministrationService, UserAdministrationService>();
             services.AddScoped<ICurrentUserAccessService, CurrentUserAccessService>();
             services.AddScoped<ISubscriptionDraftService, SubscriptionDraftService>();
+            services.AddScoped<ISubscriptionDocumentService, SubscriptionDocumentService>();
+            services.AddScoped<ISubscriptionMfaService, SubscriptionMfaService>();
+            services.AddScoped<ISubscriptionPaymentPreparationService, SubscriptionPaymentPreparationService>();
+            services.AddScoped<ISubscriptionSignatureService, SubscriptionSignatureService>();
             services.AddScoped<AuthorizationSeedService>();
+            services.AddScoped<FieldDescriptionSeedService>();
             services.AddScoped<SendTaxReceiptEmailJob>();
             services.AddSingleton<IPdfTemplate, BusinessPdfTemplate>();
             services.AddSingleton<IPdfTemplate, ContractSheetPdfTemplate>();
             services.AddHttpClient("pdf-assets");
+            services.AddHttpClient("subscription-sms", client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(10);
+            });
+            services.AddHttpClient("twilio-verify", (sp, client) =>
+            {
+                var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<SubscriptionOperationsOptions>>().Value;
+                client.BaseAddress = new Uri(options.Mfa.TwilioVerify.BaseUrl.TrimEnd('/') + "/");
+                client.Timeout = TimeSpan.FromSeconds(10);
+            });
+            services.AddHttpClient("docuseal-signature", (sp, client) =>
+            {
+                var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<SubscriptionOperationsOptions>>().Value;
+                client.BaseAddress = new Uri(options.Signature.DocuSeal.BaseUrl.TrimEnd('/') + "/");
+                client.Timeout = TimeSpan.FromSeconds(30);
+            });
+            services.AddHttpClient("youtrust-signature", (sp, client) =>
+            {
+                var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<SubscriptionOperationsOptions>>().Value;
+                client.BaseAddress = new Uri(options.Signature.Youtrust.BaseUrl.TrimEnd('/') + "/");
+                client.Timeout = TimeSpan.FromSeconds(30);
+            });
             services.AddHttpClient("personal-dashboard-news", client =>
             {
                 client.Timeout = TimeSpan.FromSeconds(8);
@@ -452,6 +479,20 @@ namespace api.Extensions
                 .Bind(config.GetSection(DonationCheckoutOptions.SectionName))
                 .ValidateDataAnnotations()
                 .Validate(o => o.MaxAmountEur >= o.MinAmountEur, "DonationCheckout:MaxAmountEur doit etre >= MinAmountEur")
+                .ValidateOnStart();
+            services
+                .AddOptions<SubscriptionOperationsOptions>()
+                .Bind(config.GetSection(SubscriptionOperationsOptions.SectionName))
+                .ValidateDataAnnotations()
+                .Validate(o => !o.Mfa.Sms.Enabled || !string.IsNullOrWhiteSpace(o.Mfa.Sms.EndpointUrl), "SubscriptionOperations:Mfa:Sms:EndpointUrl obligatoire si le SMS est actif")
+                .Validate(o => !o.Mfa.TwilioVerify.Enabled || !string.IsNullOrWhiteSpace(o.Mfa.TwilioVerify.ServiceSid), "SubscriptionOperations:Mfa:TwilioVerify:ServiceSid obligatoire si Twilio Verify est actif")
+                .Validate(o => !o.Mfa.TwilioVerify.Enabled
+                               || (!string.IsNullOrWhiteSpace(o.Mfa.TwilioVerify.ApiKey) && !string.IsNullOrWhiteSpace(o.Mfa.TwilioVerify.ApiSecret))
+                               || (!string.IsNullOrWhiteSpace(o.Mfa.TwilioVerify.AccountSid) && !string.IsNullOrWhiteSpace(o.Mfa.TwilioVerify.AuthToken)),
+                    "SubscriptionOperations:Mfa:TwilioVerify doit contenir ApiKey/ApiSecret ou AccountSid/AuthToken si actif")
+                .Validate(o => !o.Signature.DocuSeal.Enabled || !string.IsNullOrWhiteSpace(o.Signature.DocuSeal.ApiKey), "SubscriptionOperations:Signature:DocuSeal:ApiKey obligatoire si DocuSeal est actif")
+                .Validate(o => !o.Signature.Youtrust.Enabled || !string.IsNullOrWhiteSpace(o.Signature.Youtrust.ApiKey), "SubscriptionOperations:Signature:Youtrust:ApiKey obligatoire si Youtrust est actif")
+                .Validate(o => o.Mfa.ChallengeLifetime >= TimeSpan.FromMinutes(2), "SubscriptionOperations:Mfa:ChallengeLifetime doit etre >= 2 minutes")
                 .ValidateOnStart();
 
             return services;

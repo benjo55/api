@@ -15,11 +15,19 @@ namespace api.Services
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
         private readonly ApplicationDBContext _db;
         private readonly IIbanValidator _ibanValidator;
+        private readonly ISubscriptionDocumentService _documentService;
+        private readonly ISubscriptionSignatureService _signatureService;
 
-        public SubscriptionDraftService(ApplicationDBContext db, IIbanValidator ibanValidator)
+        public SubscriptionDraftService(
+            ApplicationDBContext db,
+            IIbanValidator ibanValidator,
+            ISubscriptionDocumentService documentService,
+            ISubscriptionSignatureService signatureService)
         {
             _db = db;
             _ibanValidator = ibanValidator;
+            _documentService = documentService;
+            _signatureService = signatureService;
         }
 
         public async Task<SubscriptionDraftDto?> GetCurrentAsync(int userId, CancellationToken cancellationToken)
@@ -223,10 +231,26 @@ namespace api.Services
         public async Task<SubscriptionDraftDto> SubmitAsync(int userId, int draftId, CancellationToken cancellationToken)
         {
             var draft = await RequireOwnedDraftAsync(userId, draftId, cancellationToken);
+            CompleteDerivedSteps(draft);
+
             var missing = RequiredSteps().Where(step => !IsCompleted(draft, step)).ToArray();
             if (missing.Length > 0)
             {
                 throw new InvalidOperationException($"Souscription incomplète. Étapes à finaliser : {string.Join(", ", missing)}.");
+            }
+
+            var documentDossier = await _documentService.GetDossierAsync(userId, draftId, cancellationToken);
+            if (!documentDossier.IsComplete)
+            {
+                var details = documentDossier.Warnings.Count > 0
+                    ? $" {string.Join(" ", documentDossier.Warnings)}"
+                    : string.Empty;
+                throw new InvalidOperationException($"Le dossier documentaire doit être généré avant la signature.{details}");
+            }
+
+            if (!await _signatureService.IsEnvelopePreparedAsync(userId, draftId, cancellationToken))
+            {
+                throw new InvalidOperationException("L'enveloppe de signature électronique doit être préparée avant la soumission du dossier.");
             }
 
             draft.Status = SubscriptionDraftStatus.AwaitingSignature;
@@ -418,6 +442,7 @@ namespace api.Services
             draft.RecommendationDataJson = Serialize(updated);
             draft.UpdatedAt = DateTime.UtcNow;
             draft.Version += 1;
+            CompleteStep(draft, SubscriptionStepKeys.Solution);
             await _db.SaveChangesAsync(cancellationToken);
             await AuditAsync(draft, userId, accepted ? "RecommendationAccepted" : "RecommendationOverridden", SubscriptionStepKeys.Solution, draft.RecommendationDataJson, cancellationToken, previous);
             return ToDto(draft);
@@ -477,7 +502,36 @@ namespace api.Services
             }
             else if (stepKey == SubscriptionStepKeys.Investment)
             {
-                MarkInvalidated(draft, SubscriptionStepKeys.Solution, SubscriptionStepKeys.Signature);
+                MarkInvalidated(draft, SubscriptionStepKeys.Signature);
+            }
+        }
+
+        private static void CompleteDerivedSteps(SubscriptionDraft draft)
+        {
+            if (HasCompletedSolutionData(draft))
+            {
+                CompleteStep(draft, SubscriptionStepKeys.Solution);
+            }
+        }
+
+        private static bool HasCompletedSolutionData(SubscriptionDraft draft)
+        {
+            if (!draft.ProductId.HasValue || string.IsNullOrWhiteSpace(draft.RecommendationDataJson))
+            {
+                return false;
+            }
+
+            try
+            {
+                var values = ParseObject(draft.RecommendationDataJson);
+                return HasDate(values, "acceptedAt")
+                    || HasDate(values, "overriddenAt")
+                    || ReadBool(values, "acceptedRecommendation")
+                    || !string.IsNullOrWhiteSpace(ReadString(values, "overrideReason"));
+            }
+            catch (JsonException)
+            {
+                return false;
             }
         }
 
@@ -598,6 +652,16 @@ namespace api.Services
         {
             if (!values.TryGetValue(key, out var element)) return false;
             return element.ValueKind == JsonValueKind.True || (element.ValueKind == JsonValueKind.String && bool.TryParse(element.GetString(), out var parsed) && parsed);
+        }
+
+        private static bool HasDate(Dictionary<string, JsonElement> values, string key)
+        {
+            if (!values.TryGetValue(key, out var element) || element.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            {
+                return false;
+            }
+
+            return element.ValueKind != JsonValueKind.String || !string.IsNullOrWhiteSpace(element.GetString());
         }
 
         private static void Require(Dictionary<string, JsonElement> values, string key, string message, List<string> errors)

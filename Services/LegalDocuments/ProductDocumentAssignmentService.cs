@@ -34,7 +34,8 @@ namespace api.Services.LegalDocuments
             var revisionIds = assignments.Select(x => x.LegalDocumentRevisionId).Distinct().ToList();
             var latestArtifacts = await _db.DocumentArtifacts
                 .AsNoTracking()
-                .Where(a => revisionIds.Contains(a.LegalDocumentRevisionId!.Value) &&
+                .Where(a => a.LegalDocumentRevisionId.HasValue &&
+                            revisionIds.Contains(a.LegalDocumentRevisionId.Value) &&
                             (a.Type == DocumentArtifactType.ValidatedPdf || a.Type == DocumentArtifactType.PreviewPdf))
                 .GroupBy(a => a.LegalDocumentRevisionId!.Value)
                 .Select(g => new

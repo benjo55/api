@@ -155,6 +155,9 @@ using (var scope = app.Services.CreateScope())
 {
     var seedService = scope.ServiceProvider.GetRequiredService<api.Services.AuthorizationSeedService>();
     await seedService.SeedAsync();
+
+    var fieldDescriptionSeedService = scope.ServiceProvider.GetRequiredService<api.Services.FieldDescriptionSeedService>();
+    await fieldDescriptionSeedService.SeedAsync();
 }
 
 app.Use(async (context, next) =>

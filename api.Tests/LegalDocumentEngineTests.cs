@@ -376,11 +376,17 @@ namespace api.Tests
             });
             await db.SaveChangesAsync();
 
-            var service = new DocumentStructureService(db, new DocumentNumberingService(), new FakeAuditService());
+            var service = new DocumentStructureService(db, new DocumentNumberingService(), new DocumentAuditService(db));
             await service.DeleteNodeAsync(chapter.Id, string.Empty, "test");
 
             Assert.DoesNotContain(await db.LegalDocumentNodes.ToListAsync(), x => x.Id == chapter.Id || x.Id == article.Id);
-            Assert.Null((await db.DocumentAuditEvents.SingleAsync()).LegalDocumentNodeId);
+            var auditEvents = await db.DocumentAuditEvents.OrderBy(x => x.CreatedAt).ToListAsync();
+            Assert.Equal(2, auditEvents.Count);
+            Assert.All(auditEvents, x => Assert.Null(x.LegalDocumentNodeId));
+            Assert.Contains(auditEvents, x =>
+                x.Action == DocumentAuditAction.Deleted
+                && x.DetailJson != null
+                && x.DetailJson.Contains($"\"deletedNodeId\":{chapter.Id}", StringComparison.Ordinal));
         }
 
         [Fact]

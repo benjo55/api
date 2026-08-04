@@ -47,6 +47,7 @@ namespace api.Data
         public DbSet<Brand> Brands { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<UserSecurityToken> UserSecurityTokens { get; set; }
+        public DbSet<UserMfaFactor> UserMfaFactors { get; set; }
         public DbSet<AdminAuditEvent> AdminAuditEvents { get; set; }
         public DbSet<Role> Roles { get; set; }
         public DbSet<UserRole> UserRoles { get; set; }
@@ -252,6 +253,22 @@ namespace api.Data
 
                 entity.HasIndex(t => new { t.TokenType, t.ExpiresAt })
                     .HasDatabaseName("IX_UserSecurityTokens_Type_ExpiresAt");
+            });
+            modelBuilder.Entity<UserMfaFactor>(entity =>
+            {
+                entity.ToTable("UserMfaFactors");
+                entity.Property(f => f.FactorType).HasMaxLength(40).IsRequired();
+                entity.Property(f => f.DisplayName).HasMaxLength(120).IsRequired();
+                entity.Property(f => f.ProtectedSecret).IsRequired();
+                entity.Property(f => f.CreatedAt).IsRequired();
+
+                entity.HasOne(f => f.User)
+                    .WithMany(u => u.MfaFactors)
+                    .HasForeignKey(f => f.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(f => new { f.UserId, f.FactorType, f.RevokedAt })
+                    .HasDatabaseName("IX_UserMfaFactors_User_Type_RevokedAt");
             });
             modelBuilder.Entity<AdminAuditEvent>(entity =>
             {

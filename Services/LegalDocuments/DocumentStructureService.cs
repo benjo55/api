@@ -522,7 +522,14 @@ namespace api.Services.LegalDocuments
             _db.LegalDocumentNodes.RemoveRange(orderedSubtree);
             await _db.SaveChangesAsync(cancellationToken);
             await RefreshRevisionHashAsync(node.LegalDocumentRevisionId, cancellationToken);
-            await _auditService.AddAsync(DocumentAuditAction.Deleted, node.LegalDocumentRevision.LegalDocumentDefinitionId, node.LegalDocumentRevisionId, nodeId, new { count = subtree.Count }, userName, cancellationToken);
+            await _auditService.AddAsync(
+                DocumentAuditAction.Deleted,
+                node.LegalDocumentRevision.LegalDocumentDefinitionId,
+                node.LegalDocumentRevisionId,
+                null,
+                new { deletedNodeId = nodeId, count = subtree.Count },
+                userName,
+                cancellationToken);
         }
 
         internal static void ValidateChildType(DocumentNodeType? parentType, DocumentNodeType childType)

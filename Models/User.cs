@@ -95,6 +95,8 @@ namespace api.Models
 
         public ICollection<UserSecurityToken> SecurityTokens { get; set; } = new List<UserSecurityToken>();
 
+        public ICollection<UserMfaFactor> MfaFactors { get; set; } = new List<UserMfaFactor>();
+
         public Person? Person { get; set; }
     }
 
@@ -102,6 +104,7 @@ namespace api.Models
     {
         public const string EmailConfirmation = "EmailConfirmation";
         public const string PasswordReset = "PasswordReset";
+        public const string SubscriptionMfa = "SubscriptionMfa";
     }
 
     public class UserSecurityToken
@@ -131,6 +134,40 @@ namespace api.Models
 
         [MaxLength(64)]
         public string? CreatedByIpAddress { get; set; }
+    }
+
+    public static class UserMfaFactorTypes
+    {
+        public const string Totp = "Totp";
+    }
+
+    public class UserMfaFactor
+    {
+        [Key]
+        public int Id { get; set; }
+
+        [Required]
+        public int UserId { get; set; }
+
+        [ForeignKey("UserId")]
+        public User? User { get; set; }
+
+        [Required, MaxLength(40)]
+        public string FactorType { get; set; } = string.Empty;
+
+        [Required, MaxLength(120)]
+        public string DisplayName { get; set; } = string.Empty;
+
+        [Required]
+        public string ProtectedSecret { get; set; } = string.Empty;
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public DateTime? ActivatedAt { get; set; }
+
+        public DateTime? LastUsedAt { get; set; }
+
+        public DateTime? RevokedAt { get; set; }
     }
 
     public class Role
