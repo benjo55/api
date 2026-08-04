@@ -283,7 +283,7 @@ namespace api.Tests
         public async Task Reusable_catalog_and_import_copy_a_complete_subtree()
         {
             await using var db = CreateContext();
-            var sourceRevision = await SeedDraftRevisionAsync(db, "SRC", "CG source");
+            var sourceRevision = await SeedDraftRevisionAsync(db, "SRC", "CG source", isLibrary: true);
             var sourceRoot = sourceRevision.Nodes.Single(x => x.Type == DocumentNodeType.Document);
             var sourceChapter = new LegalDocumentNode
             {
@@ -450,13 +450,15 @@ namespace api.Tests
         private static async Task<LegalDocumentRevision> SeedDraftRevisionAsync(
             ApplicationDBContext db,
             string code = "GT",
-            string name = "General terms")
+            string name = "General terms",
+            bool isLibrary = false)
         {
             var definition = new LegalDocumentDefinition
             {
                 Code = code,
                 Name = name,
-                Type = LegalDocumentType.ProductGeneralTerms
+                Type = LegalDocumentType.ProductGeneralTerms,
+                IsLibrary = isLibrary
             };
             var revision = new LegalDocumentRevision
             {
