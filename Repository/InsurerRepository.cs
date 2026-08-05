@@ -7,6 +7,7 @@ using api.Dtos.Insurer;
 using api.Dtos.Generic;
 using api.Helpers;
 using api.Interfaces;
+using api.Mappers;
 using api.Models;
 using api.Services;
 using Mapster;
@@ -28,8 +29,10 @@ namespace api.Repository
 
         public async Task<Insurer> CreateAsync(Insurer InsurerModel)
         {
+            EnsureLegacyContactPoints(InsurerModel);
             await _context.Insurers.AddAsync(InsurerModel);
             await _context.SaveChangesAsync();
+            await PopulateRelationCountsAsync(InsurerModel);
             return InsurerModel;
         }
 
@@ -68,6 +71,10 @@ namespace api.Repository
             // Pagination
             var skipNumber = (query.PageNumber - 1) * query.PageSize;
             var pagedInsurers = await Insurers.Skip(skipNumber).Take(query.PageSize).ToListAsync();
+            foreach (var insurer in pagedInsurers)
+            {
+                await PopulateRelationCountsAsync(insurer);
+            }
 
             // Indique s'il reste une page après celle-ci
             var hasNextPage = query.PageNumber < totalPages;
@@ -84,7 +91,16 @@ namespace api.Repository
         }
         public async Task<Insurer?> GetByIdAsync(int id)
         {
-            return await _context.Insurers.FirstOrDefaultAsync(p => p.Id == id);
+            var insurer = await _context.Insurers
+                .Include(p => p.Authorizations)
+                .Include(p => p.ContactPoints)
+                .Include(p => p.SolvencyMetrics)
+                .FirstOrDefaultAsync(p => p.Id == id);
+
+            if (insurer == null) return null;
+
+            await PopulateRelationCountsAsync(insurer);
+            return insurer;
         }
 
         public async Task<bool> InsurerExists(int id)
@@ -93,7 +109,11 @@ namespace api.Repository
         }
         public async Task<Insurer?> UpdateAsync(int id, UpdateInsurerRequestDto updateInsurerDto)
         {
-            var existingInsurer = await _context.Insurers.FirstOrDefaultAsync(p => p.Id == id);
+            var existingInsurer = await _context.Insurers
+                .Include(p => p.Authorizations)
+                .Include(p => p.ContactPoints)
+                .Include(p => p.SolvencyMetrics)
+                .FirstOrDefaultAsync(p => p.Id == id);
             if (existingInsurer == null) return null;
 
             // 1️⃣ Cloner l'état initial pour l'historisation
@@ -101,6 +121,32 @@ namespace api.Repository
 
             // 2️⃣ Mise à jour avec Mapster
             updateInsurerDto.Adapt(existingInsurer);
+            existingInsurer.Authorizations.Clear();
+            existingInsurer.ContactPoints.Clear();
+            existingInsurer.SolvencyMetrics.Clear();
+
+            foreach (var authorization in updateInsurerDto.Authorizations.Adapt<List<InsurerAuthorization>>())
+            {
+                authorization.Id = 0;
+                authorization.InsurerId = id;
+                existingInsurer.Authorizations.Add(authorization);
+            }
+
+            foreach (var contactPoint in updateInsurerDto.ContactPoints.Adapt<List<InsurerContactPoint>>())
+            {
+                contactPoint.Id = 0;
+                contactPoint.InsurerId = id;
+                existingInsurer.ContactPoints.Add(contactPoint);
+            }
+
+            foreach (var solvencyMetric in updateInsurerDto.SolvencyMetrics.Adapt<List<InsurerSolvencyMetric>>())
+            {
+                solvencyMetric.Id = 0;
+                solvencyMetric.InsurerId = id;
+                existingInsurer.SolvencyMetrics.Add(solvencyMetric);
+            }
+
+            existingInsurer.ApplyInputNormalization();
             existingInsurer.UpdatedDate = DateTime.UtcNow;
 
             // 3️⃣ Historisation des changements
@@ -108,6 +154,7 @@ namespace api.Repository
 
             // 4️⃣ Sauvegarde
             await _context.SaveChangesAsync();
+            await PopulateRelationCountsAsync(existingInsurer);
             return existingInsurer;
         }
 
@@ -119,6 +166,87 @@ namespace api.Repository
             insurer.Locked = locked;
             await _context.SaveChangesAsync();
             return insurer;
+        }
+
+        private static void EnsureLegacyContactPoints(Insurer insurer)
+        {
+            if (insurer.ContactPoints.Count > 0) return;
+
+            if (!string.IsNullOrWhiteSpace(insurer.HeadQuarters))
+            {
+                insurer.ContactPoints.Add(new InsurerContactPoint
+                {
+                    ContactType = "RegisteredOffice",
+                    Label = "Siège social",
+                    AddressLine1 = insurer.HeadQuarters,
+                    Phone = insurer.PhoneNumber,
+                    Email = insurer.Email,
+                    WebsiteUrl = insurer.WebSite,
+                    IsPrimary = true
+                });
+            }
+
+            if (!string.IsNullOrWhiteSpace(insurer.PostalAddress) && insurer.PostalAddress != insurer.HeadQuarters)
+            {
+                insurer.ContactPoints.Add(new InsurerContactPoint
+                {
+                    ContactType = "PostalAddress",
+                    Label = "Adresse postale",
+                    AddressLine1 = insurer.PostalAddress,
+                    Phone = string.IsNullOrWhiteSpace(insurer.HeadQuarters) ? insurer.PhoneNumber : null,
+                    Email = string.IsNullOrWhiteSpace(insurer.HeadQuarters) ? insurer.Email : null,
+                    WebsiteUrl = string.IsNullOrWhiteSpace(insurer.HeadQuarters) ? insurer.WebSite : null,
+                    IsPrimary = true
+                });
+            }
+
+            if (insurer.ContactPoints.Count == 0 && (!string.IsNullOrWhiteSpace(insurer.PhoneNumber) || !string.IsNullOrWhiteSpace(insurer.Email) || !string.IsNullOrWhiteSpace(insurer.WebSite)))
+            {
+                insurer.ContactPoints.Add(new InsurerContactPoint
+                {
+                    ContactType = "CustomerService",
+                    Label = "Contact principal",
+                    Phone = insurer.PhoneNumber,
+                    Email = insurer.Email,
+                    WebsiteUrl = insurer.WebSite,
+                    IsPrimary = true
+                });
+            }
+        }
+
+        private async Task PopulateRelationCountsAsync(Insurer insurer)
+        {
+            var productIds = await _context.Products
+                .Where(p => p.InsurerId == insurer.Id)
+                .Select(p => p.Id)
+                .ToListAsync();
+            var contractIds = productIds.Count == 0
+                ? new List<int>()
+                : await _context.Contracts
+                    .Where(c => c.ProductId.HasValue && productIds.Contains(c.ProductId.Value))
+                    .Select(c => c.Id)
+                    .ToListAsync();
+
+            insurer.ProductCount = productIds.Count;
+            insurer.ContractCount = contractIds.Count;
+            insurer.DocumentCount = contractIds.Count == 0
+                ? 0
+                : await _context.Documents.CountAsync(d => d.ContractId.HasValue && contractIds.Contains(d.ContractId.Value));
+            insurer.PersonCount = contractIds.Count == 0
+                ? 0
+                : await _context.Contracts
+                    .Where(c => contractIds.Contains(c.Id) && c.PersonId.HasValue)
+                    .Select(c => c.PersonId!.Value)
+                    .Distinct()
+                    .CountAsync();
+            insurer.BrandCount = 0;
+            insurer.AuthorizationCount = await _context.InsurerAuthorizations
+                .CountAsync(a => a.InsurerId == insurer.Id);
+            insurer.ExerciseCountryCount = await _context.InsurerAuthorizations
+                .Where(a => a.InsurerId == insurer.Id && a.HostCountryCode != null && a.HostCountryCode != "")
+                .Select(a => a.HostCountryCode)
+                .Distinct()
+                .CountAsync();
         }
 
     }

@@ -54,7 +54,22 @@ namespace api.Helpers
             config.NewConfig<CompartmentDto, Compartment>();
 
             // --------- INSURER ---------
-            config.NewConfig<UpdateInsurerRequestDto, Insurer>();
+            config.NewConfig<InsurerAuthorization, InsurerAuthorizationDto>();
+            config.NewConfig<InsurerAuthorizationDto, InsurerAuthorization>()
+                .Ignore(dest => dest.Insurer!);
+            config.NewConfig<InsurerContactPoint, InsurerContactPointDto>();
+            config.NewConfig<InsurerContactPointDto, InsurerContactPoint>()
+                .Ignore(dest => dest.Insurer!);
+            config.NewConfig<InsurerSolvencyMetric, InsurerSolvencyMetricDto>();
+            config.NewConfig<InsurerSolvencyMetricDto, InsurerSolvencyMetric>()
+                .Ignore(dest => dest.Insurer!);
+            config.NewConfig<Insurer, InsurerDto>()
+                .Map(dest => dest.AuthorizationCount, src => src.Authorizations.Count);
+            config.NewConfig<CreateInsurerRequestDto, Insurer>();
+            config.NewConfig<UpdateInsurerRequestDto, Insurer>()
+                .Ignore(dest => dest.Authorizations)
+                .Ignore(dest => dest.ContactPoints)
+                .Ignore(dest => dest.SolvencyMetrics);
 
             // --------- PRODUCT ---------
             config.NewConfig<UpdateProductRequestDto, Product>();

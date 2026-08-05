@@ -31,18 +31,18 @@ namespace api.Services
             var completed = 0;
             var now = DateTime.UtcNow;
 
-            var définitions = FieldDescriptionCatalog.All
+            var definitions = FieldDescriptionCatalog.All
                 .Concat(GetModelFieldDefinitions())
                 .Concat(await GetDatabaseFieldDefinitionsAsync(cancellationToken));
 
-            foreach (var définition in définitions)
+            foreach (var definition in definitions)
             {
-                var key = Key(définition.EntityName, définition.FieldName);
+                var key = Key(definition.EntityName, definition.FieldName);
                 if (existingByKey.TryGetValue(key, out var existing))
                 {
                     if (string.IsNullOrWhiteSpace(existing.Description))
                     {
-                        existing.Description = définition.Description;
+                        existing.Description = definition.Description;
                         existing.UpdatedDate = now;
                         completed++;
                     }
@@ -52,9 +52,9 @@ namespace api.Services
 
                 var fieldDescription = new FieldDescription
                 {
-                    EntityName = définition.EntityName,
-                    FieldName = définition.FieldName,
-                    Description = définition.Description,
+                    EntityName = definition.EntityName,
+                    FieldName = definition.FieldName,
+                    Description = definition.Description,
                     Locked = true,
                     CreatedDate = now,
                     UpdatedDate = now
@@ -70,7 +70,7 @@ namespace api.Services
             }
 
             _logger.LogInformation(
-                "Catalogue de descriptions de champs synchronisé: {Inserted} créée(s), {Completed} complétée(s).",
+                "Field description catalog synchronized: {Inserted} inserted, {Completed} completed.",
                 inserted,
                 completed);
         }
@@ -132,7 +132,7 @@ namespace api.Services
                 return [];
             }
 
-            var définitions = new List<FieldDescriptionDefinition>();
+            var definitions = new List<FieldDescriptionDefinition>();
             var connection = _db.Database.GetDbConnection();
             var shouldCloseConnection = connection.State == ConnectionState.Closed;
 
@@ -162,7 +162,7 @@ namespace api.Services
                         "YES",
                         StringComparison.OrdinalIgnoreCase);
 
-                    définitions.Add(new FieldDescriptionDefinition(
+                    definitions.Add(new FieldDescriptionDefinition(
                         tableName,
                         columnName,
                         BuildGeneratedDescription(tableName, columnName, dataType, isNullable)));
@@ -176,7 +176,7 @@ namespace api.Services
                 }
             }
 
-            return définitions;
+            return definitions;
         }
 
         private static string BuildGeneratedDescription(
@@ -211,7 +211,7 @@ namespace api.Services
 
             if (normalized.EndsWith("id", StringComparison.OrdinalIgnoreCase) && relatedEntity is not null)
             {
-                return $"Référence vers {relatedEntity}. Elle permet de rattachér cet enregistrement {tableSingular} à la donnée associée.";
+                return $"Référence vers {relatedEntity}. Elle permet de rattacher cet enregistrement {tableSingular} à la donnée associée.";
             }
 
             if (normalized.Contains("email"))
@@ -236,7 +236,7 @@ namespace api.Services
 
             if (normalized.Contains("country"))
             {
-                return $"Pays associé à {tableSingular}. Il précise le rattachément géographique ou réglementaire.";
+                return $"Pays associé à {tableSingular}. Il précise le rattachement géographique ou réglementaire.";
             }
 
             if (normalized.Contains("postal") || normalized.Contains("zip"))
@@ -643,8 +643,8 @@ namespace api.Services
             new("Persons", "birthCountry", "Pays de naissance de la personne."),
             new("Persons", "email1", "Adresse e-mail principale pour les notifications et échanges courants."),
             new("Persons", "email2", "Adresse e-mail secondaire facultative."),
-            new("Persons", "phone1", "Numéro de telephone principal."),
-            new("Persons", "phone2", "Numéro de telephone secondaire facultatif."),
+            new("Persons", "phone1", "Numéro de téléphone principal."),
+            new("Persons", "phone2", "Numéro de téléphone secondaire facultatif."),
             new("Persons", "address", "Adresse postale principale de la personne."),
             new("Persons", "fiscalAddress", "Adresse retenue pour les besoins fiscaux lorsqu'elle diffère de l'adresse principale."),
             new("Persons", "sex", "Civilité ou sexe administratif utilisé pour certaines restitutions documentaires."),
@@ -663,9 +663,9 @@ namespace api.Services
             new("Contracts", "contractType", "Nature opérationnelle du contrat."),
             new("Contracts", "contractFamily", "Famille fiscale ou assurantielle du contrat."),
             new("Contracts", "initialPremium", "Versement initial ayant permis l'ouverture du contrat."),
-            new("Contracts", "totalPaidPremiums", "Cumul des primes versees depuis l'origine du contrat."),
+            new("Contracts", "totalPaidPremiums", "Cumul des primes versées depuis l'origine du contrat."),
             new("Contracts", "currentValue", "Valeur actuelle estimée du contrat."),
-            new("Contracts", "redemptionValue", "Valeur de rachat estimée ou calculee."),
+            new("Contracts", "redemptionValue", "Valeur de rachat estimée ou calculée."),
             new("Contracts", "currency", "Devise de référence du contrat."),
             new("Contracts", "managementFeesRate", "Taux de frais de gestion applicable au contrat lorsque défini au niveau contrat."),
             new("Contracts", "entryFeesRate", "Taux de frais d'entrée applicable aux versements."),
@@ -684,12 +684,12 @@ namespace api.Services
             new("Products", "productTypeId", "Type de produit issu du référentiel produit."),
             new("Products", "lifecycleStatus", "Statut du cycle de vie: brouillon, actif, archivé ou retiré."),
             new("Products", "commercialLaunchDate", "Date de lancement commercial du produit."),
-            new("Products", "commercialEndDate", "Date de fin de commercialisation si le produit n'est plus ouvert a la vente."),
+            new("Products", "commercialEndDate", "Date de fin de commercialisation si le produit n'est plus ouvert à la vente."),
             new("Products", "minimumInitialPayment", "Montant minimal requis pour ouvrir un contrat sur ce produit."),
             new("Products", "minimumAdditionalPayment", "Montant minimal d'un versement libre ultérieur."),
             new("Products", "minimumScheduledPayment", "Montant minimal d'un versement programmé."),
             new("Products", "managementModes", "Modes de gestion proposés par le produit."),
-            new("Products", "managementFeePolicy", "Politique de frais de gestion appliquée par defaut au produit."),
+            new("Products", "managementFeePolicy", "Politique de frais de gestion appliquée par défaut au produit."),
             new("Products", "operationFeePolicies", "Règles de frais applicables aux opérations du produit."),
             new("Products", "documentAssignments", "Documents contractuels ou précontractuels rattachés au produit."),
 
@@ -701,9 +701,9 @@ namespace api.Services
             new("Brands", "logoUrl", "Adresse ou chemin du logo utilisé dans l'application."),
             new("Brands", "website", "Site web officiel de la marque."),
             new("Brands", "contactEmail", "Adresse e-mail de contact principale."),
-            new("Brands", "country", "Pays de rattachément de la marque."),
+            new("Brands", "country", "Pays de rattachement de la marque."),
             new("Brands", "city", "Ville principale ou siège de la marque."),
-            new("Brands", "foundedYear", "Annee de création de la marque."),
+            new("Brands", "foundedYear", "Année de création de la marque."),
             new("Brands", "founder", "Fondateur ou origine de la marque."),
             new("Brands", "industry", "Secteur d'activité principal."),
             new("Brands", "mainColor", "Couleur dominante utilisée pour l'identité visuelle."),
@@ -721,7 +721,7 @@ namespace api.Services
             new("Insurers", "country", "Pays d'établissement de l'assureur."),
             new("Insurers", "address", "Adresse du siège ou de contact de l'assureur."),
             new("Insurers", "email", "Adresse e-mail principale de contact."),
-            new("Insurers", "phone", "Numéro de telephone principal."),
+            new("Insurers", "phone", "Numéro de téléphone principal."),
             new("Insurers", "website", "Site web officiel de l'assureur."),
             new("Insurers", "isActive", "Indique si l'assureur est disponible pour les nouveaux rattachements."),
 
@@ -730,21 +730,21 @@ namespace api.Services
             new("FinancialSupports", "code", "Code interne ou technique du support."),
             new("FinancialSupports", "label", "Libellé lisible du support financier."),
             new("FinancialSupports", "supportType", "Type de support selon le référentiel financier."),
-            new("FinancialSupports", "supportNature", "Nature assurance-vie du support, par exemple fonds euros ou unite de compte."),
+            new("FinancialSupports", "supportNature", "Nature assurance-vie du support, par exemple fonds euros ou unité de compte."),
             new("FinancialSupports", "currency", "Devise de cotation ou de référence du support."),
             new("FinancialSupports", "status", "Statut de disponibilité ou de suivi du support."),
-            new("FinancialSupports", "marketingName", "Nom marketing affiche aux utilisateurs."),
-            new("FinancialSupports", "legalName", "Dénomination juridique complete."),
-            new("FinancialSupports", "AMFCode", "Code AMF lorsque le support est référence par l'AMF."),
+            new("FinancialSupports", "marketingName", "Nom marketing affiché aux utilisateurs."),
+            new("FinancialSupports", "legalName", "Dénomination juridique complète."),
+            new("FinancialSupports", "AMFCode", "Code AMF lorsque le support est référencé par l'AMF."),
             new("FinancialSupports", "bloombergCode", "Code Bloomberg du support."),
             new("FinancialSupports", "morningstarCode", "Code Morningstar du support."),
-            new("FinancialSupports", "CUSIP", "Identifiant CUSIP pour les marchés concernes."),
-            new("FinancialSupports", "SEDOL", "Identifiant SEDOL pour les marchés concernes."),
-            new("FinancialSupports", "assetManager", "Societe de gestion responsable du support."),
+            new("FinancialSupports", "CUSIP", "Identifiant CUSIP pour les marchés concernés."),
+            new("FinancialSupports", "SEDOL", "Identifiant SEDOL pour les marchés concernés."),
+            new("FinancialSupports", "assetManager", "Société de gestion responsable du support."),
             new("FinancialSupports", "depositaryBank", "Banque dépositaire du support."),
             new("FinancialSupports", "custodian", "Conservateur ou teneur de compte titres."),
             new("FinancialSupports", "inceptionDate", "Date de lancement du support."),
-            new("FinancialSupports", "closureDate", "Date de clôture ou de ferméture du support."),
+            new("FinancialSupports", "closureDate", "Date de clôture ou de fermeture du support."),
             new("FinancialSupports", "isClosed", "Indique si le support est fermé."),
             new("FinancialSupports", "assetClass", "Classe d'actifs principale du support."),
             new("FinancialSupports", "subAssetClass", "Sous-classe d'actifs du support."),
@@ -776,20 +776,20 @@ namespace api.Services
             new("FinancialSupports", "sfdrClassification", "Classification SFDR du support."),
             new("FinancialSupports", "esgScore", "Score ESG disponible pour le support."),
             new("FinancialSupports", "esgScoreProvider", "Fournisseur du score ESG."),
-            new("FinancialSupports", "mifidTargetMarket", "Marche cible MiFID du support."),
-            new("FinancialSupports", "mifidRiskTolerance", "Tolerance au risque MiFID associée."),
-            new("FinancialSupports", "mifidClientType", "Type de client MiFID vise."),
-            new("FinancialSupports", "lastValuationAmount", "Derniere valeur liquidative ou valorisation connue."),
-            new("FinancialSupports", "lastValuationDate", "Date de la derniere valorisation connue."),
-            new("FinancialSupports", "weeklyVolatility", "Volatilite hebdomadaire estimée ou importee."),
-            new("FinancialSupports", "maxDrawdown1Y", "Perte maximale observee sur un an."),
+            new("FinancialSupports", "mifidTargetMarket", "Marché cible MiFID du support."),
+            new("FinancialSupports", "mifidRiskTolerance", "Tolérance au risque MiFID associée."),
+            new("FinancialSupports", "mifidClientType", "Type de client MiFID visé."),
+            new("FinancialSupports", "lastValuationAmount", "Dernière valeur liquidative ou valorisation connue."),
+            new("FinancialSupports", "lastValuationDate", "Date de la dernière valorisation connue."),
+            new("FinancialSupports", "weeklyVolatility", "Volatilité hebdomadaire estimée ou importée."),
+            new("FinancialSupports", "maxDrawdown1Y", "Perte maximale observée sur un an."),
             new("FinancialSupports", "distributor", "Distributeur principal du support."),
             new("FinancialSupports", "isAvailableOnline", "Indique si le support est disponible en ligne."),
-            new("FinancialSupports", "isAdvisedSale", "Indique si la vente conseillee est requise ou recommandee."),
+            new("FinancialSupports", "isAdvisedSale", "Indique si la vente conseillée est requise ou recommandée."),
             new("FinancialSupports", "isEligiblePEA", "Indique si le support est éligible au PEA."),
             new("FinancialSupports", "countryOfDistribution", "Pays de distribution du support."),
             new("FinancialSupports", "fundDomicile", "Pays ou juridiction de domiciliation du fonds."),
-            new("FinancialSupports", "primaryListingMarket", "Marche de cotation principal."),
+            new("FinancialSupports", "primaryListingMarket", "Marché de cotation principal."),
             new("FinancialSupports", "isFundOfFunds", "Indique si le support investit principalement dans d'autres fonds."),
 
             // Opérations
@@ -812,24 +812,24 @@ namespace api.Services
             new("BeneficiaryClauses", "clauseText", "Texte juridique de la clause bénéficiaire."),
             new("BeneficiaryClauses", "isActive", "Indique si la clause est active et applicable."),
             new("BeneficiaryClauses", "contractId", "Contrat auquel la clause est rattachée."),
-            new("BeneficiaryClauses", "beneficiaries", "Liste des bénéficiaires et leurs modalités de repartition."),
+            new("BeneficiaryClauses", "beneficiaries", "Liste des bénéficiaires et leurs modalités de répartition."),
 
             // Roles et permissions
-            new("Roles", "roleCode", "Code stable utilisé par les regles d'autorisation."),
+            new("Roles", "roleCode", "Code stable utilisé par les règles d'autorisation."),
             new("Roles", "roleName", "Nom lisible du rôle."),
             new("Roles", "description", "Explication du périmètre fonctionnel du rôle."),
-            new("Roles", "isSystem", "Indique si le role est géré par le systeme."),
+            new("Roles", "isSystem", "Indique si le rôle est géré par le système."),
             new("Roles", "privilegeRank", "Niveau de privilège relatif du rôle."),
             new("Permissions", "permissionCode", "Code technique de la permission."),
             new("Permissions", "permissionName", "Nom lisible de la permission."),
-            new("Permissions", "description", "Explication de l'action ou du périmètre autorise."),
-            new("Permissions", "isSystem", "Indique si la permission appartient au catalogue systeme."),
+            new("Permissions", "description", "Explication de l'action ou du périmètre autorisé."),
+            new("Permissions", "isSystem", "Indique si la permission appartient au catalogue système."),
 
-            // Descriptions elles-memes
+            // Descriptions elles-mêmes
             new("FieldDescriptions", "entityName", "Nom de l'écran ou de la table auquel la description est rattachée."),
             new("FieldDescriptions", "fieldName", "Nom technique du champ documenté."),
-            new("FieldDescriptions", "description", "Texte explicatif affiche dans les formulaires et fiches de lecture."),
-            new("FieldDescriptions", "locked", "Indique si la description provient du catalogue systeme."),
+            new("FieldDescriptions", "description", "Texte explicatif affiché dans les formulaires et fiches de lecture."),
+            new("FieldDescriptions", "locked", "Indique si la description provient du catalogue système."),
 
             // CMDB / cartographie
             new("ConfigurationItems", "name", "Nom de l'élément de configuration."),
@@ -838,13 +838,13 @@ namespace api.Services
             new("ConfigurationItems", "status", "Statut de vie de l'élément."),
             new("ConfigurationItems", "description", "Description fonctionnelle ou technique de l'élément."),
             new("ConfigurationItems", "responsibleEmployer", "Entité ou employeur responsable de l'élément."),
-            new("ConfigurationItems", "applicationProfile", "Profil applicatif rattaché a l'élément."),
-            new("ExchangePatterns", "code", "Code du pattern d'echange."),
-            new("ExchangePatterns", "name", "Nom du pattern d'echange."),
-            new("ExchangePatterns", "description", "Description du scénario ou modèle d'echange."),
+            new("ConfigurationItems", "applicationProfile", "Profil applicatif rattaché à l'élément."),
+            new("ExchangePatterns", "code", "Code du pattern d'échange."),
+            new("ExchangePatterns", "name", "Nom du pattern d'échange."),
+            new("ExchangePatterns", "description", "Description du scénario ou modèle d'échange."),
             new("IntegrationFlows", "name", "Nom du flux d'intégration."),
-            new("IntegrationFlows", "source", "Application ou systeme source du flux."),
-            new("IntegrationFlows", "target", "Application ou systeme cible du flux."),
+            new("IntegrationFlows", "source", "Application ou système source du flux."),
+            new("IntegrationFlows", "target", "Application ou système cible du flux."),
             new("IntegrationFlows", "technology", "Technologie ou protocole utilisé par le flux."),
             new("IntegrationFlows", "description", "Description fonctionnelle du flux."),
 
@@ -864,20 +864,20 @@ namespace api.Services
             new("BeneficiaryOrganizations", "address", "Adresse officielle de l'organisme."),
             new("BeneficiaryOrganizations", "isEligibleForTaxReceipt", "Indique si l'organisme peut émettre des reçus fiscaux."),
             new("TaxReceipts", "receiptNumber", "Numéro unique du reçu fiscal."),
-            new("TaxReceipts", "donationId", "Don ayant donne lieu au reçu fiscal."),
+            new("TaxReceipts", "donationId", "Don ayant donné lieu au reçu fiscal."),
             new("TaxReceipts", "issueDate", "Date d'émission du reçu fiscal."),
             new("TaxReceipts", "amount", "Montant retenu sur le reçu fiscal."),
 
-            // Fiscalite et avances
+            // Fiscalité et avances
             new("TaxProfiles", "label", "Libellé du profil fiscal."),
-            new("TaxProfiles", "contractFamily", "Famille de contrat concernee par le profil fiscal."),
+            new("TaxProfiles", "contractFamily", "Famille de contrat concernée par le profil fiscal."),
             new("TaxProfiles", "description", "Description des hypothèses fiscales du profil."),
             new("Advances", "advanceNumber", "Numéro de l'avance."),
-            new("Advances", "contractId", "Contrat rattaché a l'avance."),
-            new("Advances", "requestedAmount", "Montant demande par le client."),
+            new("Advances", "contractId", "Contrat rattaché à l'avance."),
+            new("Advances", "requestedAmount", "Montant demandé par le client."),
             new("Advances", "approvedAmount", "Montant accordé après instruction."),
             new("Advances", "outstandingCapital", "Capital restant dû au titre de l'avance."),
-            new("Advances", "interestRate", "Taux d'intérêt applicable a l'avance."),
+            new("Advances", "interestRate", "Taux d'intérêt applicable à l'avance."),
             new("Advances", "status", "Statut d'instruction ou de vie de l'avance."),
 
             // Compartiments

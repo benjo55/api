@@ -1,6 +1,7 @@
 
 using System.Data.SqlClient;
 using api.Data;
+using api.Dtos.Generic;
 using api.Dtos.Insurer;
 using api.Helpers;
 using api.Interfaces;
@@ -22,10 +23,15 @@ namespace api.Controllers
     {
         private readonly ApplicationDBContext _context;
         private readonly IInsurerRepository _insurerRepository;
-        public InsurerController(ApplicationDBContext context, IInsurerRepository InsurerRepository)
+        private readonly IInseeSireneService _inseeSireneService;
+        public InsurerController(
+            ApplicationDBContext context,
+            IInsurerRepository InsurerRepository,
+            IInseeSireneService inseeSireneService)
         {
             _insurerRepository = InsurerRepository;
             _context = context;
+            _inseeSireneService = inseeSireneService;
         }
 
         [HttpGet]
@@ -34,8 +40,15 @@ namespace api.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
             var Insurers = await _insurerRepository.GetAllAsync(query);
-            var InsurerDto = Insurers.Items.Select(p => p.ToInsurerDto());
-            return Ok(Insurers);
+            var InsurerDto = Insurers.Items.Select(p => p.ToInsurerDto()).ToList();
+            return Ok(new PagedResult<InsurerDto>
+            {
+                Items = InsurerDto,
+                TotalCount = Insurers.TotalCount,
+                TotalPages = Insurers.TotalPages,
+                HasNextPage = Insurers.HasNextPage,
+                CurrentPage = Insurers.CurrentPage
+            });
         }
 
         [HttpGet("{id:int}")]
@@ -47,12 +60,34 @@ namespace api.Controllers
             return Ok(Insurer.ToInsurerDto());
         }
 
+        [HttpGet("sirene-search")]
+        public async Task<IActionResult> SearchSirene(
+            [FromQuery] string search,
+            [FromQuery] int limit = 10,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(search) || search.Trim().Length < 3)
+            {
+                return Ok(new { items = Array.Empty<InsurerSireneSearchDto>() });
+            }
+
+            try
+            {
+                var items = await _inseeSireneService.SearchInsurersAsync(search, limit, cancellationToken);
+                return Ok(new { items });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateInsurerRequestDto InsurerDto)
         {
             var InsurerModel = InsurerDto.ToInsurerFromCreateDto();
             await _insurerRepository.CreateAsync(InsurerModel);
-            return CreatedAtAction(nameof(GetById), new { Id = InsurerModel.Id }, InsurerModel);
+            return CreatedAtAction(nameof(GetById), new { Id = InsurerModel.Id }, InsurerModel.ToInsurerDto());
         }
 
         [HttpPut]

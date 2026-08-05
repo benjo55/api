@@ -8,6 +8,10 @@ using api.Configuration;
 using api.Middleware;
 using api.Services.Pdf;
 using api.Services.Pdf.Templates;
+using api.Services.Documents.Core;
+using api.Services.Documents.Definitions;
+using api.Services.Documents.Providers;
+using api.Services.Documents.Renderers;
 using api.Services.LegalDocuments;
 using api.Services.Cmdb;
 using api.Services.Workflow;
@@ -25,6 +29,7 @@ using QuestPDF.Infrastructure;
 using Quartz;
 using System.Text;
 using System.Text.Json.Serialization;
+using api.Interfaces.Documents;
 
 namespace api.Extensions
 {
@@ -315,6 +320,40 @@ namespace api.Extensions
             services.AddScoped<ITaxEngineService, TaxEngineService>();
             services.AddScoped<IPdfDocumentService, PdfDocumentService>();
             services.AddScoped<IPdfBusinessDocumentService, PdfBusinessDocumentService>();
+            services.AddScoped<IDocumentGenerationService, DocumentGenerationService>();
+            services.AddScoped<IDocumentDefinitionRegistry, DocumentDefinitionRegistry>();
+            services.AddScoped<ContractSituationDocumentDataProvider>();
+            services.AddScoped<ContractSituationQuestPdfRenderer>();
+            services.AddScoped<InformationSystemCartographyDataProvider>();
+            services.AddScoped<InformationSystemCartographyQuestPdfRenderer>();
+            services.AddSingleton(new DocumentDefinition(
+                "contract-situation",
+                "Situation du contrat",
+                "questpdf-contract-situation-v1",
+                "Situation_contrat_{subjectId}_{date}.pdf",
+                "A4",
+                "Portrait",
+                null,
+                SupportsPreview: true,
+                SupportsDownload: true,
+                SupportsArchive: false,
+                SupportsEmail: false,
+                typeof(ContractSituationDocumentDataProvider),
+                typeof(ContractSituationQuestPdfRenderer)));
+            services.AddSingleton(new DocumentDefinition(
+                "information-system-cartography",
+                "Cartographie du SI",
+                "questpdf-cmdb-cartography-v1",
+                "Cartographie_SI_{subjectId}_{date}.pdf",
+                "A3",
+                "Landscape",
+                null,
+                SupportsPreview: true,
+                SupportsDownload: true,
+                SupportsArchive: false,
+                SupportsEmail: false,
+                typeof(InformationSystemCartographyDataProvider),
+                typeof(InformationSystemCartographyQuestPdfRenderer)));
             services.AddScoped<IDocumentStructureService, DocumentStructureService>();
             services.AddScoped<ILegalDocumentImportService, LegalDocumentImportService>();
             services.AddScoped<IDocumentNumberingService, DocumentNumberingService>();
@@ -379,6 +418,8 @@ namespace api.Extensions
             services.AddScoped<IAuthenticationAccountService, AuthenticationAccountService>();
             services.AddScoped<IUserAdministrationService, UserAdministrationService>();
             services.AddScoped<ICurrentUserAccessService, CurrentUserAccessService>();
+            services.AddScoped<IInseeGeoService, InseeGeoService>();
+            services.AddScoped<IInseeSireneService, InseeSireneService>();
             services.AddScoped<ISubscriptionDraftService, SubscriptionDraftService>();
             services.AddScoped<ISubscriptionDocumentService, SubscriptionDocumentService>();
             services.AddScoped<ISubscriptionMfaService, SubscriptionMfaService>();
@@ -416,6 +457,20 @@ namespace api.Extensions
             {
                 client.Timeout = TimeSpan.FromSeconds(8);
                 client.DefaultRequestHeaders.UserAgent.ParseAdd("LifePersonalDashboard/1.0");
+            });
+            services.AddHttpClient("insee-sirene", (sp, client) =>
+            {
+                var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<InseeSireneOptions>>().Value;
+                client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+                client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+            });
+            services.AddHttpClient("insee-geo", (sp, client) =>
+            {
+                var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<InseeSireneOptions>>().Value;
+                client.BaseAddress = new Uri(options.GeoBaseUrl.TrimEnd('/') + "/");
+                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+                client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
             });
             services.AddHttpClient("helloasso-auth", (sp, client) =>
             {
@@ -479,6 +534,13 @@ namespace api.Extensions
                 .Bind(config.GetSection(DonationCheckoutOptions.SectionName))
                 .ValidateDataAnnotations()
                 .Validate(o => o.MaxAmountEur >= o.MinAmountEur, "DonationCheckout:MaxAmountEur doit etre >= MinAmountEur")
+                .ValidateOnStart();
+            services
+                .AddOptions<InseeSireneOptions>()
+                .Bind(config.GetSection(InseeSireneOptions.SectionName))
+                .ValidateDataAnnotations()
+                .Validate(o => Uri.TryCreate(o.BaseUrl, UriKind.Absolute, out _), "Insee:BaseUrl doit etre une URL absolue")
+                .Validate(o => Uri.TryCreate(o.GeoBaseUrl, UriKind.Absolute, out _), "Insee:GeoBaseUrl doit etre une URL absolue")
                 .ValidateOnStart();
             services
                 .AddOptions<SubscriptionOperationsOptions>()

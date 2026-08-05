@@ -21,6 +21,9 @@ namespace api.Data
         // 🔹 Déclaration de tous les DbSet
         public DbSet<Person> Persons { get; set; }
         public DbSet<Insurer> Insurers { get; set; }
+        public DbSet<InsurerAuthorization> InsurerAuthorizations { get; set; }
+        public DbSet<InsurerContactPoint> InsurerContactPoints { get; set; }
+        public DbSet<InsurerSolvencyMetric> InsurerSolvencyMetrics { get; set; }
         public DbSet<Notary> Notaries { get; set; }
         public DbSet<Contract> Contracts { get; set; }
         public DbSet<Product> Products { get; set; }
@@ -174,7 +177,119 @@ namespace api.Data
                     .HasFilter("[UserId] IS NOT NULL")
                     .HasDatabaseName("UX_Persons_UserId");
             });
-            modelBuilder.Entity<Insurer>().ToTable("Insurers");
+            modelBuilder.Entity<Insurer>(entity =>
+            {
+                entity.ToTable("Insurers");
+                entity.Property(i => i.Name).IsRequired();
+                entity.Property(i => i.LegalName).HasMaxLength(250);
+                entity.Property(i => i.TradeName).HasMaxLength(200);
+                entity.Property(i => i.Acronym).HasMaxLength(40);
+                entity.Property(i => i.InternalCode).HasMaxLength(80);
+                entity.Property(i => i.LegalForm).HasMaxLength(120);
+                entity.Property(i => i.InsurerType).HasMaxLength(60);
+                entity.Property(i => i.IncorporationCountryCode).HasMaxLength(2);
+                entity.Property(i => i.Siren).HasMaxLength(9);
+                entity.Property(i => i.HeadquartersSiret).HasMaxLength(14);
+                entity.Property(i => i.RcsCity).HasMaxLength(120);
+                entity.Property(i => i.RcsNumber).HasMaxLength(120);
+                entity.Property(i => i.VatNumber).HasMaxLength(40);
+                entity.Property(i => i.Lei).HasMaxLength(20);
+                entity.Property(i => i.ApeNafCode).HasMaxLength(20);
+                entity.Property(i => i.HomeCountryCode).HasMaxLength(2);
+                entity.Property(i => i.SupervisoryAuthorityName).HasMaxLength(200);
+                entity.Property(i => i.SupervisoryAuthorityCountryCode).HasMaxLength(2);
+                entity.Property(i => i.SupervisoryRegisterName).HasMaxLength(200);
+                entity.Property(i => i.SupervisoryRegisterId).HasMaxLength(120);
+                entity.Property(i => i.EiopaRegisterId).HasMaxLength(120);
+                entity.Property(i => i.ExerciseRegime).HasMaxLength(60);
+                entity.Property(i => i.RegulatoryStatus).HasMaxLength(60);
+                entity.Property(i => i.ShortDescription).HasMaxLength(500);
+                entity.Property(i => i.AssetsUnderManagement).HasPrecision(20, 2);
+                entity.Property(i => i.ParentLei).HasMaxLength(20);
+                entity.Property(i => i.UltimateParentLei).HasMaxLength(20);
+                entity.Property(i => i.OwnershipPercentage).HasPrecision(5, 2);
+                entity.Property(i => i.RatingAgency).HasMaxLength(120);
+                entity.Property(i => i.Rating).HasMaxLength(40);
+                entity.Property(i => i.RatingOutlook).HasMaxLength(80);
+                entity.Property(i => i.DataSourceType).HasMaxLength(60);
+                entity.Property(i => i.SourceName).HasMaxLength(160);
+                entity.Property(i => i.SourceReference).HasMaxLength(160);
+                entity.Property(i => i.VerifiedBy).HasMaxLength(120);
+                entity.Property(i => i.VerificationStatus).HasMaxLength(60);
+
+                entity.HasIndex(i => i.Siren)
+                    .IsUnique()
+                    .HasFilter("[Siren] IS NOT NULL")
+                    .HasDatabaseName("UX_Insurers_Siren");
+                entity.HasIndex(i => i.Lei)
+                    .IsUnique()
+                    .HasFilter("[Lei] IS NOT NULL")
+                    .HasDatabaseName("UX_Insurers_Lei");
+                entity.HasIndex(i => i.InternalCode)
+                    .HasDatabaseName("IX_Insurers_InternalCode");
+                entity.HasIndex(i => i.RegulatoryStatus)
+                    .HasDatabaseName("IX_Insurers_RegulatoryStatus");
+
+                entity.HasMany(i => i.Authorizations)
+                    .WithOne(a => a.Insurer)
+                    .HasForeignKey(a => a.InsurerId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasMany(i => i.ContactPoints)
+                    .WithOne(c => c.Insurer)
+                    .HasForeignKey(c => c.InsurerId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasMany(i => i.SolvencyMetrics)
+                    .WithOne(s => s.Insurer)
+                    .HasForeignKey(s => s.InsurerId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+            modelBuilder.Entity<InsurerAuthorization>(entity =>
+            {
+                entity.ToTable("InsurerAuthorizations");
+                entity.Property(a => a.AuthorityName).HasMaxLength(200);
+                entity.Property(a => a.AuthorityCountryCode).HasMaxLength(2);
+                entity.Property(a => a.RegisterName).HasMaxLength(200);
+                entity.Property(a => a.RegisterReference).HasMaxLength(120);
+                entity.Property(a => a.AuthorizationType).HasMaxLength(80);
+                entity.Property(a => a.InsuranceBranchCode).HasMaxLength(40);
+                entity.Property(a => a.InsuranceBranchLabel).HasMaxLength(200);
+                entity.Property(a => a.BusinessCategory).HasMaxLength(40);
+                entity.Property(a => a.HostCountryCode).HasMaxLength(2);
+                entity.Property(a => a.ExerciseRegime).HasMaxLength(60);
+                entity.Property(a => a.Status).HasMaxLength(60);
+                entity.HasIndex(a => new { a.InsurerId, a.HostCountryCode, a.InsuranceBranchCode })
+                    .HasDatabaseName("IX_InsurerAuthorizations_Insurer_Country_Branch");
+            });
+            modelBuilder.Entity<InsurerContactPoint>(entity =>
+            {
+                entity.ToTable("InsurerContactPoints");
+                entity.Property(c => c.ContactType).HasMaxLength(60);
+                entity.Property(c => c.Label).HasMaxLength(160);
+                entity.Property(c => c.DepartmentName).HasMaxLength(160);
+                entity.Property(c => c.ContactName).HasMaxLength(160);
+                entity.Property(c => c.AddressLine1).HasMaxLength(250);
+                entity.Property(c => c.AddressLine2).HasMaxLength(250);
+                entity.Property(c => c.PostalCode).HasMaxLength(30);
+                entity.Property(c => c.City).HasMaxLength(120);
+                entity.Property(c => c.Region).HasMaxLength(120);
+                entity.Property(c => c.CountryCode).HasMaxLength(2);
+                entity.Property(c => c.Phone).HasMaxLength(40);
+                entity.Property(c => c.Email).HasMaxLength(254);
+                entity.HasIndex(c => new { c.InsurerId, c.ContactType, c.IsPrimary })
+                    .HasDatabaseName("IX_InsurerContactPoints_Insurer_Type_Primary");
+            });
+            modelBuilder.Entity<InsurerSolvencyMetric>(entity =>
+            {
+                entity.ToTable("InsurerSolvencyMetrics");
+                entity.Property(s => s.EligibleOwnFunds).HasPrecision(20, 2);
+                entity.Property(s => s.SolvencyCapitalRequirement).HasPrecision(20, 2);
+                entity.Property(s => s.ScrCoverageRatio).HasPrecision(9, 4);
+                entity.Property(s => s.MinimumCapitalRequirement).HasPrecision(20, 2);
+                entity.Property(s => s.McrCoverageRatio).HasPrecision(9, 4);
+                entity.Property(s => s.Currency).HasMaxLength(3);
+                entity.HasIndex(s => new { s.InsurerId, s.ReportingYear, s.IsGroupReport })
+                    .HasDatabaseName("IX_InsurerSolvencyMetrics_Insurer_Year_Group");
+            });
             modelBuilder.Entity<Notary>().ToTable("Notaries");
             modelBuilder.Entity<Contract>().ToTable("Contracts");
             modelBuilder.Entity<Contract>().Property(c => c.InitialPremium).HasPrecision(20, 7);

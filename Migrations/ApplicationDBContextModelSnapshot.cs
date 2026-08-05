@@ -3943,27 +3943,172 @@ namespace api.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Acronym")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime?>("ActivityEndDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ApeNafCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal?>("AssetsUnderManagement")
+                        .HasPrecision(20, 2)
+                        .HasColumnType("decimal(20,2)");
+
+                    b.Property<DateTime?>("AuthorizationDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ComplaintsProcedureUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("CustomerCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CustomerSegmentsJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DataQualityNotes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DataSourceType")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("DistributionChannelsJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EiopaRegisterId")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
                     b.Property<string>("Email")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("EmployeeCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ExerciseRegime")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<int?>("FinancialDataYear")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FormerNamesJson")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("FoundedYear")
                         .HasColumnType("int");
 
+                    b.Property<string>("GeographicCoverage")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("GroupName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("GroupWebsiteUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("HeadQuarters")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("HeadquartersSiret")
+                        .HasMaxLength(14)
+                        .HasColumnType("nvarchar(14)");
+
+                    b.Property<string>("History")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("HomeCountryCode")
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
+                    b.Property<string>("IncorporationCountryCode")
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
+                    b.Property<DateTime?>("IncorporationDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("InsurerType")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("InternalCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
 
                     b.Property<string>("IsActive")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool?>("IsGroupHead")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("IsLifeInsurer")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("IsNonLifeInsurer")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("IsReinsurer")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("IsSubjectToSolvencyII")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("KeyFacts")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("LastVerifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LegalForm")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("LegalName")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("Lei")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<bool>("Locked")
                         .HasColumnType("bit");
+
+                    b.Property<string>("LongDescription")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("MainActivitiesJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Mission")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OfficialRegistryUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("OwnershipPercentage")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<string>("ParentLegalEntityName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ParentLei")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("PhoneNumber")
                         .HasColumnType("nvarchar(max)");
@@ -3971,19 +4116,380 @@ namespace api.Migrations
                     b.Property<string>("PostalAddress")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("PrivacyPolicyUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ProductSpecialtiesJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Rating")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("RatingAgency")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<DateTime?>("RatingDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RatingOutlook")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("RatingSourceUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RcsCity")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("RcsNumber")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
                     b.Property<string>("RegistrationNumber")
                         .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RegulatoryNotes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RegulatoryStatus")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<DateTime?>("RetrievedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ShortDescription")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Siren")
+                        .HasMaxLength(9)
+                        .HasColumnType("nvarchar(9)");
+
+                    b.Property<string>("SourceName")
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<string>("SourceReference")
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<string>("SourceUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SupervisoryAuthorityCountryCode")
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
+                    b.Property<string>("SupervisoryAuthorityName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("SupervisoryRegisterId")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("SupervisoryRegisterName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("SuspensionDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TradeName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("UltimateParentLei")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("UltimateParentName")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("UpdatedDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("ValidFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ValidTo")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("VatNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("VerificationStatus")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("VerifiedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
                     b.Property<string>("WebSite")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("WithdrawalDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InternalCode")
+                        .HasDatabaseName("IX_Insurers_InternalCode");
+
+                    b.HasIndex("Lei")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Insurers_Lei")
+                        .HasFilter("[Lei] IS NOT NULL");
+
+                    b.HasIndex("RegulatoryStatus")
+                        .HasDatabaseName("IX_Insurers_RegulatoryStatus");
+
+                    b.HasIndex("Siren")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Insurers_Siren")
+                        .HasFilter("[Siren] IS NOT NULL");
+
+                    b.ToTable("Insurers", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.InsurerAuthorization", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AuthorityCountryCode")
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
+                    b.Property<string>("AuthorityName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("AuthorizationType")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("BusinessCategory")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime?>("EffectiveFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ExerciseRegime")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("HostCountryCode")
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
+                    b.Property<string>("InsuranceBranchCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("InsuranceBranchLabel")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("InsurerId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("LastVerifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RegisterName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("RegisterReference")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("SourceUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InsurerId", "HostCountryCode", "InsuranceBranchCode")
+                        .HasDatabaseName("IX_InsurerAuthorizations_Insurer_Country_Branch");
+
+                    b.ToTable("InsurerAuthorizations", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.InsurerContactPoint", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AddressLine1")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("AddressLine2")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("ContactName")
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<string>("ContactType")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("CountryCode")
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
+                    b.Property<string>("DepartmentName")
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<DateTime?>("EffectiveFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
+
+                    b.Property<int>("InsurerId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<DateTime?>("LastVerifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("OpeningHours")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("PostalCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Region")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("SourceUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("WebsiteUrl")
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Insurers", (string)null);
+                    b.HasIndex("InsurerId", "ContactType", "IsPrimary")
+                        .HasDatabaseName("IX_InsurerContactPoints_Insurer_Type_Primary");
+
+                    b.ToTable("InsurerContactPoints", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.InsurerSolvencyMetric", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<decimal?>("EligibleOwnFunds")
+                        .HasPrecision(20, 2)
+                        .HasColumnType("decimal(20,2)");
+
+                    b.Property<int>("InsurerId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsGroupReport")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastVerifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("McrCoverageRatio")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("decimal(9,4)");
+
+                    b.Property<decimal?>("MinimumCapitalRequirement")
+                        .HasPrecision(20, 2)
+                        .HasColumnType("decimal(20,2)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ReportingDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ReportingYear")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("ScrCoverageRatio")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("decimal(9,4)");
+
+                    b.Property<string>("SfcrDocumentUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("SfcrPublicationDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("SolvencyCapitalRequirement")
+                        .HasPrecision(20, 2)
+                        .HasColumnType("decimal(20,2)");
+
+                    b.Property<string>("SourceUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InsurerId", "ReportingYear", "IsGroupReport")
+                        .HasDatabaseName("IX_InsurerSolvencyMetrics_Insurer_Year_Group");
+
+                    b.ToTable("InsurerSolvencyMetrics", (string)null);
                 });
 
             modelBuilder.Entity("api.Models.LegalDocumentDefinition", b =>
@@ -9741,6 +10247,39 @@ namespace api.Migrations
                     b.Navigation("TaxGeneration");
                 });
 
+            modelBuilder.Entity("api.Models.InsurerAuthorization", b =>
+                {
+                    b.HasOne("api.Models.Insurer", "Insurer")
+                        .WithMany("Authorizations")
+                        .HasForeignKey("InsurerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Insurer");
+                });
+
+            modelBuilder.Entity("api.Models.InsurerContactPoint", b =>
+                {
+                    b.HasOne("api.Models.Insurer", "Insurer")
+                        .WithMany("ContactPoints")
+                        .HasForeignKey("InsurerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Insurer");
+                });
+
+            modelBuilder.Entity("api.Models.InsurerSolvencyMetric", b =>
+                {
+                    b.HasOne("api.Models.Insurer", "Insurer")
+                        .WithMany("SolvencyMetrics")
+                        .HasForeignKey("InsurerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Insurer");
+                });
+
             modelBuilder.Entity("api.Models.LegalDocumentDefinition", b =>
                 {
                     b.HasOne("api.Models.LegalDocumentRevision", "CurrentDraftRevision")
@@ -10856,6 +11395,15 @@ namespace api.Migrations
                     b.Navigation("RiskProfiles");
 
                     b.Navigation("Valuations");
+                });
+
+            modelBuilder.Entity("api.Models.Insurer", b =>
+                {
+                    b.Navigation("Authorizations");
+
+                    b.Navigation("ContactPoints");
+
+                    b.Navigation("SolvencyMetrics");
                 });
 
             modelBuilder.Entity("api.Models.LegalDocumentDefinition", b =>

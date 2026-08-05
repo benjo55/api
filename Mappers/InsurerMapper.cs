@@ -1,9 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using api.Dtos.Insurer;
 using api.Models;
+using Mapster;
 
 namespace api.Mappers
 {
@@ -12,39 +9,30 @@ namespace api.Mappers
     {
         public static InsurerDto ToInsurerDto(this Insurer InsurerModel)
         {
-            return new InsurerDto
-            {
-                Id = InsurerModel.Id,
-                Name = InsurerModel.Name,
-                RegistrationNumber = InsurerModel.RegistrationNumber,
-                FoundedYear = InsurerModel.FoundedYear,
-                HeadQuarters = InsurerModel.HeadQuarters,
-                PhoneNumber = InsurerModel.PhoneNumber,
-                Email = InsurerModel.Email,
-                WebSite = InsurerModel.WebSite,
-                PostalAddress = InsurerModel.PostalAddress,
-                IsActive = InsurerModel.IsActive,
-                CreatedDate = InsurerModel.CreatedDate,
-                UpdatedDate = InsurerModel.UpdatedDate,
-            };
+            var dto = InsurerModel.Adapt<InsurerDto>();
+            dto.AuthorizationCount = InsurerModel.AuthorizationCount != 0
+                ? InsurerModel.AuthorizationCount
+                : InsurerModel.Authorizations?.Count ?? 0;
+            dto.ExerciseCountryCount = InsurerModel.ExerciseCountryCount;
+            return dto;
         }
         public static Insurer ToInsurerFromCreateDto(this CreateInsurerRequestDto InsurerDto)
 
         {
-            return new Insurer
-            {
-                Name = InsurerDto.Name,
-                RegistrationNumber = InsurerDto.RegistrationNumber,
-                FoundedYear = InsurerDto.FoundedYear,
-                HeadQuarters = InsurerDto.HeadQuarters,
-                PhoneNumber = InsurerDto.PhoneNumber,
-                Email = InsurerDto.Email,
-                WebSite = InsurerDto.WebSite,
-                PostalAddress = InsurerDto.PostalAddress,
-                IsActive = InsurerDto.IsActive,
-                CreatedDate = InsurerDto.CreatedDate,
-                UpdatedDate = InsurerDto.UpdatedDate,
-            };
+            var insurer = InsurerDto.Adapt<Insurer>();
+            ApplyInputNormalization(insurer);
+            return insurer;
+        }
+
+        public static void ApplyInputNormalization(this Insurer insurer)
+        {
+            insurer.Name = string.IsNullOrWhiteSpace(insurer.Name)
+                ? insurer.TradeName ?? insurer.LegalName ?? string.Empty
+                : insurer.Name;
+            insurer.Lei = insurer.Lei?.ToUpperInvariant();
+            insurer.ParentLei = insurer.ParentLei?.ToUpperInvariant();
+            insurer.UltimateParentLei = insurer.UltimateParentLei?.ToUpperInvariant();
+            insurer.UpdatedDate ??= DateTime.UtcNow;
         }
     }
 }
