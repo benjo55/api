@@ -31,17 +31,20 @@ namespace api.Services
         private readonly IEmailService _emailService;
         private readonly AuthenticationOptions _options;
         private readonly ILogger<AuthenticationAccountService> _logger;
+        private readonly IPublicOriginResolver? _publicOriginResolver;
 
         public AuthenticationAccountService(
             ApplicationDBContext db,
             IEmailService emailService,
             IOptions<AuthenticationOptions> options,
-            ILogger<AuthenticationAccountService> logger)
+            ILogger<AuthenticationAccountService> logger,
+            IPublicOriginResolver? publicOriginResolver = null)
         {
             _db = db;
             _emailService = emailService;
             _options = options.Value;
             _logger = logger;
+            _publicOriginResolver = publicOriginResolver;
         }
 
         public async Task<RegisterAccountResult> RegisterAsync(
@@ -556,7 +559,7 @@ namespace api.Services
 
         private async Task SendWelcomeEmailAsync(User user, CancellationToken cancellationToken)
         {
-            var profileLink = $"{_options.FrontendBaseUrl.TrimEnd('/')}/my-space";
+            var profileLink = $"{ResolveFrontendOrigin()}/my-space";
             var html = BuildWelcomeEmail(user, profileLink);
             var sent = await _emailService.SendEmailAsync(
                 user.Email,
@@ -592,7 +595,7 @@ namespace api.Services
 
         private string BuildLink(string path, int userId, string rawToken)
         {
-            var baseUrl = _options.FrontendBaseUrl.TrimEnd('/');
+            var baseUrl = ResolveFrontendOrigin();
             return QueryHelpers.AddQueryString(
                 $"{baseUrl}/{path}",
                 new Dictionary<string, string?>
@@ -600,6 +603,19 @@ namespace api.Services
                     ["userId"] = userId.ToString(),
                     ["token"] = rawToken
                 });
+        }
+
+        private string ResolveFrontendOrigin()
+        {
+            try
+            {
+                return _publicOriginResolver?.ResolveCurrent().Origin
+                    ?? _options.FrontendBaseUrl.TrimEnd('/');
+            }
+            catch
+            {
+                return _options.FrontendBaseUrl.TrimEnd('/');
+            }
         }
 
         private static string BuildActionEmail(

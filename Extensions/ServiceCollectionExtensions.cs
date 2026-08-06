@@ -50,16 +50,42 @@ namespace api.Extensions
     public static class ServiceCollectionExtensions
     {
         // --- CONFIG CORS ---
-        public static IServiceCollection AddApiCors(this IServiceCollection services)
+        public static IServiceCollection AddApiCors(this IServiceCollection services, IConfiguration config)
         {
             services.AddCors(options =>
+            {
                 options.AddPolicy("AllowAllHeaders", policy =>
                     policy.AllowAnyOrigin()
                         .AllowAnyHeader()
                         .AllowAnyMethod()
-                        .WithExposedHeaders("Content-Disposition")
-                )
-            );
+                        .WithExposedHeaders("Content-Disposition"));
+
+                var publicOrigins = config
+                    .GetSection(PublicOriginOptions.SectionName)
+                    .Get<PublicOriginOptions>();
+                var allowedOrigins = publicOrigins?.Experiences.Values
+                    .Select(x => x.Origin?.Trim().TrimEnd('/'))
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray() ?? [];
+
+                options.AddPolicy("ConfiguredCors", policy =>
+                {
+                    if (allowedOrigins.Length > 0)
+                    {
+                        policy.WithOrigins(allowedOrigins!)
+                            .AllowAnyHeader()
+                            .AllowAnyMethod()
+                            .WithExposedHeaders("Content-Disposition");
+                    }
+                    else
+                    {
+                        policy.AllowAnyHeader()
+                            .AllowAnyMethod()
+                            .WithExposedHeaders("Content-Disposition");
+                    }
+                });
+            });
             return services;
         }
 
@@ -273,6 +299,13 @@ namespace api.Extensions
 
             QuestPDF.Settings.License = LicenseType.Community;
             services.AddMemoryCache();
+            services
+                .AddOptions<PublicOriginOptions>()
+                .Bind(config.GetSection(PublicOriginOptions.SectionName))
+                .Validate(o => o.Experiences.ContainsKey(o.DefaultExperience), "PublicOrigins:DefaultExperience doit exister dans Experiences")
+                .Validate(o => o.Experiences.Values.All(x => Uri.TryCreate(x.Origin, UriKind.Absolute, out _)), "Chaque PublicOrigins:Experiences:*:Origin doit etre une URL absolue")
+                .ValidateOnStart();
+            services.AddScoped<IPublicOriginResolver, PublicOriginResolver>();
 
             services.AddScoped<IPersonRepository, PersonRepository>();
             services.AddScoped<IInsurerRepository, InsurerRepository>();

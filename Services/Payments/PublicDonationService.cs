@@ -23,6 +23,7 @@ namespace api.Services.Payments
         private readonly ITaxReceiptEmailService _taxReceiptEmailService;
         private readonly IDonationReceiptAccessTokenService _receiptTokenService;
         private readonly ILogger<PublicDonationService> _logger;
+        private readonly IPublicOriginResolver? _publicOriginResolver;
 
         public PublicDonationService(
             ApplicationDBContext db,
@@ -32,7 +33,8 @@ namespace api.Services.Payments
             ITaxReceiptService taxReceiptService,
             ITaxReceiptEmailService taxReceiptEmailService,
             IDonationReceiptAccessTokenService receiptTokenService,
-            ILogger<PublicDonationService> logger)
+            ILogger<PublicDonationService> logger,
+            IPublicOriginResolver? publicOriginResolver = null)
         {
             _db = db;
             _paymentProvider = paymentProvider;
@@ -42,6 +44,7 @@ namespace api.Services.Payments
             _taxReceiptEmailService = taxReceiptEmailService;
             _receiptTokenService = receiptTokenService;
             _logger = logger;
+            _publicOriginResolver = publicOriginResolver;
         }
 
         public async Task<PublicDonationCheckoutResponse> InitializeCheckoutAsync(PublicDonationCheckoutRequest request, CancellationToken cancellationToken)
@@ -110,8 +113,8 @@ namespace api.Services.Payments
                     amountInCents,
                     _helloAssoOptions.ItemName,
                     returnUrl,
-                    _helloAssoOptions.BackUrl,
-                    _helloAssoOptions.ErrorUrl,
+                    BuildDonationUrl("/donate"),
+                    BuildDonationUrl("/donate/error"),
                     donor.FirstName,
                     donor.LastName,
                     donor.Email ?? request.Donor.Email,
@@ -541,8 +544,31 @@ namespace api.Services.Payments
 
         private string BuildReturnUrl(string publicId)
         {
-            var separator = _helloAssoOptions.ReturnUrl.Contains('?') ? "&" : "?";
-            return $"{_helloAssoOptions.ReturnUrl}{separator}donation={Uri.EscapeDataString(publicId)}";
+            var url = BuildDonationUrl("/donate/return");
+            var separator = url.Contains('?') ? "&" : "?";
+            return $"{url}{separator}donation={Uri.EscapeDataString(publicId)}";
+        }
+
+        private string BuildDonationUrl(string path)
+        {
+            try
+            {
+                return $"{_publicOriginResolver?.GetOrigin(SiteExperience.Donation) ?? GetHelloAssoFallbackOrigin()}{path}";
+            }
+            catch
+            {
+                return $"{GetHelloAssoFallbackOrigin()}{path}";
+            }
+        }
+
+        private string GetHelloAssoFallbackOrigin()
+        {
+            if (Uri.TryCreate(_helloAssoOptions.ReturnUrl, UriKind.Absolute, out var returnUri))
+            {
+                return returnUri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
+            }
+
+            return "http://localhost:5173";
         }
 
         private static string? TryRead(JsonElement root, string property)

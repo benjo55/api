@@ -45,7 +45,26 @@ namespace api.Dtos.Me
         string? ProductName,
         bool HasAlert,
         int DocumentCount,
-        int OperationCount);
+        int OperationCount,
+        DateTime? LastValuationDate,
+        string ValueStatus,
+        string? ManagementMode,
+        int? RiskLevel,
+        decimal? EuroFundPercent,
+        decimal? UnitLinkedPercent,
+        string? ObjectiveLabel,
+        bool HasPendingOperation,
+        bool HasNewDocument,
+        MeContractCapabilitiesDto Capabilities);
+
+    public sealed record MeContractCapabilitiesDto(
+        bool CanMakePayment,
+        bool CanArbitrate,
+        bool CanRedeem,
+        bool CanSchedulePayments,
+        bool CanUpdateBeneficiaryClause,
+        bool CanChangeManagementMode,
+        IReadOnlyDictionary<string, string> DisabledReasons);
 
     public sealed record MeOperationSummaryDto(
         int Id,

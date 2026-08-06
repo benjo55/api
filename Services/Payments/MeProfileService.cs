@@ -161,11 +161,12 @@ namespace api.Services.Payments
             }
 
             var personId = user.Person.Id;
-            var contracts = await _db.Contracts
+            var contractRows = await _db.Contracts
                 .AsNoTracking()
                 .Where(c => c.PersonId == personId)
                 .OrderBy(c => c.ContractNumber)
-                .Select(c => new MeContractSummaryDto(
+                .Select(c => new
+                {
                     c.Id,
                     c.ContractNumber,
                     c.ContractLabel,
@@ -178,11 +179,133 @@ namespace api.Services.Payments
                     c.PerformancePercent,
                     c.DateEffect,
                     c.DateMaturity,
-                    c.Product != null ? c.Product.ProductName : null,
+                    ProductName = c.Product != null ? c.Product.ProductName : null,
                     c.HasAlert,
-                    c.Documents.Count(),
-                    c.Operations.Count()))
+                    c.Locked,
+                    DocumentCount = c.Documents.Count(),
+                    OperationCount = c.Operations.Count()
+                })
                 .ToListAsync(cancellationToken);
+
+            var contractIds = contractRows.Select(c => c.Id).ToList();
+
+            var valuationDates = await _db.ContractValuations
+                .AsNoTracking()
+                .Where(v => contractIds.Contains(v.ContractId))
+                .GroupBy(v => v.ContractId)
+                .Select(g => new
+                {
+                    ContractId = g.Key,
+                    LastValuationDate = g.Max(v => (DateTime?)v.ValuationDate)
+                })
+                .ToDictionaryAsync(x => x.ContractId, x => x.LastValuationDate, cancellationToken);
+
+            var supportRows = await _db.FinancialSupportAllocations
+                .AsNoTracking()
+                .Where(a => contractIds.Contains(a.ContractId))
+                .Select(a => new
+                {
+                    a.ContractId,
+                    a.CurrentAmount,
+                    a.Compartment.ManagementMode,
+                    SupportNature = a.Support.SupportNature,
+                    a.Support.MifidRiskTolerance,
+                    a.Support.LastValuationDate
+                })
+                .ToListAsync(cancellationToken);
+
+            var supportsByContract = supportRows
+                .GroupBy(a => a.ContractId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            var pendingOperationContractIds = await _db.Operations
+                .AsNoTracking()
+                .Where(o => o.Contract.PersonId == personId && o.Status == OperationStatus.Pending)
+                .Select(o => o.ContractId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+            var pendingOperationContractIdSet = pendingOperationContractIds.ToHashSet();
+
+            var recentDocumentThreshold = DateTime.UtcNow.AddDays(-45);
+            var newDocumentContractIds = await _db.Documents
+                .AsNoTracking()
+                .Where(d =>
+                    d.ContractId.HasValue &&
+                    d.Contract != null &&
+                    d.Contract.PersonId == personId &&
+                    d.UploadedAt >= recentDocumentThreshold)
+                .Select(d => d.ContractId!.Value)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+            var newDocumentContractIdSet = newDocumentContractIds.ToHashSet();
+
+            var contracts = contractRows
+                .Select(c =>
+                {
+                    supportsByContract.TryGetValue(c.Id, out var contractSupports);
+                    contractSupports ??= [];
+
+                    var supportsCurrentValue = contractSupports.Sum(s => s.CurrentAmount);
+                    var euroFundValue = contractSupports
+                        .Where(s => s.SupportNature == FinancialSupportNature.EuroFund)
+                        .Sum(s => s.CurrentAmount);
+                    var unitLinkedValue = contractSupports
+                        .Where(s => s.SupportNature == FinancialSupportNature.UnitLinked)
+                        .Sum(s => s.CurrentAmount);
+                    var lastSupportValuationDate = contractSupports
+                        .Select(s => s.LastValuationDate)
+                        .Where(d => d.HasValue)
+                        .DefaultIfEmpty(null)
+                        .Max();
+                    var lastValuationDate = valuationDates.GetValueOrDefault(c.Id) ?? lastSupportValuationDate;
+                    var valueStatus = ResolveContractValueStatus(
+                        c.Status,
+                        c.CurrentValue,
+                        c.TotalPaidPremiums,
+                        lastValuationDate);
+                    var hasPendingOperation = pendingOperationContractIdSet.Contains(c.Id);
+                    var hasNewDocument = newDocumentContractIdSet.Contains(c.Id);
+
+                    return new MeContractSummaryDto(
+                        c.Id,
+                        c.ContractNumber,
+                        c.ContractLabel,
+                        c.ContractType,
+                        c.Status,
+                        c.Currency,
+                        c.CurrentValue,
+                        c.TotalPaidPremiums,
+                        c.NetInvested,
+                        c.PerformancePercent,
+                        c.DateEffect,
+                        c.DateMaturity,
+                        c.ProductName,
+                        c.HasAlert,
+                        c.DocumentCount,
+                        c.OperationCount,
+                        lastValuationDate,
+                        valueStatus,
+                        contractSupports
+                            .Select(s => s.ManagementMode)
+                            .FirstOrDefault(mode => !string.IsNullOrWhiteSpace(mode)),
+                        contractSupports
+                            .Select(s => ExtractRiskLevel(s.MifidRiskTolerance))
+                            .Where(level => level.HasValue)
+                            .DefaultIfEmpty(null)
+                            .Max(),
+                        supportsCurrentValue > 0m ? Math.Round(euroFundValue / supportsCurrentValue * 100m, 2) : null,
+                        supportsCurrentValue > 0m ? Math.Round(unitLinkedValue / supportsCurrentValue * 100m, 2) : null,
+                        null,
+                        hasPendingOperation,
+                        hasNewDocument,
+                        BuildContractCapabilities(
+                            c.Status,
+                            c.Locked,
+                            c.CurrentValue,
+                            valueStatus,
+                            hasPendingOperation));
+                })
+                .ToList();
 
             var recentOperationRows = await _db.Operations
                 .AsNoTracking()
@@ -573,6 +696,121 @@ namespace api.Services.Payments
             }
 
             return items.Take(4).ToList();
+        }
+
+        private static string ResolveContractValueStatus(
+            string status,
+            decimal currentValue,
+            decimal totalPaidPremiums,
+            DateTime? lastValuationDate)
+        {
+            var normalizedStatus = NormalizeStatus(status);
+            if (normalizedStatus.Contains("activation") || normalizedStatus.Contains("ouverture"))
+            {
+                return "activating";
+            }
+
+            if (currentValue == 0m && totalPaidPremiums == 0m)
+            {
+                return "notFunded";
+            }
+
+            if (currentValue == 0m && !lastValuationDate.HasValue)
+            {
+                return "unavailable";
+            }
+
+            if (currentValue == 0m)
+            {
+                return "zero";
+            }
+
+            return "known";
+        }
+
+        private static MeContractCapabilitiesDto BuildContractCapabilities(
+            string status,
+            bool locked,
+            decimal currentValue,
+            string valueStatus,
+            bool hasPendingOperation)
+        {
+            var disabledReasons = new Dictionary<string, string>();
+            var normalizedStatus = NormalizeStatus(status);
+            var closed = normalizedStatus.Contains("clos") || normalizedStatus.Contains("resilie");
+            var activating = normalizedStatus.Contains("activation") || normalizedStatus.Contains("ouverture");
+            var valueUnavailable = valueStatus is "unavailable" or "pending" or "error";
+
+            if (closed)
+            {
+                disabledReasons["all"] = "Contrat clôturé.";
+            }
+            else if (activating)
+            {
+                disabledReasons["all"] = "Contrat en cours d'activation.";
+            }
+            else if (locked)
+            {
+                disabledReasons["all"] = "Contrat verrouillé.";
+            }
+            else if (hasPendingOperation)
+            {
+                disabledReasons["all"] = "Une opération est déjà en cours sur ce contrat.";
+            }
+
+            if (valueUnavailable)
+            {
+                disabledReasons["value"] = "Valeur du contrat indisponible.";
+            }
+
+            if (currentValue <= 0m)
+            {
+                disabledReasons["fundedValue"] = "Valeur insuffisante pour cette opération.";
+            }
+
+            var commonAvailable = !disabledReasons.ContainsKey("all");
+            var valueAvailable = !disabledReasons.ContainsKey("value");
+            var funded = !disabledReasons.ContainsKey("fundedValue");
+
+            return new MeContractCapabilitiesDto(
+                CanMakePayment: commonAvailable,
+                CanArbitrate: commonAvailable && valueAvailable && funded,
+                CanRedeem: commonAvailable && valueAvailable && funded,
+                CanSchedulePayments: commonAvailable,
+                CanUpdateBeneficiaryClause: commonAvailable,
+                CanChangeManagementMode: commonAvailable && valueAvailable,
+                DisabledReasons: disabledReasons);
+        }
+
+        private static int? ExtractRiskLevel(string? risk)
+        {
+            if (string.IsNullOrWhiteSpace(risk)) return null;
+
+            foreach (var c in risk)
+            {
+                if (char.IsDigit(c))
+                {
+                    var value = c - '0';
+                    if (value is >= 1 and <= 7)
+                    {
+                        return value;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static string NormalizeStatus(string? status)
+        {
+            if (string.IsNullOrWhiteSpace(status)) return string.Empty;
+
+            return status
+                .Normalize(System.Text.NormalizationForm.FormD)
+                .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark)
+                .Aggregate(string.Empty, (current, c) => current + c)
+                .ToLowerInvariant()
+                .Trim();
         }
 
         [GeneratedRegex(@"^\d{5}$")]

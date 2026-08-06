@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RestoreLockedMode>false</RestoreLockedMode>
+    <UseAppHost Condition="'$(Configuration)' == 'Debug'">false</UseAppHost>
 
     <!-- Exclusions evaluated before SDK globs scan the project tree -->
     <DefaultItemExcludes>

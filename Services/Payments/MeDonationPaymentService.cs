@@ -27,6 +27,7 @@ namespace api.Services.Payments
         private readonly IBankAccountProtector _bankAccountProtector;
         private readonly HelloAssoOptions _helloAssoOptions;
         private readonly PaymentsOptions _paymentsOptions;
+        private readonly IPublicOriginResolver? _publicOriginResolver;
 
         public MeDonationPaymentService(
             ApplicationDBContext db,
@@ -34,7 +35,8 @@ namespace api.Services.Payments
             IPaymentReconciliationService reconciliationService,
             IBankAccountProtector bankAccountProtector,
             IOptions<HelloAssoOptions> helloAssoOptions,
-            IOptions<PaymentsOptions> paymentsOptions)
+            IOptions<PaymentsOptions> paymentsOptions,
+            IPublicOriginResolver? publicOriginResolver = null)
         {
             _db = db;
             _helloAssoProvider = helloAssoProvider;
@@ -42,6 +44,7 @@ namespace api.Services.Payments
             _bankAccountProtector = bankAccountProtector;
             _helloAssoOptions = helloAssoOptions.Value;
             _paymentsOptions = paymentsOptions.Value;
+            _publicOriginResolver = publicOriginResolver;
         }
 
         public async Task<MeDonationPaymentOptionsDto?> GetPaymentOptionsAsync(int userId, string publicId, CancellationToken cancellationToken)
@@ -425,9 +428,22 @@ namespace api.Services.Payments
 
         private string BuildFrontendUrl(string path, string publicId)
         {
-            var baseUrl = _paymentsOptions.PublicBaseUrl.TrimEnd('/');
+            var baseUrl = ResolveDonationOrigin();
             var separator = path.Contains('?') ? "&" : "?";
             return $"{baseUrl}{path}{separator}donation={Uri.EscapeDataString(publicId)}";
+        }
+
+        private string ResolveDonationOrigin()
+        {
+            try
+            {
+                return _publicOriginResolver?.GetOrigin(SiteExperience.Donation)
+                    ?? _paymentsOptions.PublicBaseUrl.TrimEnd('/');
+            }
+            catch
+            {
+                return _paymentsOptions.PublicBaseUrl.TrimEnd('/');
+            }
         }
 
         private async Task<string> GeneratePaymentReferenceAsync(CancellationToken cancellationToken)

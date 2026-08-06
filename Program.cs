@@ -9,7 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // --- CONFIGURATION DES SERVICES ---
 
-builder.Services.AddApiCors()
+builder.Services.AddApiCors(builder.Configuration)
     .AddApiControllers()
     .AddApiSwagger()
     .AddApiAuthentication(builder.Configuration)
@@ -202,6 +202,7 @@ app.Use(async (context, next) =>
 });
 
 app.UseMiddleware<ExceptionMiddleware>();
+app.UseMiddleware<PublicHostValidationMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
@@ -212,8 +213,7 @@ if (app.Environment.IsDevelopment())
 Console.WriteLine("✅ JWT Issuer: " + builder.Configuration["Jwt:Issuer"]);
 Console.WriteLine("✅ JWT Audience: " + builder.Configuration["Jwt:Audience"]);
 
-// Applique la policy CORS ultra permissive pour debug
-app.UseCors("DevCors");
+app.UseCors(app.Environment.IsDevelopment() ? "DevCors" : "ConfiguredCors");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
