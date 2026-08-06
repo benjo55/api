@@ -17,6 +17,7 @@ namespace api.Dtos.Pdf
 
         public string? LogoBase64 { get; set; }
         public string? LogoUrl { get; set; }
+        public string? QrCodeContent { get; set; }
 
         public List<MergePdfPartDto> AdditionalDocuments { get; set; } = new();
     }

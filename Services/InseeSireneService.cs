@@ -12,6 +12,14 @@ namespace api.Services
     public sealed class InseeSireneService : IInseeSireneService
     {
         private const string ApiKeyHeader = "X-INSEE-Api-Key-Integration";
+        private const int InternalSearchLimit = 25;
+        private static readonly string[] InsurerActivityCodes =
+        [
+            "65.11Z", // Assurance vie
+            "65.12Z", // Autres assurances
+            "65.20Z", // Reassurance
+            "65.30Z"  // Caisses de retraite
+        ];
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
         private readonly IHttpClientFactory _httpClientFactory;
@@ -49,7 +57,7 @@ namespace api.Services
             }
 
             var safeLimit = Math.Clamp(limit, 1, _options.MaxSearchResults);
-            var cacheKey = $"insee-sirene:insurer-search:{normalizedSearch}:{safeLimit}";
+            var cacheKey = $"insee-sirene:insurer-search:v2:{normalizedSearch}:{safeLimit}";
             if (_cache.TryGetValue<IReadOnlyCollection<InsurerSireneSearchDto>>(cacheKey, out var cached)
                 && cached is not null)
             {
@@ -57,8 +65,11 @@ namespace api.Services
             }
 
             var query = BuildQuery(normalizedSearch);
-            var requestPath = $"siret?q={Uri.EscapeDataString(query)}&nombre={safeLimit}&masquerValeursNulles=true";
-            var results = await FetchEtablissementsAsync(requestPath, cancellationToken);
+            var requestCount = IsIdentifierSearch(normalizedSearch)
+                ? safeLimit
+                : Math.Clamp(Math.Max(safeLimit * 3, safeLimit), safeLimit, InternalSearchLimit);
+            var requestPath = $"siret?q={Uri.EscapeDataString(query)}&nombre={requestCount}&masquerValeursNulles=true";
+            var results = await FetchEtablissementsAsync(requestPath, normalizedSearch, safeLimit, cancellationToken);
 
             _cache.Set(
                 cacheKey,
@@ -70,6 +81,8 @@ namespace api.Services
 
         private async Task<IReadOnlyCollection<InsurerSireneSearchDto>> FetchEtablissementsAsync(
             string requestPath,
+            string normalizedSearch,
+            int limit,
             CancellationToken cancellationToken)
         {
             var client = _httpClientFactory.CreateClient("insee-sirene");
@@ -107,6 +120,9 @@ namespace api.Services
                 .Where(item => !string.IsNullOrWhiteSpace(item.Siren) && !string.IsNullOrWhiteSpace(item.LegalName))
                 .GroupBy(item => item.Siren, StringComparer.OrdinalIgnoreCase)
                 .Select(group => group.First())
+                .OrderByDescending(item => ScoreResult(item, normalizedSearch))
+                .ThenBy(item => item.LegalName.Length)
+                .Take(limit)
                 .ToList();
         }
 
@@ -127,8 +143,12 @@ namespace api.Services
             var denominationQuery = search.Contains(' ', StringComparison.Ordinal)
                 ? $"denominationUniteLegale:\"{escaped}\"~2"
                 : $"denominationUniteLegale:{escaped}*";
+            var sigleQuery = search.Contains(' ', StringComparison.Ordinal)
+                ? ""
+                : $" OR sigleUniteLegale:{escaped}*";
+            var activityQuery = string.Join(" OR ", InsurerActivityCodes.Select(code => $"activitePrincipaleUniteLegale:{code}"));
 
-            return $"{denominationQuery} AND etablissementSiege:true";
+            return $"({denominationQuery}{sigleQuery}) AND etablissementSiege:true AND etatAdministratifUniteLegale:A AND ({activityQuery})";
         }
 
         private static InsurerSireneSearchDto MapEtablissement(JsonElement etablissement)
@@ -281,6 +301,56 @@ namespace api.Services
 
         private static string NormalizeSearch(string value) =>
             string.Join(" ", (value ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries));
+
+        private static bool IsIdentifierSearch(string search)
+        {
+            var digits = new string(search.Where(char.IsDigit).ToArray());
+            return digits.Length is 9 or 14;
+        }
+
+        private static int ScoreResult(InsurerSireneSearchDto item, string search)
+        {
+            var normalizedSearch = search.ToUpperInvariant();
+            var legalName = item.LegalName.ToUpperInvariant();
+            var tradeName = item.TradeName?.ToUpperInvariant() ?? "";
+            var score = 0;
+
+            if (string.Equals(item.IsActive, "En activité", StringComparison.OrdinalIgnoreCase))
+            {
+                score += 1000;
+            }
+
+            if (item.ApeNafCode is not null && InsurerActivityCodes.Contains(item.ApeNafCode, StringComparer.OrdinalIgnoreCase))
+            {
+                score += 500;
+            }
+
+            if (legalName.Equals(normalizedSearch, StringComparison.OrdinalIgnoreCase)
+                || tradeName.Equals(normalizedSearch, StringComparison.OrdinalIgnoreCase))
+            {
+                score += 250;
+            }
+
+            if (legalName.StartsWith(normalizedSearch, StringComparison.OrdinalIgnoreCase)
+                || tradeName.StartsWith(normalizedSearch, StringComparison.OrdinalIgnoreCase))
+            {
+                score += 150;
+            }
+
+            if (legalName.Contains($" {normalizedSearch}", StringComparison.OrdinalIgnoreCase)
+                || tradeName.Contains($" {normalizedSearch}", StringComparison.OrdinalIgnoreCase))
+            {
+                score += 75;
+            }
+
+            if (legalName.Contains(normalizedSearch, StringComparison.OrdinalIgnoreCase)
+                || tradeName.Contains(normalizedSearch, StringComparison.OrdinalIgnoreCase))
+            {
+                score += 50;
+            }
+
+            return score;
+        }
 
         private static string EscapeLuceneValue(string value) =>
             value.Replace("\\", "\\\\", StringComparison.Ordinal)

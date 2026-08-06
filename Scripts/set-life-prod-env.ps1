@@ -48,6 +48,9 @@ $MailjetSecretKey = "07edaa4e0f06e0e2700850808720c2e0"
 # EOD Historical Data.
 $EodApiKey = "684f34554390c3.19045690"
 
+# INSEE Sirene / geo.
+$InseeApiKey = "84ae371e-fb23-47f3-ae37-1efb2357f36f"
+
 # HelloAsso Production.
 $HelloAssoClientId = "0a0a08ba5b0a46b2874a8ad753afe987"
 $HelloAssoClientSecret = "+pcW0wwbZW/wdGT2tZyHG0xXOnTXVwKv"
@@ -77,6 +80,7 @@ Assert-Configured "JwtKey" $JwtKey
 Assert-Configured "MailjetApiKey" $MailjetApiKey
 Assert-Configured "MailjetSecretKey" $MailjetSecretKey
 Assert-Configured "EodApiKey" $EodApiKey
+Assert-Configured "InseeApiKey" $InseeApiKey
 Assert-Configured "HelloAssoClientId" $HelloAssoClientId
 Assert-Configured "HelloAssoClientSecret" $HelloAssoClientSecret
 
@@ -91,6 +95,19 @@ $vars = [ordered]@{
     "Jwt__DurationInMinutes"                                          = "60"
 
     "AllowedHosts"                                                    = "api.euroboost.top"
+
+    "PublicOrigins__DefaultExperience"                                = "Insurance"
+    "PublicOrigins__UnknownHostPolicy"                                = "Reject"
+    "PublicOrigins__Experiences__Insurance__Origin"                   = "https://euroboost.top"
+    "PublicOrigins__Experiences__Insurance__Domains__0"               = "euroboost.top"
+    "PublicOrigins__Experiences__Insurance__Domains__1"               = "www.euroboost.top"
+    "PublicOrigins__Experiences__Insurance__Domains__2"               = "api.euroboost.top"
+    "PublicOrigins__Experiences__Donation__Origin"                    = "https://cerfa.top"
+    "PublicOrigins__Experiences__Donation__Domains__0"                = "cerfa.top"
+    "PublicOrigins__Experiences__Donation__Domains__1"                = "www.cerfa.top"
+    "PublicOrigins__Experiences__Urbanization__Origin"                = "https://urbanisation.world"
+    "PublicOrigins__Experiences__Urbanization__Domains__0"            = "urbanisation.world"
+    "PublicOrigins__Experiences__Urbanization__Domains__1"            = "www.urbanisation.world"
 
     "Authentication__FrontendBaseUrl"                                 = $FrontBaseUrl
     "Authentication__EmailConfirmationTokenLifetime"                  = "1.00:00:00"
@@ -108,6 +125,13 @@ $vars = [ordered]@{
 
     "Eod__ApiKey"                                                     = $EodApiKey
     "EodSettings__OnlyStrategyMode"                                   = "true"
+
+    "Insee__ApiKey"                                                   = $InseeApiKey
+    "Insee__BaseUrl"                                                  = "https://api.insee.fr/api-sirene/3.11/"
+    "Insee__GeoBaseUrl"                                               = "https://api.insee.fr/metadonnees/V1/geo/"
+    "Insee__TimeoutSeconds"                                           = "10"
+    "Insee__CacheDurationMinutes"                                     = "720"
+    "Insee__MaxSearchResults"                                         = "10"
 
     "ExternalFeeds__News__Provider"                                   = "Rss"
     "ExternalFeeds__News__CacheDurationMinutes"                       = "15"

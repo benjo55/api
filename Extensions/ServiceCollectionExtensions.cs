@@ -64,8 +64,10 @@ namespace api.Extensions
                     .GetSection(PublicOriginOptions.SectionName)
                     .Get<PublicOriginOptions>();
                 var allowedOrigins = publicOrigins?.Experiences.Values
-                    .Select(x => x.Origin?.Trim().TrimEnd('/'))
-                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .SelectMany(x => new[] { x.Origin }
+                        .Concat(x.Domains.Select(domain => $"https://{domain}")))
+                    .Select(origin => origin?.Trim().TrimEnd('/'))
+                    .Where(origin => !string.IsNullOrWhiteSpace(origin))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToArray() ?? [];
 

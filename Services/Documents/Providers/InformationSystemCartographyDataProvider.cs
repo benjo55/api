@@ -59,6 +59,9 @@ namespace api.Services.Documents.Providers
                     .AsNoTracking()
                     .Where(x => x.Status != "Retired" &&
                         (applicationIds.Contains(x.SourceCiId) || applicationIds.Contains(x.TargetCiId)))
+                    .OrderBy(x => x.SourceCi.Name)
+                    .ThenBy(x => x.TargetCi.Name)
+                    .ThenBy(x => x.Name)
                     .Select(x => new CartographyFlowModel(
                         x.SourceCi.Name,
                         x.TargetCi.Name,
@@ -66,9 +69,6 @@ namespace api.Services.Documents.Providers
                         x.ExchangePattern.Name,
                         x.ExchangePattern.InteractionMode,
                         x.Technology != null ? x.Technology.Name : null))
-                    .OrderBy(x => x.SourceName)
-                    .ThenBy(x => x.TargetName)
-                    .ThenBy(x => x.Name)
                     .ToListAsync(cancellationToken);
 
             var includeDomainSections = ReadBooleanParameter(request, "includeDomainSections", true);

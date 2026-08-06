@@ -3,6 +3,7 @@ using api.Dtos.Cmdb;
 using api.Services.Cmdb;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace api.Controllers;
 
@@ -10,20 +11,35 @@ namespace api.Controllers;
 [Route("api/cartography")]
 public sealed class CartographyController : ControllerBase
 {
-    private readonly ApplicationDBContext _db;
+    private const string EmployerEntitiesCacheKey = "cartography:employer-entities:v2";
+    private static readonly TimeSpan EmployerEntitiesCacheDuration = TimeSpan.FromMinutes(5);
 
-    public CartographyController(ApplicationDBContext db) => _db = db;
+    private readonly ApplicationDBContext _db;
+    private readonly IMemoryCache _cache;
+
+    public CartographyController(ApplicationDBContext db, IMemoryCache cache)
+    {
+        _db = db;
+        _cache = cache;
+    }
 
     [HttpGet("employer-entities")]
     public async Task<ActionResult<List<CartographyEmployerEntityDto>>> GetEmployerEntities(
         CancellationToken cancellationToken = default)
     {
+        if (_cache.TryGetValue(EmployerEntitiesCacheKey, out List<CartographyEmployerEntityDto>? cached)
+            && cached is not null)
+        {
+            return Ok(cached);
+        }
+
         var ownership = await _db.ConfigurationItems.AsNoTracking()
             .Where(x => x.IsCurrent &&
                 ((x.ResponsibleEmployer != null && x.ResponsibleEmployer != "") ||
                  (x.EntityPath != null && x.EntityPath != "")))
             .Select(x => new
             {
+                x.Id,
                 x.ResponsibleEmployer,
                 x.EntityPath,
                 x.Model,
@@ -32,77 +48,47 @@ public sealed class CartographyController : ControllerBase
             })
             .ToListAsync(cancellationToken);
 
-        var flowOwnershipRaw = await _db.IntegrationFlows.AsNoTracking()
-            .Where(x => x.Status != "Retired")
+        var ownershipByCiId = ownership
             .Select(x => new
             {
                 x.Id,
-                SourceEntityPath = x.SourceCi.EntityPath,
-                SourceResponsibleEmployer = x.SourceCi.ResponsibleEmployer,
-                SourceIsCurrent = x.SourceCi.IsCurrent,
-                TargetEntityPath = x.TargetCi.EntityPath,
-                TargetResponsibleEmployer = x.TargetCi.ResponsibleEmployer,
-                TargetIsCurrent = x.TargetCi.IsCurrent,
+                EmployerEntity = CmdbEmployerResolver.Resolve(
+                    x.EntityPath,
+                    x.ResponsibleEmployer),
+            })
+            .Where(x => !string.IsNullOrWhiteSpace(x.EmployerEntity))
+            .ToDictionary(x => x.Id, x => x.EmployerEntity!, EqualityComparer<int>.Default);
+
+        var flowEdges = await _db.IntegrationFlows.AsNoTracking()
+            .Where(x => x.Status != "Retired")
+            .Select(x => new
+            {
+                x.SourceCiId,
+                x.TargetCiId,
             })
             .ToListAsync(cancellationToken);
 
         var flowCountsByEntity = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-        foreach (var flow in flowOwnershipRaw)
+        foreach (var flow in flowEdges)
         {
-            var sourceEmployerEntity = CmdbEmployerResolver.Resolve(
-                flow.SourceEntityPath,
-                flow.SourceResponsibleEmployer);
-            var targetEmployerEntity = CmdbEmployerResolver.Resolve(
-                flow.TargetEntityPath,
-                flow.TargetResponsibleEmployer);
-
-            foreach (var entity in new[]
-            {
-                flow.SourceIsCurrent ? sourceEmployerEntity : null,
-                flow.TargetIsCurrent ? targetEmployerEntity : null,
-            })
-            {
-                if (string.IsNullOrWhiteSpace(entity)) continue;
-
-                flowCountsByEntity[entity] = flowCountsByEntity.GetValueOrDefault(entity) + 0.5m;
-            }
+            AddEndpointContribution(flowCountsByEntity, ownershipByCiId, flow.SourceCiId);
+            AddEndpointContribution(flowCountsByEntity, ownershipByCiId, flow.TargetCiId);
         }
 
-        var relationshipOwnershipRaw = await _db.CmdbRelationships.AsNoTracking()
+        var relationshipEdges = await _db.CmdbRelationships.AsNoTracking()
             .Where(x => x.IsCurrent)
             .Select(x => new
             {
-                x.Id,
-                SourceEntityPath = x.SourceCi.EntityPath,
-                SourceResponsibleEmployer = x.SourceCi.ResponsibleEmployer,
-                SourceIsCurrent = x.SourceCi.IsCurrent,
-                TargetEntityPath = x.TargetCi.EntityPath,
-                TargetResponsibleEmployer = x.TargetCi.ResponsibleEmployer,
-                TargetIsCurrent = x.TargetCi.IsCurrent,
+                x.SourceCiId,
+                x.TargetCiId,
             })
             .ToListAsync(cancellationToken);
 
         var relationshipCountsByEntity = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-        foreach (var relationship in relationshipOwnershipRaw)
+        foreach (var relationship in relationshipEdges)
         {
-            var sourceEmployerEntity = CmdbEmployerResolver.Resolve(
-                relationship.SourceEntityPath,
-                relationship.SourceResponsibleEmployer);
-            var targetEmployerEntity = CmdbEmployerResolver.Resolve(
-                relationship.TargetEntityPath,
-                relationship.TargetResponsibleEmployer);
-
-            foreach (var entity in new[]
-            {
-                relationship.SourceIsCurrent ? sourceEmployerEntity : null,
-                relationship.TargetIsCurrent ? targetEmployerEntity : null,
-            })
-            {
-                if (string.IsNullOrWhiteSpace(entity)) continue;
-
-                relationshipCountsByEntity[entity] =
-                    relationshipCountsByEntity.GetValueOrDefault(entity) + 0.5m;
-            }
+            AddEndpointContribution(relationshipCountsByEntity, ownershipByCiId, relationship.SourceCiId);
+            AddEndpointContribution(relationshipCountsByEntity, ownershipByCiId, relationship.TargetCiId);
         }
 
         var entities = ownership
@@ -136,7 +122,30 @@ public sealed class CartographyController : ControllerBase
             .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+        _cache.Set(
+            EmployerEntitiesCacheKey,
+            entities,
+            new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = EmployerEntitiesCacheDuration,
+                Size = 1,
+            });
+
         return Ok(entities);
+    }
+
+    private static void AddEndpointContribution(
+        Dictionary<string, decimal> countsByEntity,
+        IReadOnlyDictionary<int, string> ownershipByCiId,
+        int configurationItemId)
+    {
+        if (!ownershipByCiId.TryGetValue(configurationItemId, out var entity) ||
+            string.IsNullOrWhiteSpace(entity))
+        {
+            return;
+        }
+
+        countsByEntity[entity] = countsByEntity.GetValueOrDefault(entity) + 0.5m;
     }
 
     private static readonly IReadOnlyDictionary<string, string> CiTypeLabels =

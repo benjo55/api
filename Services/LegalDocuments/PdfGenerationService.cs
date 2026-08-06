@@ -29,17 +29,7 @@ namespace api.Services.LegalDocuments
             try
             {
                 using var playwright = await Playwright.CreateAsync();
-                var launchOptions = new BrowserTypeLaunchOptions
-                {
-                    Headless = true
-                };
-
-                if (!OperatingSystem.IsWindows())
-                {
-                    launchOptions.Args = ["--no-sandbox", "--disable-dev-shm-usage"];
-                }
-
-                await using var browser = await playwright.Chromium.LaunchAsync(launchOptions);
+                await using var browser = await LaunchBrowserAsync(playwright);
 
                 var page = await browser.NewPageAsync();
                 await page.RouteAsync("**/*", route =>
@@ -102,6 +92,55 @@ namespace api.Services.LegalDocuments
             }
         }
 
+        private async Task<IBrowser> LaunchBrowserAsync(IPlaywright playwright)
+        {
+            Exception? firstFailure = null;
+            foreach (var channel in GetBrowserChannels())
+            {
+                try
+                {
+                    return await playwright.Chromium.LaunchAsync(CreateLaunchOptions(channel));
+                }
+                catch (Exception ex) when (LooksLikePlaywrightRuntimeIssue(ex))
+                {
+                    firstFailure ??= ex;
+                    _logger.LogWarning(
+                        ex,
+                        "Chromium launch failed for Channel={Channel}; trying next browser option.",
+                        channel ?? "playwright");
+                }
+            }
+
+            throw firstFailure ?? new InvalidOperationException("Aucun navigateur compatible Playwright n'est disponible.");
+        }
+
+        private static IEnumerable<string?> GetBrowserChannels()
+        {
+            yield return null;
+
+            if (OperatingSystem.IsWindows())
+            {
+                yield return "msedge";
+                yield return "chrome";
+            }
+        }
+
+        private static BrowserTypeLaunchOptions CreateLaunchOptions(string? channel)
+        {
+            var options = new BrowserTypeLaunchOptions
+            {
+                Headless = true,
+                Channel = channel,
+            };
+
+            if (!OperatingSystem.IsWindows())
+            {
+                options.Args = ["--no-sandbox", "--disable-dev-shm-usage"];
+            }
+
+            return options;
+        }
+
         private static string BuildFailureMessage(Exception exception)
         {
             var root = exception;
@@ -114,8 +153,8 @@ namespace api.Services.LegalDocuments
             if (LooksLikePlaywrightRuntimeIssue(root))
             {
                 return "La génération PDF a échoué car Chromium/Playwright n'est pas disponible sur le serveur. "
-                    + "Sur Windows Server, exécutez `playwright.ps1 install chromium` dans le dossier publié "
-                    + "et vérifiez que le compte applicatif peut lire le navigateur installé. "
+                    + "Sur Windows Server, installez Microsoft Edge ou exécutez `playwright.ps1 install chromium` "
+                    + "dans le dossier publié, puis vérifiez que le compte applicatif peut lire le navigateur installé. "
                     + $"Détail: {details}";
             }
 

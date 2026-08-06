@@ -37,9 +37,6 @@ namespace api.Services
 
             var query = _db.Users
                 .AsNoTracking()
-                .Include(u => u.Person)
-                .Include(u => u.UserRoles)
-                    .ThenInclude(ur => ur.Role)
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(request.Search))
@@ -118,11 +115,71 @@ namespace api.Services
             var users = await query
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
+                .Select(u => new
+                {
+                    u.Id,
+                    u.Username,
+                    u.Email,
+                    u.PhoneNumber,
+                    u.Status,
+                    u.EmailConfirmed,
+                    u.CreatedDate,
+                    u.LastLoginAt,
+                    u.LastActivityAt,
+                    u.AccountExpiresAt,
+                    u.LockedUntil,
+                    LinkedPerson = u.Person == null
+                        ? null
+                        : new AdminLinkedPersonDto(
+                            u.Person.Id,
+                            u.Person.FirstName,
+                            u.Person.LastName,
+                            (u.Person.FirstName + " " + u.Person.LastName).Trim(),
+                            string.IsNullOrWhiteSpace(u.Person.Email1) ? null : u.Person.Email1,
+                            string.IsNullOrWhiteSpace(u.Person.PhoneNumber) ? null : u.Person.PhoneNumber,
+                            u.Person.Role,
+                            u.Person.Status)
+                })
                 .ToListAsync(cancellationToken);
+
+            var userIds = users.Select(u => u.Id).ToList();
+            var roles = userIds.Count == 0
+                ? []
+                : await _db.UserRoles
+                    .AsNoTracking()
+                    .Where(ur => userIds.Contains(ur.UserId) && ur.Role != null)
+                    .OrderBy(ur => ur.Role!.PrivilegeRank)
+                    .ThenBy(ur => ur.Role!.RoleCode)
+                    .Select(ur => new { ur.UserId, ur.Role!.RoleCode })
+                    .ToListAsync(cancellationToken);
+            var rolesByUserId = roles
+                .GroupBy(role => role.UserId)
+                .ToDictionary(group => group.Key, group => (IReadOnlyCollection<string>)group.Select(role => role.RoleCode).ToList());
 
             return new PagedResult<AdminUserListItemDto>
             {
-                Items = users.Select(ToListItem).ToList(),
+                Items = users
+                    .Select(user =>
+                    {
+                        rolesByUserId.TryGetValue(user.Id, out var userRoles);
+                        var locked = user.Status == UserStatus.Locked
+                            || (user.LockedUntil.HasValue && user.LockedUntil.Value > now);
+                        return new AdminUserListItemDto(
+                            user.Id,
+                            user.Username,
+                            user.Email,
+                            user.PhoneNumber,
+                            user.Status.ToString(),
+                            user.EmailConfirmed,
+                            userRoles ?? Array.Empty<string>(),
+                            user.CreatedDate,
+                            user.LastLoginAt,
+                            user.LastActivityAt,
+                            user.AccountExpiresAt,
+                            locked,
+                            user.LinkedPerson);
+                    })
+                    .ToList(),
                 TotalCount = totalCount,
                 TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize),
                 HasNextPage = page * pageSize < totalCount,

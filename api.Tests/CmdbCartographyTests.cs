@@ -7,6 +7,7 @@ using api.Services.Cmdb;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Xunit;
 
 namespace api.Tests;
@@ -71,7 +72,7 @@ public sealed class CmdbCartographyTests
         });
         await db.SaveChangesAsync();
 
-        var controller = new CartographyController(db);
+        var controller = new CartographyController(db, CreateMemoryCache());
         var result = await controller.GetGraph(application.Id, 1, "Both", true, true, 300);
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var graph = Assert.IsType<CartographyGraphDto>(ok.Value);
@@ -128,7 +129,7 @@ public sealed class CmdbCartographyTests
         });
         await db.SaveChangesAsync();
 
-        var controller = new CartographyController(db);
+        var controller = new CartographyController(db, CreateMemoryCache());
         var entitiesResult = await controller.GetEmployerEntities();
         var entitiesOk = Assert.IsType<OkObjectResult>(entitiesResult.Result);
         var entities = Assert.IsType<List<CartographyEmployerEntityDto>>(entitiesOk.Value);
@@ -388,4 +389,7 @@ public sealed class CmdbCartographyTests
             CancellationToken cancellationToken) =>
             throw new NotSupportedException();
     }
+
+    private static IMemoryCache CreateMemoryCache() =>
+        new MemoryCache(new MemoryCacheOptions());
 }

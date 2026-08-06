@@ -12,17 +12,20 @@ namespace api.Services.Pdf
         private readonly IOperationRepository _operationRepository;
         private readonly ISupportHistoricalDataRepository _supportHistoricalDataRepository;
         private readonly IPdfDocumentService _pdfDocumentService;
+        private readonly IPublicOriginResolver? _publicOriginResolver;
 
         public PdfBusinessDocumentService(
             IContractRepository contractRepository,
             IOperationRepository operationRepository,
             ISupportHistoricalDataRepository supportHistoricalDataRepository,
-            IPdfDocumentService pdfDocumentService)
+            IPdfDocumentService pdfDocumentService,
+            IPublicOriginResolver? publicOriginResolver = null)
         {
             _contractRepository = contractRepository;
             _operationRepository = operationRepository;
             _supportHistoricalDataRepository = supportHistoricalDataRepository;
             _pdfDocumentService = pdfDocumentService;
+            _publicOriginResolver = publicOriginResolver;
         }
 
         public async Task<PdfGeneratedFileDto> GenerateContractSheetAsync(GenerateContractSheetRequestDto request, CancellationToken cancellationToken = default)
@@ -44,7 +47,7 @@ namespace api.Services.Pdf
 
             if (request.IncludeContractSheet)
             {
-                var contractSheet = BuildContractSheetDocument(contract, operations, $"{request.FileName}-fiche-contrat", request.LogoBase64, request.LogoUrl, BuildContractQrContent(contract), appendix);
+                var contractSheet = BuildContractSheetDocument(contract, operations, $"{request.FileName}-fiche-contrat", request.LogoBase64, request.LogoUrl, request.QrCodeContent, appendix);
                 var contractFile = await _pdfDocumentService.GenerateAsync(contractSheet, cancellationToken);
                 generatedParts.Add(ToMergePart(contractFile, "fiche-contrat"));
             }
@@ -103,7 +106,7 @@ namespace api.Services.Pdf
                 .ToList();
         }
 
-        private static GeneratePdfRequestDto BuildContractSheetDocument(
+        private GeneratePdfRequestDto BuildContractSheetDocument(
             Contract contract,
             List<Operation> operations,
             string fileName,
@@ -340,9 +343,15 @@ namespace api.Services.Pdf
             return string.IsNullOrWhiteSpace(fullName) ? "Titulaire non renseigné" : fullName;
         }
 
-        private static string BuildContractQrContent(Contract contract)
+        private string BuildContractQrContent(Contract contract)
         {
-            return $"Contrat:{contract.ContractNumber}|Titulaire:{BuildPersonName(contract.Person)}|Valeur:{contract.CurrentValue}";
+            var origin = _publicOriginResolver?.ResolveCurrent().Origin;
+            if (string.IsNullOrWhiteSpace(origin))
+            {
+                origin = "http://localhost:5173";
+            }
+
+            return $"{origin.TrimEnd('/')}/contracts/{contract.Id}";
         }
 
         private static string BuildHolderSectionContent(Contract contract, string personName)
