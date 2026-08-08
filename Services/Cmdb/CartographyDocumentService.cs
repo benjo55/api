@@ -37,6 +37,8 @@ public interface ICartographyDocumentService
 
 public sealed class CartographyDocumentService : ICartographyDocumentService
 {
+    private const string GeneralDomainCode = "GENERAL";
+    private const string GeneralDomainDisplayName = "Cartographie générale du SI ESF";
     private const string WordContentType =
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     private const string PdfContentType = "application/pdf";
@@ -45,6 +47,9 @@ public sealed class CartographyDocumentService : ICartographyDocumentService
     private const string Dark = "1F1F1F";
     private const string Gray = "6B7280";
     private const string FontName = "Century Gothic";
+    private const int PdfBodyFontSize = 11;
+    private const int PdfHorizontalMargin = 60;
+    private const int PdfVerticalMargin = 30;
     private readonly ApplicationDBContext _db;
 
     public CartographyDocumentService(ApplicationDBContext db) => _db = db;
@@ -109,6 +114,7 @@ public sealed class CartographyDocumentService : ICartographyDocumentService
         {
             return null;
         }
+        var isGeneralDomain = IsGeneralDomain(employerEntity);
 
         var configurationItems = (await _db.ConfigurationItems.AsNoTracking()
             .Include(x => x.ApplicationProfile)
@@ -123,7 +129,7 @@ public sealed class CartographyDocumentService : ICartographyDocumentService
                 StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        if (configurationItems.Count == 0)
+        if (configurationItems.Count == 0 && !isGeneralDomain)
         {
             return null;
         }
@@ -197,7 +203,7 @@ public sealed class CartographyDocumentService : ICartographyDocumentService
             : [];
 
         return new CartographyDocumentContext(
-            employerEntity,
+            isGeneralDomain ? GeneralDomainDisplayName : employerEntity,
             configurationItems,
             applications,
             flows,
@@ -230,13 +236,23 @@ public sealed class CartographyDocumentService : ICartographyDocumentService
             if (domainSections.Count > 0)
             {
                 AddDomainSections(mainPart, body, employerEntity, domainSections, includeTableOfContents: true);
-                body.Append(CreatePageBreak());
             }
 
-            AddConfigurationItemsInventory(body, configurationItems);
-            body.Append(CreatePageBreak());
+            if (configurationItems.Count > 0)
+            {
+                if (domainSections.Count > 0)
+                {
+                    body.Append(CreatePageBreak());
+                }
 
-            AddAnnexHeading(body, employerEntity, applications.Count);
+                AddConfigurationItemsInventory(body, configurationItems);
+            }
+
+            if (applications.Count > 0)
+            {
+                body.Append(CreatePageBreak());
+                AddAnnexHeading(body, employerEntity, applications.Count);
+            }
 
             for (var index = 0; index < applications.Count; index++)
             {
@@ -335,10 +351,11 @@ public sealed class CartographyDocumentService : ICartographyDocumentService
             document.Page(page =>
             {
                 page.Size(PageSizes.A4);
-                page.Margin(30);
+                page.MarginHorizontal(PdfHorizontalMargin);
+                page.MarginVertical(PdfVerticalMargin);
                 page.DefaultTextStyle(style => style
                     .FontFamily(FontName)
-                    .FontSize(9)
+                    .FontSize(PdfBodyFontSize)
                     .FontColor($"#{Dark}"));
 
                 page.Header().Column(header =>
@@ -348,7 +365,7 @@ public sealed class CartographyDocumentService : ICartographyDocumentService
                         .FontSize(18)
                         .FontColor($"#{Red}");
                     header.Item().Text("Architecture, rubriques du domaine et inventaire des CI")
-                        .FontSize(10)
+                        .FontSize(PdfBodyFontSize)
                         .FontColor($"#{Gray}");
                     header.Item().PaddingTop(6).LineHorizontal(1).LineColor("#E5E7EB");
                 });
@@ -410,7 +427,7 @@ public sealed class CartographyDocumentService : ICartographyDocumentService
             column.Item()
                 .PaddingTop(4)
                 .Text(string.IsNullOrWhiteSpace(content) ? "À compléter" : content)
-                .FontSize(9)
+                .FontSize(PdfBodyFontSize)
                 .LineHeight(1.25f)
                 .FontColor(string.IsNullOrWhiteSpace(content) ? $"#{Gray}" : $"#{Dark}");
         });
@@ -420,6 +437,11 @@ public sealed class CartographyDocumentService : ICartographyDocumentService
         IContainer container,
         IReadOnlyList<ConfigurationItem> configurationItems)
     {
+        if (configurationItems.Count == 0)
+        {
+            return;
+        }
+
         container.Column(column =>
         {
             column.Item().Text("CI du domaine")
@@ -428,7 +450,7 @@ public sealed class CartographyDocumentService : ICartographyDocumentService
                 .FontColor($"#{Red}");
             column.Item().PaddingBottom(8).Text(
                     $"{configurationItems.Count} CI actif(s) rattaché(s) au domaine.")
-                .FontSize(9)
+                .FontSize(PdfBodyFontSize)
                 .FontColor($"#{Gray}");
 
             column.Item().Table(table =>
@@ -462,7 +484,7 @@ public sealed class CartographyDocumentService : ICartographyDocumentService
                             .Padding(4)
                             .Text(title)
                             .Bold()
-                            .FontSize(7);
+                            .FontSize(PdfBodyFontSize);
                     }
                 });
 
@@ -489,7 +511,7 @@ public sealed class CartographyDocumentService : ICartographyDocumentService
             .PaddingVertical(3)
             .PaddingHorizontal(4)
             .Text(string.IsNullOrWhiteSpace(value) ? "-" : value)
-            .FontSize(6);
+            .FontSize(PdfBodyFontSize);
     }
 
     private static string HtmlToPdfText(string? html, string? fallbackText)
@@ -499,30 +521,10 @@ public sealed class CartographyDocumentService : ICartographyDocumentService
             return fallbackText?.Trim() ?? string.Empty;
         }
 
-        var prepared = html
-            .Replace("\r\n", "\n", StringComparison.Ordinal)
-            .Replace('\r', '\n');
-        prepared = Regex.Replace(
-            prepared,
-            "</(p|div|h1|h2|h3|li|tr)>",
-            "\n",
-            RegexOptions.IgnoreCase);
-        prepared = Regex.Replace(
-            prepared,
-            "<br\\s*/?>",
-            "\n",
-            RegexOptions.IgnoreCase);
-        prepared = Regex.Replace(
-            prepared,
-            "<li[^>]*>",
-            "• ",
-            RegexOptions.IgnoreCase);
-
         return string.Join(
             Environment.NewLine,
-            DecodeAndStripHtml(prepared)
-                .Split('\n')
-                .Select(x => x.Trim())
+            ParseHtmlTextFragments(html)
+                .Select(x => x.BulletMarker is null ? x.Text : $"{x.BulletMarker} {x.Text}")
                 .Where(x => !string.IsNullOrWhiteSpace(x)));
     }
 
@@ -735,9 +737,67 @@ public sealed class CartographyDocumentService : ICartographyDocumentService
             return;
         }
 
+        foreach (var fragment in ParseHtmlTextFragments(html))
+        {
+            if (fragment.BulletMarker is not null)
+            {
+                AddBullet(body, fragment.Text, fragment.BulletMarker);
+            }
+            else
+            {
+                body.Append(CreateParagraph(fragment.Text, 10, Dark, spaceAfter: 45));
+            }
+        }
+    }
+
+    private static IEnumerable<(string Text, string? BulletMarker)> ParseHtmlTextFragments(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+        {
+            yield break;
+        }
+
+        var normalized = html
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n');
+        var listMatches = Regex.Matches(
+            normalized,
+            "<ul\\b[^>]*>[\\s\\S]*?</ul>",
+            RegexOptions.IgnoreCase);
+        var cursor = 0;
+
+        foreach (Match listMatch in listMatches)
+        {
+            foreach (var line in ParsePlainHtmlLines(normalized[cursor..listMatch.Index]))
+            {
+                yield return (line, null);
+            }
+
+            var marker = ReadListBulletMarker(listMatch.Value);
+            foreach (var item in ParseHtmlListItems(listMatch.Value))
+            {
+                yield return (item, marker);
+            }
+
+            cursor = listMatch.Index + listMatch.Length;
+        }
+
+        foreach (var line in ParsePlainHtmlLines(normalized[cursor..]))
+        {
+            yield return (line, null);
+        }
+    }
+
+    private static IEnumerable<string> ParsePlainHtmlLines(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+        {
+            yield break;
+        }
+
         var prepared = Regex.Replace(
             html,
-            "</(p|div|h1|h2|h3|li)>",
+            "</(p|div|h1|h2|h3|li|tr)>",
             "\n",
             RegexOptions.IgnoreCase);
         prepared = Regex.Replace(
@@ -750,29 +810,108 @@ public sealed class CartographyDocumentService : ICartographyDocumentService
             "<li[^>]*>",
             "• ",
             RegexOptions.IgnoreCase);
-        var text = DecodeAndStripHtml(prepared);
-        var lines = text
+
+        foreach (var line in DecodeAndStripHtml(prepared)
             .Split('\n')
             .Select(x => x.Trim())
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .ToList();
-
-        if (lines.Count == 0)
+            .Where(x => !string.IsNullOrWhiteSpace(x)))
         {
-            return;
+            yield return line;
+        }
+    }
+
+    private static IEnumerable<string> ParseHtmlListItems(string listHtml)
+    {
+        var itemMatches = Regex.Matches(
+            listHtml,
+            "<li\\b[^>]*>(?<content>[\\s\\S]*?)</li>",
+            RegexOptions.IgnoreCase);
+
+        foreach (Match itemMatch in itemMatches)
+        {
+            var text = StripInlineHtml(itemMatch.Groups["content"].Value);
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                yield return text;
+            }
+        }
+    }
+
+    private static string ReadListBulletMarker(string listHtml)
+    {
+        var openingTag = Regex.Match(listHtml, "^\\s*<ul\\b[^>]*>", RegexOptions.IgnoreCase).Value;
+        var style = GetHtmlAttribute(openingTag, "data-bullet-style");
+        if (!string.IsNullOrWhiteSpace(style))
+        {
+            return BulletMarkerFromStyle(style);
         }
 
-        foreach (var line in lines)
+        var marker = GetHtmlAttribute(openingTag, "data-bullet-marker");
+        if (!string.IsNullOrWhiteSpace(marker))
         {
-            if (line.StartsWith('•'))
-            {
-                AddBullet(body, line.TrimStart('•', ' '));
-            }
-            else
-            {
-                body.Append(CreateParagraph(line, 10, Dark, spaceAfter: 45));
-            }
+            return marker.Trim();
         }
+
+        return BulletMarkerFromStyle(ReadListStyleType(GetHtmlAttribute(openingTag, "style")));
+    }
+
+    private static string? ReadListStyleType(string? style)
+    {
+        if (string.IsNullOrWhiteSpace(style))
+        {
+            return null;
+        }
+
+        var match = Regex.Match(
+            style,
+            "(?:^|;)\\s*list-style-type\\s*:\\s*(?<value>[^;]+)",
+            RegexOptions.IgnoreCase);
+
+        return match.Success ? match.Groups["value"].Value.Trim() : null;
+    }
+
+    private static string BulletMarkerFromStyle(string? style)
+    {
+        var normalized = (style ?? string.Empty)
+            .Replace("\"", string.Empty, StringComparison.Ordinal)
+            .Replace("'", string.Empty, StringComparison.Ordinal)
+            .Trim()
+            .ToLowerInvariant();
+
+        return normalized switch
+        {
+            "circle" => "◦",
+            "square" => "▪",
+            "filledsquare" or "filled-square" or "■" => "■",
+            "hollowsquare" or "hollow-square" or "□" => "□",
+            "diamond" or "◆" => "◆",
+            "hollowdiamond" or "hollow-diamond" or "◇" => "◇",
+            "dash" or "-" or "–" => "–",
+            "plus" or "+" => "+",
+            "cross" or "✚" => "✚",
+            "check" or "✓" => "✓",
+            "arrow" or "→" => "→",
+            "triangle" or "►" => "►",
+            "star" or "★" => "★",
+            _ => "•",
+        };
+    }
+
+    private static string StripInlineHtml(string html)
+    {
+        var prepared = Regex.Replace(
+            html,
+            "</(p|div|h1|h2|h3)>",
+            " ",
+            RegexOptions.IgnoreCase);
+        prepared = Regex.Replace(
+            prepared,
+            "<br\\s*/?>",
+            " ",
+            RegexOptions.IgnoreCase);
+        prepared = Regex.Replace(prepared, "<[^>]+>", string.Empty, RegexOptions.IgnoreCase);
+
+        return Regex.Replace(WebUtility.HtmlDecode(prepared), "\\s+", " ").Trim();
     }
 
     private static void AddHtmlTable(Body body, string tableHtml)
@@ -1328,10 +1467,10 @@ public sealed class CartographyDocumentService : ICartographyDocumentService
         }
     }
 
-    private static void AddBullet(Body body, string text)
+    private static void AddBullet(Body body, string text, string marker = "•")
     {
         var paragraph = CreateParagraph(
-            $"•  {text}",
+            $"{marker}  {text}",
             9,
             Dark,
             spaceAfter: 25);
@@ -1746,6 +1885,9 @@ public sealed class CartographyDocumentService : ICartographyDocumentService
 
         return builder.ToString().Replace(' ', '_');
     }
+
+    private static bool IsGeneralDomain(string employerEntity) =>
+        string.Equals(employerEntity, GeneralDomainCode, StringComparison.OrdinalIgnoreCase);
 
     private sealed record ApplicationFlow(
         int SourceCiId,

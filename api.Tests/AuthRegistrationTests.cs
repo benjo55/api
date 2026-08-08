@@ -7,6 +7,7 @@ using api.Dtos.Auth;
 using api.Interfaces;
 using api.Models;
 using api.Repository;
+using api.Security;
 using api.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -62,6 +63,42 @@ public class AuthRegistrationTests
         Assert.Single(emailService.SentMessages);
         Assert.Contains("confirm-email", emailService.SentMessages[0].HtmlBody);
         Assert.Contains("Ce lien est valable 24 heures.", emailService.SentMessages[0].HtmlBody);
+    }
+
+    [Theory]
+    [InlineData(SiteExperience.Urbanization, SystemRoles.Cartography)]
+    [InlineData(SiteExperience.Donation, SystemRoles.Donor)]
+    [InlineData(SiteExperience.Insurance, SystemRoles.LegacyUser)]
+    public async Task Register_AssignsRoleForRequestedSiteExperience(
+        SiteExperience siteExperience,
+        string expectedRoleCode)
+    {
+        await using var db = CreateDbContext();
+        db.Roles.AddRange(
+            new Role { RoleCode = SystemRoles.Cartography, RoleName = "Cartographie" },
+            new Role { RoleCode = SystemRoles.Donor, RoleName = "Donateur" },
+            new Role { RoleCode = SystemRoles.LegacyUser, RoleName = "Utilisateur" });
+        await db.SaveChangesAsync();
+        var (controller, _) = CreateController(db);
+
+        var result = await controller.Register(new RegisterRequestDto
+        {
+            UserName = "benjamin",
+            Email = "benjamin@example.com",
+            PhoneNumber = "06 12 34 56 78",
+            Password = "Motdepasse10!",
+            FirstName = "Benjamin",
+            LastName = "Dupont",
+            AcceptPrivacyPolicy = true,
+            SiteExperience = siteExperience
+        }, CancellationToken.None);
+
+        Assert.IsType<CreatedResult>(result);
+        var roleCode = await db.UserRoles
+            .Include(ur => ur.Role)
+            .Select(ur => ur.Role!.RoleCode)
+            .SingleAsync();
+        Assert.Equal(expectedRoleCode, roleCode);
     }
 
     [Fact]

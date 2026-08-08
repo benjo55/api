@@ -11,8 +11,9 @@ namespace api.Controllers;
 [Route("api/cartography")]
 public sealed class CartographyController : ControllerBase
 {
-    private const string EmployerEntitiesCacheKey = "cartography:employer-entities:v2";
+    private const string EmployerEntitiesCacheKey = "cartography:employer-entities:v3";
     private static readonly TimeSpan EmployerEntitiesCacheDuration = TimeSpan.FromMinutes(5);
+    private const string GeneralDomainCode = "GENERAL";
 
     private readonly ApplicationDBContext _db;
     private readonly IMemoryCache _cache;
@@ -121,6 +122,23 @@ public sealed class CartographyController : ControllerBase
             })
             .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+        entities.Insert(0, new CartographyEmployerEntityDto
+        {
+            Name = GeneralDomainCode,
+            ConfigurationItemCount = 0,
+            FlowCount = 0,
+            CmdbRelationshipCount = 0,
+            TypeCounts =
+            [
+                new CartographyEmployerEntityTypeCountDto
+                {
+                    Type = "documentaryDomain",
+                    Label = "Vision générale du SI ESF",
+                    Count = 1,
+                },
+            ],
+        });
 
         _cache.Set(
             EmployerEntitiesCacheKey,

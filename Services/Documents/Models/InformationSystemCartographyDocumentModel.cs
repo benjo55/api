@@ -13,7 +13,8 @@ namespace api.Services.Documents.Models
         string Title,
         int HeadingLevel,
         int SortOrder,
-        string Content);
+        string Content,
+        string ContentHtml);
 
     public sealed record CartographyApplicationModel(
         int Id,

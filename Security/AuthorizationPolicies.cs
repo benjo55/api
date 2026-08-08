@@ -77,6 +77,8 @@ namespace api.Security
         public const string UserManager = "UserManager";
         public const string SecurityAuditor = "SecurityAuditor";
         public const string StandardUser = "StandardUser";
+        public const string Cartography = "Cartographie";
+        public const string Donor = "Donateur";
         public const string LegacyAdmin = "Admin";
         public const string LegacyUser = "User";
     }

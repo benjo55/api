@@ -78,6 +78,8 @@ namespace api.Services
                 new RoleDefinition(SystemRoles.UserManager, "Gestionnaire utilisateurs", 60, SystemPermissions.UserManagerPermissions),
                 new RoleDefinition(SystemRoles.SecurityAuditor, "Auditeur sécurité", 40, new[] { SystemPermissions.UsersView, SystemPermissions.RolesView, SystemPermissions.AuditView }),
                 new RoleDefinition(SystemRoles.StandardUser, "Utilisateur standard", 10, Array.Empty<string>()),
+                new RoleDefinition(SystemRoles.Cartography, "Cartographie", 10, Array.Empty<string>()),
+                new RoleDefinition(SystemRoles.Donor, "Donateur", 10, Array.Empty<string>()),
                 new RoleDefinition(SystemRoles.LegacyUser, "Utilisateur", 10, Array.Empty<string>()),
                 new RoleDefinition(SystemRoles.LegacyAdmin, "Administrateur historique", 80, SystemPermissions.AdministratorPermissions)
             };

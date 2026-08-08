@@ -6,6 +6,7 @@ using api.Data;
 using api.Dtos.Auth;
 using api.Interfaces;
 using api.Models;
+using api.Security;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -131,8 +132,7 @@ namespace api.Services
                     "email");
             }
 
-            var defaultRole = await _db.Roles
-                .FirstOrDefaultAsync(r => r.RoleCode == "User", cancellationToken);
+            var defaultRole = await ResolveRegistrationRoleAsync(request, cancellationToken);
 
             await using var transaction = _db.Database.IsRelational()
                 ? await _db.Database.BeginTransactionAsync(cancellationToken)
@@ -218,6 +218,40 @@ namespace api.Services
                 user.Email,
                 MaskEmail(user.Email),
                 registrationMessage);
+        }
+
+        private async Task<Role?> ResolveRegistrationRoleAsync(
+            RegisterRequestDto request,
+            CancellationToken cancellationToken)
+        {
+            var experience = ResolveRegistrationExperience(request.SiteExperience);
+            var roleCode = experience switch
+            {
+                SiteExperience.Urbanization => SystemRoles.Cartography,
+                SiteExperience.Donation => SystemRoles.Donor,
+                _ => SystemRoles.LegacyUser
+            };
+
+            return await _db.Roles.FirstOrDefaultAsync(r => r.RoleCode == roleCode, cancellationToken)
+                ?? await _db.Roles.FirstOrDefaultAsync(r => r.RoleCode == SystemRoles.LegacyUser, cancellationToken);
+        }
+
+        private SiteExperience ResolveRegistrationExperience(SiteExperience? requestedExperience)
+        {
+            if (requestedExperience.HasValue)
+            {
+                return requestedExperience.Value;
+            }
+
+            try
+            {
+                return _publicOriginResolver?.ResolveCurrent().Experience
+                    ?? SiteExperience.Insurance;
+            }
+            catch
+            {
+                return SiteExperience.Insurance;
+            }
         }
 
         private async Task<List<Person>> FindUnlinkedPersonsByEmailAsync(

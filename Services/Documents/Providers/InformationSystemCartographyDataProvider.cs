@@ -12,6 +12,8 @@ namespace api.Services.Documents.Providers
 {
     public sealed class InformationSystemCartographyDataProvider : IDocumentDataProvider
     {
+        private const string GeneralDomainCode = "GENERAL";
+        private const string GeneralDomainDisplayName = "Cartographie générale du SI ESF";
         private readonly ApplicationDBContext _db;
 
         public InformationSystemCartographyDataProvider(ApplicationDBContext db)
@@ -30,6 +32,7 @@ namespace api.Services.Documents.Providers
             {
                 throw new InvalidOperationException("L'entité employeur CMDB est obligatoire.");
             }
+            var isGeneralDomain = IsGeneralDomain(employerEntity);
 
             var configurationItems = (await _db.ConfigurationItems
                     .AsNoTracking()
@@ -43,7 +46,7 @@ namespace api.Services.Documents.Providers
                     StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
-            if (configurationItems.Count == 0)
+            if (configurationItems.Count == 0 && !isGeneralDomain)
             {
                 throw new KeyNotFoundException("Aucun CI actif n'est rattaché à cette entité.");
             }
@@ -82,12 +85,13 @@ namespace api.Services.Documents.Providers
                         x.Title,
                         x.HeadingLevel,
                         x.SortOrder,
-                        HtmlToText(x.ContentHtml, x.PlainText)))
+                        HtmlToText(x.ContentHtml, x.PlainText),
+                        x.ContentHtml ?? string.Empty))
                     .ToListAsync(cancellationToken)
                 : [];
 
             return new InformationSystemCartographyDocumentModel(
-                employerEntity,
+                isGeneralDomain ? GeneralDomainDisplayName : employerEntity,
                 ReadDateParameter(request, "asOfDate") ?? DateTime.UtcNow.Date,
                 ReadStringParameter(request, "classification") ?? "Interne",
                 domainSections,
@@ -115,6 +119,9 @@ namespace api.Services.Documents.Providers
                     .ToList(),
                 flows);
         }
+
+        private static bool IsGeneralDomain(string employerEntity) =>
+            string.Equals(employerEntity, GeneralDomainCode, StringComparison.OrdinalIgnoreCase);
 
         private static string? ReadStringParameter(GenerateDocumentRequestDto request, string propertyName)
         {
@@ -159,7 +166,7 @@ namespace api.Services.Documents.Providers
             var prepared = html.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
             prepared = Regex.Replace(prepared, "</(p|div|h1|h2|h3|li|tr)>", "\n", RegexOptions.IgnoreCase);
             prepared = Regex.Replace(prepared, "<br\\s*/?>", "\n", RegexOptions.IgnoreCase);
-            prepared = Regex.Replace(prepared, "<li[^>]*>", "- ", RegexOptions.IgnoreCase);
+            prepared = Regex.Replace(prepared, "<li[^>]*>", "• ", RegexOptions.IgnoreCase);
             prepared = Regex.Replace(prepared, "<[^>]+>", string.Empty, RegexOptions.IgnoreCase);
             return WebUtility.HtmlDecode(prepared).Trim();
         }

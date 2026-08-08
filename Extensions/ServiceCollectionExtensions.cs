@@ -381,7 +381,7 @@ namespace api.Extensions
                 "questpdf-cmdb-cartography-v1",
                 "Cartographie_SI_{subjectId}_{date}.pdf",
                 "A3",
-                "Landscape",
+                "Portrait",
                 null,
                 SupportsPreview: true,
                 SupportsDownload: true,

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using api.Configuration;
 
 namespace api.Dtos.Auth
 {
@@ -33,5 +34,7 @@ namespace api.Dtos.Auth
 
         [Required(ErrorMessage = "L'acceptation de la politique de confidentialité est obligatoire.")]
         public bool AcceptPrivacyPolicy { get; set; }
+
+        public SiteExperience? SiteExperience { get; set; }
     }
 }
