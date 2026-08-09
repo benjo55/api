@@ -66,12 +66,30 @@ public class AuthRegistrationTests
     }
 
     [Theory]
-    [InlineData(SiteExperience.Urbanization, SystemRoles.Cartography)]
-    [InlineData(SiteExperience.Donation, SystemRoles.Donor)]
-    [InlineData(SiteExperience.Insurance, SystemRoles.LegacyUser)]
+    [InlineData(
+        SiteExperience.Urbanization,
+        SystemRoles.Cartography,
+        "Confirmez votre adresse e-mail Urbanisation.world",
+        "Votre compte Urbanisation.world a été créé.",
+        "https://urbanisation.world/confirm-email")]
+    [InlineData(
+        SiteExperience.Donation,
+        SystemRoles.Donor,
+        "Confirmez votre adresse e-mail CERFA.top",
+        "Votre compte CERFA.top a été créé.",
+        "https://cerfa.top/confirm-email")]
+    [InlineData(
+        SiteExperience.Insurance,
+        SystemRoles.LegacyUser,
+        "Confirmez votre adresse e-mail Euroboost",
+        "Votre compte Euroboost espace client a été créé.",
+        "https://euroboost.top/confirm-email")]
     public async Task Register_AssignsRoleForRequestedSiteExperience(
         SiteExperience siteExperience,
-        string expectedRoleCode)
+        string expectedRoleCode,
+        string expectedSubject,
+        string expectedBodyFragment,
+        string expectedConfirmationUrl)
     {
         await using var db = CreateDbContext();
         db.Roles.AddRange(
@@ -79,7 +97,7 @@ public class AuthRegistrationTests
             new Role { RoleCode = SystemRoles.Donor, RoleName = "Donateur" },
             new Role { RoleCode = SystemRoles.LegacyUser, RoleName = "Utilisateur" });
         await db.SaveChangesAsync();
-        var (controller, _) = CreateController(db);
+        var (controller, emailService) = CreateController(db, new FakePublicOriginResolver());
 
         var result = await controller.Register(new RegisterRequestDto
         {
@@ -99,6 +117,58 @@ public class AuthRegistrationTests
             .Select(ur => ur.Role!.RoleCode)
             .SingleAsync();
         Assert.Equal(expectedRoleCode, roleCode);
+        var confirmationEmail = Assert.Single(emailService.SentMessages);
+        Assert.Equal(expectedSubject, confirmationEmail.Subject);
+        var decodedBody = WebUtility.HtmlDecode(confirmationEmail.HtmlBody);
+        Assert.Contains(expectedBodyFragment, decodedBody);
+        Assert.Contains(expectedConfirmationUrl, decodedBody);
+    }
+
+    [Fact]
+    public async Task Register_AllowsConfiguredTestEmailThroughUniqueAlias()
+    {
+        await using var db = CreateDbContext();
+        db.Roles.Add(new Role { RoleCode = SystemRoles.LegacyUser, RoleName = "Utilisateur" });
+        await db.SaveChangesAsync();
+        var (controller, emailService) = CreateController(db);
+
+        var firstResult = await controller.Register(new RegisterRequestDto
+        {
+            UserName = "testuser1",
+            Email = "p_benhamou@hotmail.com",
+            PhoneNumber = "06 12 34 56 78",
+            Password = "Motdepasse10!",
+            FirstName = "Patrick",
+            LastName = "Benhamou",
+            AcceptPrivacyPolicy = true
+        }, CancellationToken.None);
+
+        var secondResult = await controller.Register(new RegisterRequestDto
+        {
+            UserName = "testuser2",
+            Email = "p_benhamou@hotmail.com",
+            PhoneNumber = "06 12 34 56 79",
+            Password = "Motdepasse10!",
+            FirstName = "Patrick",
+            LastName = "Benhamou",
+            AcceptPrivacyPolicy = true
+        }, CancellationToken.None);
+
+        Assert.IsType<CreatedResult>(firstResult);
+        Assert.IsType<CreatedResult>(secondResult);
+
+        var users = await db.Users
+            .OrderBy(u => u.Username)
+            .Select(u => new { u.Username, u.Email, u.NormalizedEmail })
+            .ToListAsync();
+        Assert.Equal(2, users.Count);
+        Assert.Equal("p_benhamou@hotmail.com", users[0].Email);
+        Assert.StartsWith("p_benhamou+test-", users[1].Email);
+        Assert.EndsWith("@hotmail.com", users[1].Email);
+        Assert.NotEqual(users[0].NormalizedEmail, users[1].NormalizedEmail);
+        Assert.Equal(2, emailService.SentMessages.Count);
+        Assert.Equal(users[0].Email, emailService.SentMessages[0].To);
+        Assert.Equal(users[1].Email, emailService.SentMessages[1].To);
     }
 
     [Fact]
@@ -338,7 +408,9 @@ public class AuthRegistrationTests
         }, CancellationToken.None);
     }
 
-    private static (AuthController Controller, FakeEmailService EmailService) CreateController(ApplicationDBContext db)
+    private static (AuthController Controller, FakeEmailService EmailService) CreateController(
+        ApplicationDBContext db,
+        IPublicOriginResolver? publicOriginResolver = null)
     {
         var userRepository = new UserRepository(db);
         var rolePermissionRepository = new RolePermissionRepository(db);
@@ -363,7 +435,8 @@ public class AuthRegistrationTests
                 FrontendBaseUrl = "http://localhost:5173",
                 MinimumEmailResendInterval = TimeSpan.Zero
             }),
-            NullLogger<AuthenticationAccountService>.Instance);
+            NullLogger<AuthenticationAccountService>.Instance,
+            publicOriginResolver);
 
         var controller = new AuthController(
             userRepository,
@@ -416,4 +489,33 @@ public class AuthRegistrationTests
     }
 
     private sealed record SentEmail(string To, string Subject, string HtmlBody);
+
+    private sealed class FakePublicOriginResolver : IPublicOriginResolver
+    {
+        public ResolvedPublicOrigin ResolveCurrent() => Resolve("euroboost.top");
+
+        public ResolvedPublicOrigin Resolve(string? host)
+        {
+            var experience = host?.Contains("urbanisation", StringComparison.OrdinalIgnoreCase) == true
+                ? SiteExperience.Urbanization
+                : host?.Contains("cerfa", StringComparison.OrdinalIgnoreCase) == true
+                    ? SiteExperience.Donation
+                    : SiteExperience.Insurance;
+
+            return new ResolvedPublicOrigin(
+                experience,
+                GetOrigin(experience),
+                host ?? string.Empty,
+                true,
+                UnknownHostPolicy.UseDefaultExperience);
+        }
+
+        public string GetOrigin(SiteExperience experience) =>
+            experience switch
+            {
+                SiteExperience.Urbanization => "https://urbanisation.world",
+                SiteExperience.Donation => "https://cerfa.top",
+                _ => "https://euroboost.top"
+            };
+    }
 }

@@ -11,5 +11,10 @@ namespace api.Configuration
         public TimeSpan MinimumEmailResendInterval { get; init; } = TimeSpan.FromMinutes(2);
 
         public int PasswordMinLength { get; init; } = 10;
+
+        public string[] DuplicateTestEmailAliases { get; init; } =
+        [
+            "p_benhamou@hotmail.com"
+        ];
     }
 }
