@@ -1,4 +1,5 @@
 using System.Globalization;
+using api.Interfaces.Documents;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -16,6 +17,26 @@ namespace api.Services.Documents.Renderers
 
         public static string Date(DateTime? value) =>
             value.HasValue ? value.Value.ToString("dd/MM/yyyy", CultureInfo.GetCultureInfo("fr-FR")) : "-";
+
+        public static PageSize ResolvePageSize(DocumentRenderOptions options)
+        {
+            var pageSize = (options.PageSize ?? string.Empty).Trim().ToUpperInvariant() switch
+            {
+                "A3" => PageSizes.A3,
+                "A4" => PageSizes.A4,
+                "A5" => PageSizes.A5,
+                "LETTER" => PageSizes.Letter,
+                "LEGAL" => PageSizes.Legal,
+                _ => PageSizes.A4
+            };
+
+            return string.Equals(options.Orientation, "Landscape", StringComparison.OrdinalIgnoreCase)
+                ? pageSize.Landscape()
+                : pageSize.Portrait();
+        }
+
+        public static float Millimeters(decimal value) =>
+            (float)value * 72f / 25.4f;
 
         public static IContainer HeaderCell(IContainer container) =>
             container

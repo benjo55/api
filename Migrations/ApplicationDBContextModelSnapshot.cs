@@ -3330,6 +3330,378 @@ namespace api.Migrations
                     b.ToTable("EntityHistories", (string)null);
                 });
 
+            modelBuilder.Entity("api.Models.EuroFundConfiguration", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AccrualMethod")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<int>("AnnualCreditDay")
+                        .HasColumnType("int");
+
+                    b.Property<int>("AnnualCreditMonth")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EarlyExitRateMethod")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<int>("FinancialSupportId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("FixedProvisionalRate")
+                        .HasPrecision(18, 7)
+                        .HasColumnType("decimal(18,7)");
+
+                    b.Property<string>("LotConsumptionMethod")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("ManagementFeeTreatment")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<decimal?>("MinimumGuaranteedRate")
+                        .HasPrecision(18, 7)
+                        .HasColumnType("decimal(18,7)");
+
+                    b.Property<decimal?>("PreviousFinalRatePercentage")
+                        .HasPrecision(18, 7)
+                        .HasColumnType("decimal(18,7)");
+
+                    b.Property<string>("ProvisionalRateMethod")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<decimal?>("ProvisionalRatePercentage")
+                        .HasPrecision(18, 7)
+                        .HasColumnType("decimal(18,7)");
+
+                    b.Property<decimal?>("RateCap")
+                        .HasPrecision(18, 7)
+                        .HasColumnType("decimal(18,7)");
+
+                    b.Property<decimal?>("RateFloor")
+                        .HasPrecision(18, 7)
+                        .HasColumnType("decimal(18,7)");
+
+                    b.Property<string>("RateNature")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FinancialSupportId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_EuroFundConfigurations_FinancialSupport");
+
+                    b.ToTable("EuroFundConfigurations", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.EuroFundFinancialYear", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal?>("AssetYield")
+                        .HasPrecision(18, 7)
+                        .HasColumnType("decimal(18,7)");
+
+                    b.Property<decimal?>("ClosingPpbReserve")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("FinalServedRate")
+                        .HasPrecision(18, 7)
+                        .HasColumnType("decimal(18,7)");
+
+                    b.Property<DateTime?>("FinalizedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FinancialSupportId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("OpeningPpbReserve")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<decimal?>("PpbAllocation")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<decimal?>("PpbRelease")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<string>("RateNature")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<decimal?>("TmeRate")
+                        .HasPrecision(18, 7)
+                        .HasColumnType("decimal(18,7)");
+
+                    b.Property<DateTime>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FinancialSupportId", "Year")
+                        .IsUnique()
+                        .HasDatabaseName("UX_EuroFundFinancialYears_Fund_Year");
+
+                    b.ToTable("EuroFundFinancialYears", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.EuroFundLot", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal?>("BonusRate")
+                        .HasPrecision(18, 7)
+                        .HasColumnType("decimal(18,7)");
+
+                    b.Property<string>("BonusRuleId")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<int>("ContractId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FinancialSupportId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("InitialAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<decimal>("RemainingAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<int?>("SourceOperationId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ValueDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FinancialSupportId");
+
+                    b.HasIndex("SourceOperationId")
+                        .HasDatabaseName("IX_EuroFundLots_SourceOperation");
+
+                    b.HasIndex("ValueDate")
+                        .HasDatabaseName("IX_EuroFundLots_ValueDate");
+
+                    b.HasIndex("ContractId", "FinancialSupportId")
+                        .HasDatabaseName("IX_EuroFundLots_Contract_Fund");
+
+                    b.ToTable("EuroFundLots", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.EuroFundLotMovement", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<int>("ContractId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("EuroFundLotId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("FinancialSupportId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("MovementDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("MovementType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<int?>("OperationId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EuroFundLotId");
+
+                    b.HasIndex("OperationId")
+                        .HasDatabaseName("IX_EuroFundLotMovements_Operation");
+
+                    b.HasIndex("ContractId", "FinancialSupportId", "MovementDate")
+                        .HasDatabaseName("IX_EuroFundLotMovements_Contract_Fund_Date");
+
+                    b.ToTable("EuroFundLotMovements", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.EuroFundRevaluation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("BookValueBeforeCredit")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<DateTime>("ComputedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ContractId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("FinalServedRate")
+                        .HasPrecision(18, 7)
+                        .HasColumnType("decimal(18,7)");
+
+                    b.Property<int>("FinancialSupportId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("FinancialYear")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("InterestAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<int>("OperationId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("WeightedExposure")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<int>("YearBasis")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FinancialSupportId");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_EuroFundRevaluations_Operation");
+
+                    b.HasIndex("ContractId", "FinancialSupportId", "FinancialYear")
+                        .IsUnique()
+                        .HasDatabaseName("UX_EuroFundRevaluations_Contract_Fund_Year");
+
+                    b.ToTable("EuroFundRevaluations", (string)null);
+                });
+
+            modelBuilder.Entity("api.Models.EuroFundRevaluationDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("ApplicableRate")
+                        .HasPrecision(18, 7)
+                        .HasColumnType("decimal(18,7)");
+
+                    b.Property<decimal>("BaseRate")
+                        .HasPrecision(18, 7)
+                        .HasColumnType("decimal(18,7)");
+
+                    b.Property<decimal>("BonusRate")
+                        .HasPrecision(18, 7)
+                        .HasColumnType("decimal(18,7)");
+
+                    b.Property<int>("DayCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EuroFundLotId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EuroFundRevaluationId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("InterestAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<decimal>("OpeningAmount")
+                        .HasPrecision(20, 7)
+                        .HasColumnType("decimal(20,7)");
+
+                    b.Property<DateTime>("PeriodEnd")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("PeriodStart")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("YearBasis")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EuroFundLotId");
+
+                    b.HasIndex("EuroFundRevaluationId", "PeriodStart")
+                        .HasDatabaseName("IX_EuroFundRevaluationDetails_Revaluation_Period");
+
+                    b.ToTable("EuroFundRevaluationDetails", (string)null);
+                });
+
             modelBuilder.Entity("api.Models.FeePolicy", b =>
                 {
                     b.Property<int>("Id")
@@ -6926,6 +7298,43 @@ namespace api.Migrations
                     b.ToTable("PsHistory", (string)null);
                 });
 
+            modelBuilder.Entity("api.Models.ReferenceRate", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("RateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RateType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<decimal>("RateValue")
+                        .HasPrecision(18, 7)
+                        .HasColumnType("decimal(18,7)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RateType", "RateDate", "Source")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ReferenceRates_Type_Date_Source");
+
+                    b.ToTable("ReferenceRates", (string)null);
+                });
+
             modelBuilder.Entity("api.Models.Role", b =>
                 {
                     b.Property<int>("Id")
@@ -10131,6 +10540,118 @@ namespace api.Migrations
                     b.Navigation("FinancialSupport");
                 });
 
+            modelBuilder.Entity("api.Models.EuroFundConfiguration", b =>
+                {
+                    b.HasOne("api.Models.FinancialSupport", "FinancialSupport")
+                        .WithMany()
+                        .HasForeignKey("FinancialSupportId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FinancialSupport");
+                });
+
+            modelBuilder.Entity("api.Models.EuroFundFinancialYear", b =>
+                {
+                    b.HasOne("api.Models.FinancialSupport", "FinancialSupport")
+                        .WithMany()
+                        .HasForeignKey("FinancialSupportId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FinancialSupport");
+                });
+
+            modelBuilder.Entity("api.Models.EuroFundLot", b =>
+                {
+                    b.HasOne("api.Models.Contract", "Contract")
+                        .WithMany()
+                        .HasForeignKey("ContractId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.FinancialSupport", "FinancialSupport")
+                        .WithMany()
+                        .HasForeignKey("FinancialSupportId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.Operation", "SourceOperation")
+                        .WithMany()
+                        .HasForeignKey("SourceOperationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Contract");
+
+                    b.Navigation("FinancialSupport");
+
+                    b.Navigation("SourceOperation");
+                });
+
+            modelBuilder.Entity("api.Models.EuroFundLotMovement", b =>
+                {
+                    b.HasOne("api.Models.EuroFundLot", "EuroFundLot")
+                        .WithMany("Movements")
+                        .HasForeignKey("EuroFundLotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.Operation", "Operation")
+                        .WithMany()
+                        .HasForeignKey("OperationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("EuroFundLot");
+
+                    b.Navigation("Operation");
+                });
+
+            modelBuilder.Entity("api.Models.EuroFundRevaluation", b =>
+                {
+                    b.HasOne("api.Models.Contract", "Contract")
+                        .WithMany()
+                        .HasForeignKey("ContractId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.FinancialSupport", "FinancialSupport")
+                        .WithMany()
+                        .HasForeignKey("FinancialSupportId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.Operation", "Operation")
+                        .WithMany()
+                        .HasForeignKey("OperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Contract");
+
+                    b.Navigation("FinancialSupport");
+
+                    b.Navigation("Operation");
+                });
+
+            modelBuilder.Entity("api.Models.EuroFundRevaluationDetail", b =>
+                {
+                    b.HasOne("api.Models.EuroFundLot", "EuroFundLot")
+                        .WithMany()
+                        .HasForeignKey("EuroFundLotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("api.Models.EuroFundRevaluation", "EuroFundRevaluation")
+                        .WithMany("Details")
+                        .HasForeignKey("EuroFundRevaluationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EuroFundLot");
+
+                    b.Navigation("EuroFundRevaluation");
+                });
+
             modelBuilder.Entity("api.Models.FeePolicy", b =>
                 {
                     b.HasOne("api.Models.Compartment", "Compartment")
@@ -11376,6 +11897,16 @@ namespace api.Migrations
             modelBuilder.Entity("api.Models.Donor", b =>
                 {
                     b.Navigation("Donations");
+                });
+
+            modelBuilder.Entity("api.Models.EuroFundLot", b =>
+                {
+                    b.Navigation("Movements");
+                });
+
+            modelBuilder.Entity("api.Models.EuroFundRevaluation", b =>
+                {
+                    b.Navigation("Details");
                 });
 
             modelBuilder.Entity("api.Models.FinancialSupport", b =>

@@ -19,6 +19,7 @@ using api.Services.TaxReceipts;
 using api.Services.Payments;
 using api.Services.Jobs;
 using api.Services.PersonalDashboard;
+using api.Services.EuroFunds;
 using api.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
@@ -338,6 +339,10 @@ namespace api.Extensions
             services.AddHttpClient<ITwelveDataProvider, TwelveDataProvider>();
             services.AddScoped<IContractValuationService, ContractValuationService>();
             services.AddScoped<ICostBasisService, CostBasisService>();
+            services.AddScoped<EuroFundAccrualCalculator>();
+            services.AddScoped<IEuroFundLotService, EuroFundLotService>();
+            services.AddScoped<IEuroFundValuationService, EuroFundValuationService>();
+            services.AddScoped<IEuroFundRevaluationService, EuroFundRevaluationService>();
             services.AddScoped<IContractAuditService, ContractAuditService>();
             services.AddScoped<IFeeEngine, FeeEngine>();
             services.AddScoped<IManagementFeePolicyResolver, ManagementFeePolicyResolver>();
@@ -361,6 +366,20 @@ namespace api.Extensions
             services.AddScoped<ContractSituationQuestPdfRenderer>();
             services.AddScoped<InformationSystemCartographyDataProvider>();
             services.AddScoped<InformationSystemCartographyQuestPdfRenderer>();
+            services.AddScoped<LegalDocumentRevisionDataProvider>();
+            services.AddScoped<LegalDocumentHtmlPdfRenderer>();
+            services.AddScoped<TaxReceiptDocumentDataProvider>();
+            services.AddScoped<TaxReceiptPdfRenderer>();
+            services.AddScoped<ClientCaseFileDocumentDataProvider>();
+            services.AddScoped<ClientCaseFilePdfMergeRenderer>();
+            services.AddScoped<ContractSheetDocumentDataProvider>();
+            services.AddScoped<ContractSheetPdfRenderer>();
+            services.AddScoped<OperationsHistoryDocumentDataProvider>();
+            services.AddScoped<OperationsHistoryPdfRenderer>();
+            services.AddScoped<AssetAllocationReportDocumentDataProvider>();
+            services.AddScoped<AssetAllocationReportPdfRenderer>();
+            services.AddScoped<BoostSimulationDocumentDataProvider>();
+            services.AddScoped<BoostSimulationHtmlPdfRenderer>();
             services.AddSingleton(new DocumentDefinition(
                 "contract-situation",
                 "Situation du contrat",
@@ -374,7 +393,17 @@ namespace api.Extensions
                 SupportsArchive: false,
                 SupportsEmail: false,
                 typeof(ContractSituationDocumentDataProvider),
-                typeof(ContractSituationQuestPdfRenderer)));
+                typeof(ContractSituationQuestPdfRenderer),
+                DocumentRenderEngine.QuestPdf,
+                DocumentRenderOptions.Default with
+                {
+                    PageSize = "A4",
+                    Orientation = "Portrait",
+                    MarginTopMm = 12,
+                    MarginRightMm = 12,
+                    MarginBottomMm = 12,
+                    MarginLeftMm = 12
+                }));
             services.AddSingleton(new DocumentDefinition(
                 "information-system-cartography",
                 "Cartographie du SI",
@@ -388,7 +417,203 @@ namespace api.Extensions
                 SupportsArchive: false,
                 SupportsEmail: false,
                 typeof(InformationSystemCartographyDataProvider),
-                typeof(InformationSystemCartographyQuestPdfRenderer)));
+                typeof(InformationSystemCartographyQuestPdfRenderer),
+                DocumentRenderEngine.QuestPdf,
+                DocumentRenderOptions.Default with
+                {
+                    PageSize = "A3",
+                    Orientation = "Portrait",
+                    MarginTopMm = 10,
+                    MarginRightMm = 15,
+                    MarginBottomMm = 10,
+                    MarginLeftMm = 15
+                }));
+            services.AddSingleton(new DocumentDefinition(
+                "legal-document-revision",
+                "Document juridique",
+                "html-legal-document-v1",
+                "Document_juridique_{subjectId}_{date}.pdf",
+                "A4",
+                "Portrait",
+                null,
+                SupportsPreview: true,
+                SupportsDownload: true,
+                SupportsArchive: false,
+                SupportsEmail: false,
+                typeof(LegalDocumentRevisionDataProvider),
+                typeof(LegalDocumentHtmlPdfRenderer),
+                DocumentRenderEngine.HtmlToPdf,
+                DocumentRenderOptions.Default with
+                {
+                    PageSize = "A4",
+                    Orientation = "Portrait",
+                    MarginTopMm = 18,
+                    MarginRightMm = 16,
+                    MarginBottomMm = 18,
+                    MarginLeftMm = 16
+                }));
+            services.AddSingleton(new DocumentDefinition(
+                "tax-receipt",
+                "Reçu fiscal",
+                "pdf-template-tax-receipt-v1",
+                "Recu_fiscal_{subjectId}_{date}.pdf",
+                "A4",
+                "Portrait",
+                null,
+                SupportsPreview: true,
+                SupportsDownload: true,
+                SupportsArchive: false,
+                SupportsEmail: false,
+                typeof(TaxReceiptDocumentDataProvider),
+                typeof(TaxReceiptPdfRenderer),
+                DocumentRenderEngine.PdfTemplateOverlay,
+                DocumentRenderOptions.Default with
+                {
+                    PageSize = "A4",
+                    Orientation = "Portrait",
+                    MarginTopMm = 0,
+                    MarginRightMm = 0,
+                    MarginBottomMm = 0,
+                    MarginLeftMm = 0,
+                    PrintBackground = true,
+                    PreferCssPageSize = false,
+                    DisplayHeaderFooter = false
+                }));
+            services.AddSingleton(new DocumentDefinition(
+                "contract-sheet",
+                "Fiche contrat",
+                "pdf-contract-sheet-v1",
+                "Fiche_contrat_{subjectId}_{date}.pdf",
+                "A4",
+                "Portrait",
+                null,
+                SupportsPreview: true,
+                SupportsDownload: true,
+                SupportsArchive: false,
+                SupportsEmail: false,
+                typeof(ContractSheetDocumentDataProvider),
+                typeof(ContractSheetPdfRenderer),
+                DocumentRenderEngine.QuestPdf,
+                DocumentRenderOptions.Default with
+                {
+                    PageSize = "A4",
+                    Orientation = "Portrait",
+                    MarginTopMm = 12,
+                    MarginRightMm = 12,
+                    MarginBottomMm = 12,
+                    MarginLeftMm = 12,
+                    PrintBackground = true,
+                    PreferCssPageSize = false,
+                    DisplayHeaderFooter = true
+                }));
+            services.AddSingleton(new DocumentDefinition(
+                "operations-history",
+                "Historique des opérations",
+                "pdf-operations-history-v1",
+                "Historique_operations_{subjectId}_{date}.pdf",
+                "A4",
+                "Portrait",
+                null,
+                SupportsPreview: true,
+                SupportsDownload: true,
+                SupportsArchive: false,
+                SupportsEmail: false,
+                typeof(OperationsHistoryDocumentDataProvider),
+                typeof(OperationsHistoryPdfRenderer),
+                DocumentRenderEngine.QuestPdf,
+                DocumentRenderOptions.Default with
+                {
+                    PageSize = "A4",
+                    Orientation = "Portrait",
+                    MarginTopMm = 12,
+                    MarginRightMm = 12,
+                    MarginBottomMm = 12,
+                    MarginLeftMm = 12,
+                    PrintBackground = true,
+                    PreferCssPageSize = false,
+                    DisplayHeaderFooter = true
+                }));
+            services.AddSingleton(new DocumentDefinition(
+                "asset-allocation-report",
+                "Rapport d'allocation d'actifs",
+                "pdf-asset-allocation-report-v1",
+                "Allocation_actifs_{subjectId}_{date}.pdf",
+                "A4",
+                "Portrait",
+                null,
+                SupportsPreview: true,
+                SupportsDownload: true,
+                SupportsArchive: false,
+                SupportsEmail: false,
+                typeof(AssetAllocationReportDocumentDataProvider),
+                typeof(AssetAllocationReportPdfRenderer),
+                DocumentRenderEngine.QuestPdf,
+                DocumentRenderOptions.Default with
+                {
+                    PageSize = "A4",
+                    Orientation = "Portrait",
+                    MarginTopMm = 12,
+                    MarginRightMm = 12,
+                    MarginBottomMm = 12,
+                    MarginLeftMm = 12,
+                    PrintBackground = true,
+                    PreferCssPageSize = false,
+                    DisplayHeaderFooter = true
+                }));
+            services.AddSingleton(new DocumentDefinition(
+                "client-case-file",
+                "Dossier client",
+                "pdf-merge-client-case-file-v1",
+                "Dossier_client_{subjectId}_{date}.pdf",
+                "A4",
+                "Portrait",
+                null,
+                SupportsPreview: true,
+                SupportsDownload: true,
+                SupportsArchive: false,
+                SupportsEmail: false,
+                typeof(ClientCaseFileDocumentDataProvider),
+                typeof(ClientCaseFilePdfMergeRenderer),
+                DocumentRenderEngine.PdfMerge,
+                DocumentRenderOptions.Default with
+                {
+                    PageSize = "A4",
+                    Orientation = "Portrait",
+                    MarginTopMm = 12,
+                    MarginRightMm = 12,
+                    MarginBottomMm = 12,
+                    MarginLeftMm = 12,
+                    PrintBackground = true,
+                    PreferCssPageSize = false,
+                    DisplayHeaderFooter = true
+                }));
+            services.AddSingleton(new DocumentDefinition(
+                "boost-simulation",
+                "Simulation Boost",
+                "html-boost-simulation-v1",
+                "Simulation_Boost_{subjectId}_{date}.pdf",
+                "A4",
+                "Portrait",
+                null,
+                SupportsPreview: true,
+                SupportsDownload: true,
+                SupportsArchive: false,
+                SupportsEmail: false,
+                typeof(BoostSimulationDocumentDataProvider),
+                typeof(BoostSimulationHtmlPdfRenderer),
+                DocumentRenderEngine.HtmlToPdf,
+                DocumentRenderOptions.Default with
+                {
+                    PageSize = "A4",
+                    Orientation = "Portrait",
+                    MarginTopMm = 16,
+                    MarginRightMm = 14,
+                    MarginBottomMm = 16,
+                    MarginLeftMm = 14,
+                    PrintBackground = true,
+                    PreferCssPageSize = true,
+                    DisplayHeaderFooter = true
+                }));
             services.AddScoped<IDocumentStructureService, DocumentStructureService>();
             services.AddScoped<ILegalDocumentImportService, LegalDocumentImportService>();
             services.AddScoped<IDocumentNumberingService, DocumentNumberingService>();

@@ -105,6 +105,13 @@ namespace api.Data
         public DbSet<OperationSupportAllocation> OperationSupportAllocations { get; set; }
         public DbSet<ContractSupportHolding> ContractSupportHoldings { get; set; }
         public DbSet<ContractValuation> ContractValuations { get; set; }
+        public DbSet<EuroFundConfiguration> EuroFundConfigurations { get; set; }
+        public DbSet<EuroFundFinancialYear> EuroFundFinancialYears { get; set; }
+        public DbSet<ReferenceRate> ReferenceRates { get; set; }
+        public DbSet<EuroFundLot> EuroFundLots { get; set; }
+        public DbSet<EuroFundLotMovement> EuroFundLotMovements { get; set; }
+        public DbSet<EuroFundRevaluation> EuroFundRevaluations { get; set; }
+        public DbSet<EuroFundRevaluationDetail> EuroFundRevaluationDetails { get; set; }
 
         public DbSet<SupportLookthroughAsset> SupportLookthroughAssets { get; set; }
         public DbSet<TaxProfile> TaxProfiles { get; set; }
@@ -423,6 +430,128 @@ namespace api.Data
                 .Property(fs => fs.SupportNature)
                 .HasConversion<string>()
                 .HasMaxLength(30);
+
+            modelBuilder.Entity<EuroFundConfiguration>(entity =>
+            {
+                entity.ToTable("EuroFundConfigurations");
+                entity.Property(e => e.AccrualMethod).HasConversion<string>().HasMaxLength(40);
+                entity.Property(e => e.ProvisionalRateMethod).HasConversion<string>().HasMaxLength(40);
+                entity.Property(e => e.EarlyExitRateMethod).HasConversion<string>().HasMaxLength(40);
+                entity.Property(e => e.LotConsumptionMethod).HasConversion<string>().HasMaxLength(40);
+                entity.Property(e => e.RateNature).HasConversion<string>().HasMaxLength(40);
+                entity.Property(e => e.ManagementFeeTreatment).HasConversion<string>().HasMaxLength(40);
+                entity.HasOne(e => e.FinancialSupport)
+                    .WithMany()
+                    .HasForeignKey(e => e.FinancialSupportId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasIndex(e => e.FinancialSupportId)
+                    .IsUnique()
+                    .HasDatabaseName("UX_EuroFundConfigurations_FinancialSupport");
+            });
+
+            modelBuilder.Entity<EuroFundFinancialYear>(entity =>
+            {
+                entity.ToTable("EuroFundFinancialYears");
+                entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(30);
+                entity.Property(e => e.RateNature).HasConversion<string>().HasMaxLength(40);
+                entity.HasOne(e => e.FinancialSupport)
+                    .WithMany()
+                    .HasForeignKey(e => e.FinancialSupportId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasIndex(e => new { e.FinancialSupportId, e.Year })
+                    .IsUnique()
+                    .HasDatabaseName("UX_EuroFundFinancialYears_Fund_Year");
+            });
+
+            modelBuilder.Entity<ReferenceRate>(entity =>
+            {
+                entity.ToTable("ReferenceRates");
+                entity.Property(e => e.RateType).HasConversion<string>().HasMaxLength(30);
+                entity.Property(e => e.Source).HasMaxLength(120);
+                entity.HasIndex(e => new { e.RateType, e.RateDate, e.Source })
+                    .IsUnique()
+                    .HasDatabaseName("UX_ReferenceRates_Type_Date_Source");
+            });
+
+            modelBuilder.Entity<EuroFundLot>(entity =>
+            {
+                entity.ToTable("EuroFundLots");
+                entity.Property(e => e.BonusRuleId).HasMaxLength(80);
+                entity.HasOne(e => e.Contract)
+                    .WithMany()
+                    .HasForeignKey(e => e.ContractId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(e => e.FinancialSupport)
+                    .WithMany()
+                    .HasForeignKey(e => e.FinancialSupportId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.SourceOperation)
+                    .WithMany()
+                    .HasForeignKey(e => e.SourceOperationId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(e => new { e.ContractId, e.FinancialSupportId })
+                    .HasDatabaseName("IX_EuroFundLots_Contract_Fund");
+                entity.HasIndex(e => e.ValueDate)
+                    .HasDatabaseName("IX_EuroFundLots_ValueDate");
+                entity.HasIndex(e => e.SourceOperationId)
+                    .HasDatabaseName("IX_EuroFundLots_SourceOperation");
+            });
+
+            modelBuilder.Entity<EuroFundLotMovement>(entity =>
+            {
+                entity.ToTable("EuroFundLotMovements");
+                entity.Property(e => e.MovementType).HasConversion<string>().HasMaxLength(40);
+                entity.HasOne(e => e.EuroFundLot)
+                    .WithMany(l => l.Movements)
+                    .HasForeignKey(e => e.EuroFundLotId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(e => e.Operation)
+                    .WithMany()
+                    .HasForeignKey(e => e.OperationId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(e => new { e.ContractId, e.FinancialSupportId, e.MovementDate })
+                    .HasDatabaseName("IX_EuroFundLotMovements_Contract_Fund_Date");
+                entity.HasIndex(e => e.OperationId)
+                    .HasDatabaseName("IX_EuroFundLotMovements_Operation");
+            });
+
+            modelBuilder.Entity<EuroFundRevaluation>(entity =>
+            {
+                entity.ToTable("EuroFundRevaluations");
+                entity.HasOne(e => e.Operation)
+                    .WithMany()
+                    .HasForeignKey(e => e.OperationId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.Contract)
+                    .WithMany()
+                    .HasForeignKey(e => e.ContractId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(e => e.FinancialSupport)
+                    .WithMany()
+                    .HasForeignKey(e => e.FinancialSupportId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(e => new { e.ContractId, e.FinancialSupportId, e.FinancialYear })
+                    .IsUnique()
+                    .HasDatabaseName("UX_EuroFundRevaluations_Contract_Fund_Year");
+                entity.HasIndex(e => e.OperationId)
+                    .IsUnique()
+                    .HasDatabaseName("UX_EuroFundRevaluations_Operation");
+            });
+
+            modelBuilder.Entity<EuroFundRevaluationDetail>(entity =>
+            {
+                entity.ToTable("EuroFundRevaluationDetails");
+                entity.HasOne(e => e.EuroFundRevaluation)
+                    .WithMany(r => r.Details)
+                    .HasForeignKey(e => e.EuroFundRevaluationId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(e => e.EuroFundLot)
+                    .WithMany()
+                    .HasForeignKey(e => e.EuroFundLotId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(e => new { e.EuroFundRevaluationId, e.PeriodStart })
+                    .HasDatabaseName("IX_EuroFundRevaluationDetails_Revaluation_Period");
+            });
             modelBuilder.Entity<ProductManagementFeePolicy>(entity =>
             {
                 entity.HasOne(p => p.Product)

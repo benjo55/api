@@ -7,6 +7,7 @@ using api.Models;
 using api.Models.Enum;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Globalization;
 using System.Text.Json.Nodes;
 
 namespace api.Services.Payments
@@ -28,6 +29,8 @@ namespace api.Services.Payments
         private readonly HelloAssoOptions _helloAssoOptions;
         private readonly PaymentsOptions _paymentsOptions;
         private readonly IPublicOriginResolver? _publicOriginResolver;
+        private readonly IHttpContextAccessor? _httpContextAccessor;
+        private readonly IHostEnvironment? _environment;
 
         public MeDonationPaymentService(
             ApplicationDBContext db,
@@ -36,7 +39,9 @@ namespace api.Services.Payments
             IBankAccountProtector bankAccountProtector,
             IOptions<HelloAssoOptions> helloAssoOptions,
             IOptions<PaymentsOptions> paymentsOptions,
-            IPublicOriginResolver? publicOriginResolver = null)
+            IPublicOriginResolver? publicOriginResolver = null,
+            IHttpContextAccessor? httpContextAccessor = null,
+            IHostEnvironment? environment = null)
         {
             _db = db;
             _helloAssoProvider = helloAssoProvider;
@@ -45,6 +50,8 @@ namespace api.Services.Payments
             _helloAssoOptions = helloAssoOptions.Value;
             _paymentsOptions = paymentsOptions.Value;
             _publicOriginResolver = publicOriginResolver;
+            _httpContextAccessor = httpContextAccessor;
+            _environment = environment;
         }
 
         public async Task<MeDonationPaymentOptionsDto?> GetPaymentOptionsAsync(int userId, string publicId, CancellationToken cancellationToken)
@@ -68,7 +75,8 @@ namespace api.Services.Payments
 
             EnsurePayableDonation(donation);
             var organizationSlug = ResolveHelloAssoSlug(donation.Organization);
-            if (!IsHelloAssoAvailable(donation.Organization, organizationSlug))
+            var credentialKey = ResolveCredentialKey(donation.Organization);
+            if (!IsHelloAssoAvailable(donation.Organization, organizationSlug, credentialKey))
             {
                 throw new BusinessException("Le paiement HelloAsso n'est pas disponible pour cet organisme.");
             }
@@ -122,7 +130,7 @@ namespace api.Services.Payments
 
             var donor = donation.DonorSnapshot;
             var birthDate = donor?.BirthDate ?? donation.Donor.BirthDate;
-            var credentialKey = ResolveCredentialKey(donation.Organization);
+            var country = NormalizeCountryCode(donor?.Country ?? donation.Donor.CountryCode);
             var metadata = new Dictionary<string, string>
             {
                 ["flow"] = "donation-space",
@@ -147,7 +155,7 @@ namespace api.Services.Payments
                     donor?.AddressLine1 ?? donation.Donor.AddressLine1,
                     donor?.PostalCode ?? donation.Donor.PostalCode,
                     donor?.City ?? donation.Donor.City,
-                    donor?.Country ?? donation.Donor.CountryCode,
+                    country,
                     birthDate,
                     metadata,
                     credentialKey),
@@ -296,6 +304,7 @@ namespace api.Services.Payments
         private MeDonationPaymentOptionsDto MapOptions(Donation donation)
         {
             var organizationSlug = ResolveHelloAssoSlug(donation.Organization);
+            var credentialKey = ResolveCredentialKey(donation.Organization);
             var isPayable = IsPayable(donation);
             var bankAccount = ResolveActiveBankAccount(donation.Organization);
 
@@ -306,7 +315,7 @@ namespace api.Services.Payments
                 donation.Currency,
                 donation.Status.ToString(),
                 isPayable,
-                isPayable && IsHelloAssoAvailable(donation.Organization, organizationSlug),
+                isPayable && IsHelloAssoAvailable(donation.Organization, organizationSlug, credentialKey),
                 isPayable && bankAccount is not null,
                 false,
                 false,
@@ -378,11 +387,13 @@ namespace api.Services.Payments
                 .FirstOrDefault();
         }
 
-        private bool IsHelloAssoAvailable(BeneficiaryOrganization organization, string organizationSlug)
+        private bool IsHelloAssoAvailable(
+            BeneficiaryOrganization organization,
+            string organizationSlug,
+            string? credentialKey)
         {
-            var hasCredentials = _helloAssoOptions.HasCredential(organization.HelloAssoCredentialKey)
-                || (!string.IsNullOrWhiteSpace(ResolveCredentialKey(organization))
-                    && _helloAssoOptions.HasCredential(ResolveCredentialKey(organization)))
+            var hasCredentials = (!string.IsNullOrWhiteSpace(credentialKey)
+                    && _helloAssoOptions.HasCredential(credentialKey))
                 || _helloAssoOptions.HasGlobalCredentials;
 
             return (_helloAssoOptions.Enabled || _helloAssoOptions.HasAnyCredentials)
@@ -394,13 +405,15 @@ namespace api.Services.Payments
         }
 
         private string ResolveHelloAssoSlug(BeneficiaryOrganization organization) =>
-            organization.HelloAssoOrganizationSlug ?? _helloAssoOptions.OrganizationSlug;
+            !string.IsNullOrWhiteSpace(organization.HelloAssoOrganizationSlug)
+                ? organization.HelloAssoOrganizationSlug.Trim()
+                : _helloAssoOptions.OrganizationSlug.Trim();
 
         private string? ResolveCredentialKey(BeneficiaryOrganization organization)
         {
             if (!string.IsNullOrWhiteSpace(organization.HelloAssoCredentialKey))
             {
-                return organization.HelloAssoCredentialKey;
+                return organization.HelloAssoCredentialKey.Trim();
             }
 
             return _helloAssoOptions.Credentials.Count == 1
@@ -435,6 +448,12 @@ namespace api.Services.Payments
 
         private string ResolveDonationOrigin()
         {
+            var requestOrigin = ResolveRequestOrigin();
+            if (!string.IsNullOrWhiteSpace(requestOrigin))
+            {
+                return requestOrigin;
+            }
+
             try
             {
                 return _publicOriginResolver?.GetOrigin(SiteExperience.Donation)
@@ -444,6 +463,58 @@ namespace api.Services.Payments
             {
                 return _paymentsOptions.PublicBaseUrl.TrimEnd('/');
             }
+        }
+
+        private string? ResolveRequestOrigin()
+        {
+            var origin = _httpContextAccessor?.HttpContext?.Request.Headers.Origin.FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(origin)
+                || !Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+                || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            var normalized = uri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
+            if (_environment?.IsDevelopment() == true)
+            {
+                return normalized;
+            }
+
+            var resolved = _publicOriginResolver?.Resolve(uri.Host);
+            return resolved is { IsKnownHost: true, Experience: SiteExperience.Donation }
+                ? normalized
+                : null;
+        }
+
+        private static string NormalizeCountryCode(string country)
+        {
+            var value = country.Trim().ToUpperInvariant();
+            if (value.Length == 2)
+            {
+                return value;
+            }
+
+            if (value.Length == 3)
+            {
+                foreach (var culture in CultureInfo.GetCultures(CultureTypes.SpecificCultures))
+                {
+                    try
+                    {
+                        var region = new RegionInfo(culture.Name);
+                        if (string.Equals(region.ThreeLetterISORegionName, value, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return region.TwoLetterISORegionName.ToUpperInvariant();
+                        }
+                    }
+                    catch (ArgumentException)
+                    {
+                        // Ignore cultures without a usable region.
+                    }
+                }
+            }
+
+            throw new BusinessException("Le pays doit etre renseigne au format ISO2 ou ISO3.");
         }
 
         private async Task<string> GeneratePaymentReferenceAsync(CancellationToken cancellationToken)

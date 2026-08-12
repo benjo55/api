@@ -1,8 +1,13 @@
 using api.Data;
+using api.Dtos.Documents;
 using api.Dtos.LegalDocuments;
 using api.Interfaces;
+using api.Interfaces.Documents;
 using api.Models;
 using api.Models.Enum;
+using api.Services.Documents.Models;
+using api.Services.Documents.Providers;
+using api.Services.Documents.Renderers;
 using api.Services.LegalDocuments;
 using Microsoft.EntityFrameworkCore;
 using UglyToad.PdfPig;
@@ -180,6 +185,76 @@ namespace api.Tests
             Assert.Contains("Page 1 / 3", document.GetPage(1).Text);
             Assert.Contains("Page 2 / 3", document.GetPage(2).Text);
             Assert.Contains("Page 3 / 3", document.GetPage(3).Text);
+        }
+
+        [Fact]
+        public async Task Unified_documents_pipeline_renders_legal_document_revisions()
+        {
+            await using var db = CreateContext();
+            var revision = await SeedDraftRevisionAsync(db);
+            db.LegalDocumentNodes.Add(new LegalDocumentNode
+            {
+                LegalDocumentRevisionId = revision.Id,
+                Type = DocumentNodeType.Chapter,
+                StableKey = "chapter-unified-pdf",
+                Title = "Clause unifiée",
+                ContentHtml = "<p>Contenu juridique riche</p>",
+                SortOrder = 2000
+            });
+            await db.SaveChangesAsync();
+            db.ChangeTracker.Clear();
+
+            var pdfGeneration = new RecordingPdfGenerationService();
+            var renderService = new DocumentRenderService(
+                db,
+                new DocumentNumberingService(),
+                pdfGeneration,
+                new FakeBinaryStorage(),
+                new FakeAuditService());
+            var provider = new LegalDocumentRevisionDataProvider(renderService);
+            var renderer = new LegalDocumentHtmlPdfRenderer(renderService, pdfGeneration);
+            var definition = new DocumentDefinition(
+                "legal-document-revision",
+                "Document juridique",
+                "html-legal-document-v1",
+                "Document_juridique_{subjectId}_{date}.pdf",
+                "A4",
+                "Portrait",
+                null,
+                SupportsPreview: true,
+                SupportsDownload: true,
+                SupportsArchive: false,
+                SupportsEmail: false,
+                typeof(LegalDocumentRevisionDataProvider),
+                typeof(LegalDocumentHtmlPdfRenderer),
+                DocumentRenderEngine.HtmlToPdf,
+                DocumentRenderOptions.Default);
+            var request = new GenerateDocumentRequestDto
+            {
+                SubjectId = revision.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                DeliveryMode = DocumentDeliveryMode.Preview
+            };
+            var context = new DocumentGenerationContext(
+                new System.Security.Claims.ClaimsPrincipal(),
+                null,
+                "test",
+                "fr-FR",
+                "Europe/Paris",
+                DateTimeOffset.UtcNow,
+                DocumentDeliveryMode.Preview,
+                "corr",
+                null);
+
+            var model = (LegalDocumentRevisionDocumentModel)await provider.BuildModelAsync(definition, request, context);
+            var rendered = await renderer.RenderAsync(model, definition, context);
+
+            Assert.Equal("application/pdf", rendered.ContentType);
+            Assert.Equal("GT-1.0-preview.pdf", rendered.FileName);
+            Assert.Equal("A4", pdfGeneration.LastPageFormat);
+            Assert.Contains("General terms", pdfGeneration.LastHtml);
+            Assert.Contains("GT - version 1.0", pdfGeneration.LastHtml);
+            Assert.Equal(revision.Id.ToString(System.Globalization.CultureInfo.InvariantCulture), rendered.Metadata["legalDocumentRevisionId"]);
+            Assert.Equal("HtmlToPdf", definition.RenderEngine.ToString());
         }
 
         [Fact]
@@ -506,6 +581,19 @@ namespace api.Tests
     {
         public Task<byte[]> GeneratePdfAsync(string html, string pageFormat, CancellationToken cancellationToken = default) =>
             Task.FromResult(new byte[] { 1, 2, 3 });
+    }
+
+    internal sealed class RecordingPdfGenerationService : IPdfGenerationService
+    {
+        public string LastHtml { get; private set; } = string.Empty;
+        public string LastPageFormat { get; private set; } = string.Empty;
+
+        public Task<byte[]> GeneratePdfAsync(string html, string pageFormat, CancellationToken cancellationToken = default)
+        {
+            LastHtml = html;
+            LastPageFormat = pageFormat;
+            return Task.FromResult(new byte[] { 37, 80, 68, 70 });
+        }
     }
 
     internal sealed class FakeBinaryStorage : IDocumentBinaryStorage

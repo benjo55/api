@@ -200,17 +200,31 @@ namespace api.Controllers
                 });
             }
 
+            var roleIds = dbUser.UserRoles
+                .Where(ur => ur.Role != null)
+                .Select(ur => ur.RoleId)
+                .ToList();
+
+            var rolePermissionRows = await _context.RolePermissions
+                .Where(rp => roleIds.Contains(rp.RoleId) && rp.Permission != null)
+                .Select(rp => new
+                {
+                    rp.RoleId,
+                    rp.PermissionId,
+                    permissionCode = rp.Permission!.PermissionCode,
+                    permissionName = rp.Permission!.PermissionName
+                })
+                .ToListAsync();
+
             var roles = dbUser.UserRoles
                 .Where(ur => ur.Role != null)
                 .Select(ur => ur.Role!.RoleCode) // Utilisation du null-forgiving operator '!'
                 .ToList();
 
-            var permissions = await _context.RolePermissions
-                .Where(rp => dbUser.UserRoles.Select(ur => ur.RoleId).Contains(rp.RoleId))
-                .Select(rp => rp.Permission != null ? rp.Permission.PermissionCode : string.Empty)
-                .Where(permissionCode => !string.IsNullOrEmpty(permissionCode))
+            var permissions = rolePermissionRows
+                .Select(rp => rp.permissionCode)
                 .Distinct()
-                .ToListAsync();
+                .ToList();
 
             var claims = new List<Claim>
             {
@@ -239,13 +253,46 @@ namespace api.Controllers
             dbUser.LockedUntil = null;
             await _context.SaveChangesAsync();
 
+            var userResponse = new
+            {
+                id = dbUser.Id,
+                firstName = dbUser.FirstName,
+                lastName = dbUser.LastName,
+                username = dbUser.Username,
+                email = dbUser.Email,
+                emailConfirmed = dbUser.EmailConfirmed,
+                accountStatus = dbUser.Status.ToString(),
+                lastLoginAt = dbUser.LastLoginAt,
+                roles = dbUser.UserRoles
+                    .Where(ur => ur.Role != null)
+                    .Select(ur => new
+                    {
+                        id = ur.Role!.Id,
+                        roleCode = ur.Role!.RoleCode,
+                        roleName = ur.Role!.RoleName,
+                        description = ur.Role!.Description,
+                        rolePermissions = rolePermissionRows
+                            .Where(rp => rp.RoleId == ur.Role!.Id)
+                            .Select(rp => new
+                            {
+                                rp.RoleId,
+                                rp.PermissionId,
+                                rp.permissionCode,
+                                rp.permissionName
+                            })
+                            .ToList()
+                    })
+                    .ToList()
+            };
+
             return Ok(new
             {
                 token,
                 username = dbUser.Username,
                 email = dbUser.Email,
                 roles,
-                permissions
+                permissions,
+                user = userResponse
             });
         }
 

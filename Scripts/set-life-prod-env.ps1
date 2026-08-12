@@ -22,9 +22,11 @@ if (-not (Test-Path -LiteralPath $ApiPhysicalPath)) {
 }
 Set-Location -LiteralPath $ApiPhysicalPath
 
-# Domaine canonique front utilise par HelloAsso pour le retour utilisateur.
-# Choisir UN seul domaine et garder le meme partout: https://euroboost.top ou https://www.euroboost.top.
-$FrontBaseUrl = "https://www.euroboost.top"
+# Domaines canoniques front.
+# L'assurance reste sur euroboost.top, les dons et retours HelloAsso sur cerfa.top.
+$InsuranceFrontBaseUrl = "https://www.euroboost.top"
+$DonationFrontBaseUrl = "https://cerfa.top"
+$UrbanizationFrontBaseUrl = "https://urbanisation.world"
 $ApiBaseUrl = "https://api.euroboost.top"
 
 # App Pool IIS de l'API. Adapter au nom reel dans IIS.
@@ -91,25 +93,25 @@ $vars = [ordered]@{
 
     "Jwt__Key"                                                        = $JwtKey
     "Jwt__Issuer"                                                     = $ApiBaseUrl
-    "Jwt__Audience"                                                   = $FrontBaseUrl
+    "Jwt__Audience"                                                   = $InsuranceFrontBaseUrl
     "Jwt__DurationInMinutes"                                          = "60"
 
     "AllowedHosts"                                                    = "api.euroboost.top"
 
     "PublicOrigins__DefaultExperience"                                = "Insurance"
     "PublicOrigins__UnknownHostPolicy"                                = "Reject"
-    "PublicOrigins__Experiences__Insurance__Origin"                   = "https://euroboost.top"
+    "PublicOrigins__Experiences__Insurance__Origin"                   = $InsuranceFrontBaseUrl
     "PublicOrigins__Experiences__Insurance__Domains__0"               = "euroboost.top"
     "PublicOrigins__Experiences__Insurance__Domains__1"               = "www.euroboost.top"
     "PublicOrigins__Experiences__Insurance__Domains__2"               = "api.euroboost.top"
-    "PublicOrigins__Experiences__Donation__Origin"                    = "https://cerfa.top"
+    "PublicOrigins__Experiences__Donation__Origin"                    = $DonationFrontBaseUrl
     "PublicOrigins__Experiences__Donation__Domains__0"                = "cerfa.top"
     "PublicOrigins__Experiences__Donation__Domains__1"                = "www.cerfa.top"
-    "PublicOrigins__Experiences__Urbanization__Origin"                = "https://urbanisation.world"
+    "PublicOrigins__Experiences__Urbanization__Origin"                = $UrbanizationFrontBaseUrl
     "PublicOrigins__Experiences__Urbanization__Domains__0"            = "urbanisation.world"
     "PublicOrigins__Experiences__Urbanization__Domains__1"            = "www.urbanisation.world"
 
-    "Authentication__FrontendBaseUrl"                                 = $FrontBaseUrl
+    "Authentication__FrontendBaseUrl"                                 = $InsuranceFrontBaseUrl
     "Authentication__EmailConfirmationTokenLifetime"                  = "1.00:00:00"
     "Authentication__PasswordResetTokenLifetime"                      = "00:30:00"
     "Authentication__MinimumEmailResendInterval"                      = "00:02:00"
@@ -145,7 +147,7 @@ $vars = [ordered]@{
     "DonationCheckout__StatusPollingMaxSeconds"                       = "120"
     "DonationCheckout__ReceiptTokenLifetimeMinutes"                   = "15"
 
-    "Payments__PublicBaseUrl"                                         = $FrontBaseUrl
+    "Payments__PublicBaseUrl"                                         = $DonationFrontBaseUrl
     "Payments__DefaultCurrency"                                       = "EUR"
     "Payments__BankTransfersEnabled"                                  = "false"
     "Payments__BankEncryptionKey"                                     = $BankEncryptionKey
@@ -160,9 +162,9 @@ $vars = [ordered]@{
     "Payments__HelloAsso__OrganizationSlug"                           = ""
     "Payments__HelloAsso__WebhookSignatureKey"                        = $HelloAssoWebhookSignatureKey
     "Payments__HelloAsso__ItemName"                                   = "Don a l'association"
-    "Payments__HelloAsso__ReturnUrl"                                  = "$FrontBaseUrl/my-space/donations/payment/helloasso/return"
-    "Payments__HelloAsso__BackUrl"                                    = "$FrontBaseUrl/my-space"
-    "Payments__HelloAsso__ErrorUrl"                                   = "$FrontBaseUrl/my-space/donations/payment/helloasso/error"
+    "Payments__HelloAsso__ReturnUrl"                                  = "$DonationFrontBaseUrl/donate/return"
+    "Payments__HelloAsso__BackUrl"                                    = "$DonationFrontBaseUrl/donate"
+    "Payments__HelloAsso__ErrorUrl"                                   = "$DonationFrontBaseUrl/donate/error"
     "Payments__HelloAsso__HttpTimeoutSeconds"                         = "20"
     "Payments__HelloAsso__RetryCount"                                 = "3"
 

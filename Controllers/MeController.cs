@@ -30,6 +30,21 @@ namespace api.Controllers
             return Ok(await _profileService.GetDashboardAsync(userId.Value, cancellationToken));
         }
 
+        [HttpGet("home")]
+        public async Task<IActionResult> GetHome(CancellationToken cancellationToken)
+        {
+            var userId = CurrentUserId();
+            if (!userId.HasValue)
+            {
+                return Unauthorized(new { message = "Utilisateur non authentifié." });
+            }
+
+            var dashboard = await _profileService.GetDashboardAsync(userId.Value, cancellationToken);
+            var privateSpace = await _profileService.GetPrivateSpaceAsync(userId.Value, cancellationToken);
+
+            return Ok(new MeHomeDto(dashboard, privateSpace));
+        }
+
         [HttpGet("private-space")]
         public async Task<IActionResult> GetPrivateSpace(CancellationToken cancellationToken)
         {

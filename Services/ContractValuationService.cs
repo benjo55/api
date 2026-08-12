@@ -13,15 +13,18 @@ public class ContractValuationService : IContractValuationService
     private readonly ApplicationDBContext _context;
     private readonly ILogger<ContractValuationService> _logger;
     private readonly api.Interfaces.ICostBasisService _costBasisService;
+    private readonly api.Interfaces.IEuroFundValuationService _euroFundValuationService;
 
     public ContractValuationService(
         ApplicationDBContext context,
         ILogger<ContractValuationService> logger,
-        api.Interfaces.ICostBasisService costBasisService)
+        api.Interfaces.ICostBasisService costBasisService,
+        api.Interfaces.IEuroFundValuationService euroFundValuationService)
     {
         _context = context;
         _logger = logger;
         _costBasisService = costBasisService;
+        _euroFundValuationService = euroFundValuationService;
     }
 
     // ==========================================================
@@ -69,10 +72,12 @@ public class ContractValuationService : IContractValuationService
             // 3️⃣ Mettre à jour les montants holdings (DERIVÉ)
             foreach (var h in holdings)
             {
-                decimal vl = h.Support?.LastValuationAmount ?? 0m;
+                var isEuroFund = h.Support?.SupportNature == api.Models.Enum.FinancialSupportNature.EuroFund;
 
                 // 1️⃣ Valeur courante
-                h.CurrentAmount = Math.Round(h.TotalShares * vl, 7);
+                h.CurrentAmount = isEuroFund
+                    ? (await _euroFundValuationService.GetValuationAsync(h.ContractId, h.SupportId, DateTime.UtcNow)).EstimatedValue
+                    : Math.Round(h.TotalShares * (h.Support?.LastValuationAmount ?? 0m), 7);
 
                 // 2️⃣ Performance %
                 if (h.TotalInvested > 0)
@@ -109,8 +114,10 @@ public class ContractValuationService : IContractValuationService
             // 5️⃣ 🔥 Recalcul FSA.CurrentAmount = Shares × VL (SOURCE DE VÉRITÉ)
             foreach (var fsa in fsas)
             {
-                decimal vl = fsa.Support?.LastValuationAmount ?? 0m;
-                fsa.CurrentAmount = Math.Round(fsa.CurrentShares * vl, 7);
+                var isEuroFund = fsa.Support?.SupportNature == api.Models.Enum.FinancialSupportNature.EuroFund;
+                fsa.CurrentAmount = isEuroFund
+                    ? (await _euroFundValuationService.GetValuationAsync(fsa.ContractId, fsa.SupportId, DateTime.UtcNow)).EstimatedValue
+                    : Math.Round(fsa.CurrentShares * (fsa.Support?.LastValuationAmount ?? 0m), 7);
                 // ⚠️ InvestedAmount JAMAIS modifié ici
             }
 
@@ -276,11 +283,12 @@ public class ContractValuationService : IContractValuationService
         if (!fsas.Any())
             return 0;
 
-        decimal vl = fsas.First().Support?.LastValuationAmount ?? 0m;
-
         foreach (var fsa in fsas)
         {
-            fsa.CurrentAmount = Math.Round(fsa.CurrentShares * vl, 7);
+            var isEuroFund = fsa.Support?.SupportNature == api.Models.Enum.FinancialSupportNature.EuroFund;
+            fsa.CurrentAmount = isEuroFund
+                ? (await _euroFundValuationService.GetValuationAsync(fsa.ContractId, fsa.SupportId, DateTime.UtcNow)).EstimatedValue
+                : Math.Round(fsa.CurrentShares * (fsa.Support?.LastValuationAmount ?? 0m), 7);
             fsa.UpdatedDate = DateTime.UtcNow;
 
             // InvestedAmount NE CHANGE PAS

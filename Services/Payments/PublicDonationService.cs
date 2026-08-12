@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Globalization;
 using api.Configuration;
 using api.Data;
 using api.Dtos.PublicDonations;
@@ -24,6 +26,8 @@ namespace api.Services.Payments
         private readonly IDonationReceiptAccessTokenService _receiptTokenService;
         private readonly ILogger<PublicDonationService> _logger;
         private readonly IPublicOriginResolver? _publicOriginResolver;
+        private readonly IHttpContextAccessor? _httpContextAccessor;
+        private readonly IHostEnvironment? _environment;
 
         public PublicDonationService(
             ApplicationDBContext db,
@@ -34,7 +38,9 @@ namespace api.Services.Payments
             ITaxReceiptEmailService taxReceiptEmailService,
             IDonationReceiptAccessTokenService receiptTokenService,
             ILogger<PublicDonationService> logger,
-            IPublicOriginResolver? publicOriginResolver = null)
+            IPublicOriginResolver? publicOriginResolver = null,
+            IHttpContextAccessor? httpContextAccessor = null,
+            IHostEnvironment? environment = null)
         {
             _db = db;
             _paymentProvider = paymentProvider;
@@ -45,6 +51,8 @@ namespace api.Services.Payments
             _receiptTokenService = receiptTokenService;
             _logger = logger;
             _publicOriginResolver = publicOriginResolver;
+            _httpContextAccessor = httpContextAccessor;
+            _environment = environment;
         }
 
         public async Task<PublicDonationCheckoutResponse> InitializeCheckoutAsync(PublicDonationCheckoutRequest request, CancellationToken cancellationToken)
@@ -55,6 +63,13 @@ namespace api.Services.Payments
                 .AsTracking()
                 .FirstOrDefaultAsync(x => x.IsActive && x.IsDonationEnabled, cancellationToken)
                 ?? throw new BusinessException("Aucune organisation active pour les dons.");
+
+            var organizationSlug = ResolveHelloAssoSlug(organization);
+            var credentialKey = ResolveCredentialKey(organization);
+            if (!IsHelloAssoAvailable(organization, organizationSlug, credentialKey))
+            {
+                throw new BusinessException("Le paiement HelloAsso n'est pas disponible pour cet organisme.");
+            }
 
             var donor = await FindOrCreateDonorAsync(request.Donor, cancellationToken);
             var reference = await GenerateDonationReferenceAsync(cancellationToken);
@@ -109,7 +124,7 @@ namespace api.Services.Payments
             var returnUrl = BuildReturnUrl(donation.PublicId);
             var checkout = await _paymentProvider.CreateCheckoutAsync(
                 new CreateCheckoutCommand(
-                    _helloAssoOptions.OrganizationSlug,
+                    organizationSlug,
                     amountInCents,
                     _helloAssoOptions.ItemName,
                     returnUrl,
@@ -123,20 +138,22 @@ namespace api.Services.Payments
                     donor.City,
                     donor.CountryCode,
                     donor.BirthDate,
-                    metadata),
+                    metadata,
+                    credentialKey),
                 cancellationToken);
 
             if (!checkout.Success || string.IsNullOrWhiteSpace(checkout.RedirectUrl))
             {
+                var failureMessage = BuildHelloAssoCheckoutFailureMessage(checkout);
                 paymentAttempt.PaymentStatus = PaymentStatus.Refused;
                 paymentAttempt.FailedAt = DateTime.UtcNow;
                 paymentAttempt.FailureCode = checkout.ErrorCode;
-                paymentAttempt.FailureMessage = checkout.ErrorMessage;
+                paymentAttempt.FailureMessage = Truncate(failureMessage, 1000);
                 donation.Status = DonationStatus.Failed;
                 donation.UpdatedAt = DateTime.UtcNow;
                 await _db.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
-                throw new BusinessException("Echec de creation du checkout de paiement.");
+                throw new BusinessException(failureMessage);
             }
 
             paymentAttempt.ProviderCheckoutIntentId = checkout.CheckoutIntentId;
@@ -479,6 +496,8 @@ namespace api.Services.Payments
             {
                 throw new BusinessException("Informations donateur incompletes.");
             }
+
+            _ = NormalizeCountryCode(request.Donor.Country);
         }
 
         private async Task<Donor> FindOrCreateDonorAsync(PublicDonationDonorInput donorInput, CancellationToken cancellationToken)
@@ -489,18 +508,20 @@ namespace api.Services.Payments
 
             if (existing is not null)
             {
+                var countryCode = NormalizeCountryCode(donorInput.Country);
                 existing.FirstName = donorInput.FirstName.Trim();
                 existing.LastName = donorInput.LastName.Trim();
                 existing.Email = normalizedEmail;
                 existing.AddressLine1 = donorInput.Address.Trim();
                 existing.PostalCode = donorInput.PostalCode.Trim();
                 existing.City = donorInput.City.Trim();
-                existing.CountryCode = donorInput.Country.Trim().ToUpperInvariant();
+                existing.CountryCode = countryCode;
                 existing.StreetName = donorInput.Address.Trim();
                 existing.UpdatedAt = DateTime.UtcNow;
                 return existing;
             }
 
+            var donorCountryCode = NormalizeCountryCode(donorInput.Country);
             var donor = new Donor
             {
                 DonorType = DonorType.Individual,
@@ -511,7 +532,7 @@ namespace api.Services.Payments
                 StreetName = donorInput.Address.Trim(),
                 PostalCode = donorInput.PostalCode.Trim(),
                 City = donorInput.City.Trim(),
-                CountryCode = donorInput.Country.Trim().ToUpperInvariant(),
+                CountryCode = donorCountryCode,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
             };
@@ -542,6 +563,70 @@ namespace api.Services.Payments
             return $"DON-{year}-{(max + 1):000000}";
         }
 
+        private bool IsHelloAssoAvailable(
+            BeneficiaryOrganization organization,
+            string organizationSlug,
+            string? credentialKey)
+        {
+            var hasCredentials = (!string.IsNullOrWhiteSpace(credentialKey)
+                    && _helloAssoOptions.HasCredential(credentialKey))
+                || _helloAssoOptions.HasGlobalCredentials;
+
+            return (_helloAssoOptions.Enabled || _helloAssoOptions.HasAnyCredentials)
+                && !string.IsNullOrWhiteSpace(organizationSlug)
+                && hasCredentials
+                && (organization.IsHelloAssoPaymentEnabled
+                    || !string.IsNullOrWhiteSpace(organization.HelloAssoOrganizationSlug)
+                    || !string.IsNullOrWhiteSpace(_helloAssoOptions.OrganizationSlug));
+        }
+
+        private string ResolveHelloAssoSlug(BeneficiaryOrganization organization) =>
+            !string.IsNullOrWhiteSpace(organization.HelloAssoOrganizationSlug)
+                ? organization.HelloAssoOrganizationSlug.Trim()
+                : _helloAssoOptions.OrganizationSlug.Trim();
+
+        private string? ResolveCredentialKey(BeneficiaryOrganization organization)
+        {
+            if (!string.IsNullOrWhiteSpace(organization.HelloAssoCredentialKey))
+            {
+                return organization.HelloAssoCredentialKey.Trim();
+            }
+
+            return _helloAssoOptions.Credentials.Count == 1
+                ? _helloAssoOptions.Credentials.Keys.Single()
+                : null;
+        }
+
+        private static string NormalizeCountryCode(string country)
+        {
+            var value = country.Trim().ToUpperInvariant();
+            if (value.Length == 2)
+            {
+                return value;
+            }
+
+            if (value.Length == 3)
+            {
+                foreach (var culture in CultureInfo.GetCultures(CultureTypes.SpecificCultures))
+                {
+                    try
+                    {
+                        var region = new RegionInfo(culture.Name);
+                        if (string.Equals(region.ThreeLetterISORegionName, value, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return region.TwoLetterISORegionName.ToUpperInvariant();
+                        }
+                    }
+                    catch (ArgumentException)
+                    {
+                        // Ignore cultures without a usable region.
+                    }
+                }
+            }
+
+            throw new BusinessException("Le pays doit etre renseigne au format ISO2 ou ISO3.");
+        }
+
         private string BuildReturnUrl(string publicId)
         {
             var url = BuildDonationUrl("/donate/return");
@@ -553,13 +638,101 @@ namespace api.Services.Payments
         {
             try
             {
-                return $"{_publicOriginResolver?.GetOrigin(SiteExperience.Donation) ?? GetHelloAssoFallbackOrigin()}{path}";
+                return $"{ResolveDonationOrigin()}{path}";
             }
             catch
             {
                 return $"{GetHelloAssoFallbackOrigin()}{path}";
             }
         }
+
+        private string ResolveDonationOrigin()
+        {
+            var requestOrigin = ResolveRequestOrigin();
+            if (!string.IsNullOrWhiteSpace(requestOrigin))
+            {
+                return requestOrigin;
+            }
+
+            return _publicOriginResolver?.GetOrigin(SiteExperience.Donation)
+                ?? GetHelloAssoFallbackOrigin();
+        }
+
+        private string? ResolveRequestOrigin()
+        {
+            var origin = _httpContextAccessor?.HttpContext?.Request.Headers.Origin.FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(origin)
+                || !Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+                || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            var normalized = uri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
+            if (_environment?.IsDevelopment() == true)
+            {
+                return normalized;
+            }
+
+            var resolved = _publicOriginResolver?.Resolve(uri.Host);
+            return resolved is { IsKnownHost: true, Experience: SiteExperience.Donation }
+                ? normalized
+                : null;
+        }
+
+        private static string BuildHelloAssoCheckoutFailureMessage(CreateCheckoutResult checkout)
+        {
+            var detail = ExtractHelloAssoErrorDetail(checkout.RawTechnicalPayload)
+                ?? checkout.ErrorMessage
+                ?? "Reponse HelloAsso non exploitable.";
+
+            return string.IsNullOrWhiteSpace(checkout.ErrorCode)
+                ? $"HelloAsso a refuse la creation du paiement : {detail}"
+                : $"HelloAsso a refuse la creation du paiement (HTTP {checkout.ErrorCode}) : {detail}";
+        }
+
+        private static string? ExtractHelloAssoErrorDetail(string? rawPayload)
+        {
+            if (string.IsNullOrWhiteSpace(rawPayload))
+            {
+                return null;
+            }
+
+            try
+            {
+                var root = JsonNode.Parse(rawPayload);
+                var firstObjectError = root?["errors"]?.AsArray().OfType<JsonObject>().FirstOrDefault();
+                var objectErrorMessage = firstObjectError?["message"]?.GetValue<string>();
+                if (!string.IsNullOrWhiteSpace(objectErrorMessage))
+                {
+                    return objectErrorMessage;
+                }
+
+                var errorsObject = root?["errors"]?.AsObject();
+                if (errorsObject is not null)
+                {
+                    var firstValidationError = errorsObject
+                        .SelectMany(x => x.Value?.AsArray().Select(v => v?.ToString()) ?? [])
+                        .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
+
+                    if (!string.IsNullOrWhiteSpace(firstValidationError))
+                    {
+                        return firstValidationError;
+                    }
+                }
+
+                return root?["detail"]?.GetValue<string>()
+                    ?? root?["title"]?.GetValue<string>()
+                    ?? Truncate(rawPayload, 300);
+            }
+            catch
+            {
+                return Truncate(rawPayload, 300);
+            }
+        }
+
+        private static string Truncate(string value, int maxLength) =>
+            value.Length <= maxLength ? value : value[..maxLength];
 
         private string GetHelloAssoFallbackOrigin()
         {

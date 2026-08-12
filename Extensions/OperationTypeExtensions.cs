@@ -17,5 +17,13 @@ namespace api.Models
                        or OperationType.FreePayment
                        or OperationType.ScheduledPayment;
         }
+
+        public static bool IsPositionIncrease(this OperationType type)
+        {
+            return type.IsPayment()
+                   || type is OperationType.InterestPayment
+                              or OperationType.ParticipationBenefit
+                              or OperationType.CouponDetachment;
+        }
     }
 }

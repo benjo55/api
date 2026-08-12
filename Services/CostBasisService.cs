@@ -95,9 +95,7 @@ namespace api.Services
                 {
                     var position = GetPosition(allocation);
 
-                    if (operation.Type is OperationType.InitialPayment or
-                        OperationType.FreePayment or
-                        OperationType.ScheduledPayment)
+                    if (operation.Type.IsPositionIncrease())
                     {
                         position.Shares += allocation.Shares ?? 0m;
                         position.CostBasis += allocation.Amount ?? 0m;

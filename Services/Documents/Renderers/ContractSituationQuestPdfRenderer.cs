@@ -17,13 +17,17 @@ namespace api.Services.Documents.Renderers
         {
             var document = (ContractSituationDocumentModel)model;
             var theme = DocumentTheme.Default;
+            var options = definition.EffectiveRenderOptions;
 
             var bytes = QuestPDF.Fluent.Document.Create(container =>
             {
                 container.Page(page =>
                 {
-                    page.Size(PageSizes.A4);
-                    page.Margin(28);
+                    page.Size(DocumentRendererHelpers.ResolvePageSize(options));
+                    page.MarginTop(DocumentRendererHelpers.Millimeters(options.MarginTopMm));
+                    page.MarginRight(DocumentRendererHelpers.Millimeters(options.MarginRightMm));
+                    page.MarginBottom(DocumentRendererHelpers.Millimeters(options.MarginBottomMm));
+                    page.MarginLeft(DocumentRendererHelpers.Millimeters(options.MarginLeftMm));
                     page.DefaultTextStyle(style => style
                         .FontFamily(theme.FontFamily)
                         .FontSize(9)

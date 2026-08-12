@@ -53,6 +53,10 @@ namespace api.Dtos.Me
         IReadOnlyList<MeNewsItemDto> NewsFeed,
         IReadOnlyList<MeFinancialFeedItemDto> FinancialFeed);
 
+    public sealed record MeHomeDto(
+        MeDashboardDto Dashboard,
+        MePrivateSpaceDto PrivateSpace);
+
     public sealed record MeDonationSummaryDto(
         int DonationCount,
         decimal ConfirmedTotalAmount,

@@ -31,6 +31,8 @@ namespace api.Controllers
                 x.TemplateVersion,
                 x.DefaultPageSize,
                 x.DefaultOrientation,
+                RenderEngine = x.RenderEngine.ToString(),
+                RenderOptions = x.EffectiveRenderOptions,
                 x.SupportsPreview,
                 x.SupportsDownload,
                 x.SupportsArchive,
@@ -50,6 +52,24 @@ namespace api.Controllers
                     request,
                     User,
                     cancellationToken);
+
+                Response.Headers["X-Document-Type"] = result.DocumentType;
+                Response.Headers["X-Document-Template-Version"] = result.TemplateVersion;
+                Response.Headers["X-Document-Generated-At"] = result.GeneratedAt.ToString("O");
+                if (!string.IsNullOrWhiteSpace(result.Hash))
+                {
+                    Response.Headers["X-Document-Hash"] = result.Hash;
+                }
+
+                if (result.Metadata.TryGetValue("correlationId", out var correlationId))
+                {
+                    Response.Headers["X-Document-Correlation-Id"] = correlationId;
+                }
+
+                if (result.Metadata.TryGetValue("renderEngine", out var renderEngine))
+                {
+                    Response.Headers["X-Document-Render-Engine"] = renderEngine;
+                }
 
                 return File(result.Content, result.ContentType, result.FileName);
             }

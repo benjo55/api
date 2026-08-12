@@ -204,7 +204,7 @@ namespace api.Services.Payments
             for (var attempt = 1; attempt <= maxRetries; attempt++)
             {
                 var accessToken = await _tokenProvider.GetAccessTokenAsync(cancellationToken, credentialKey);
-                var request = BuildRequest(method, path, payload, accessToken);
+                var request = BuildRequest(method, ResolveApiUri(path, credentialKey), payload, accessToken);
                 var client = _httpClientFactory.CreateClient("helloasso-api");
                 var response = await client.SendAsync(request, cancellationToken);
 
@@ -227,9 +227,22 @@ namespace api.Services.Payments
             throw new InvalidOperationException("Appel HelloAsso impossible.");
         }
 
-        private static HttpRequestMessage BuildRequest(HttpMethod method, string path, object? payload, string accessToken)
+        private Uri ResolveApiUri(string path, string? credentialKey)
         {
-            var request = new HttpRequestMessage(method, path);
+            var apiBaseUrl = _options.ApiBaseUrl;
+            if (!string.IsNullOrWhiteSpace(credentialKey)
+                && _options.Credentials.TryGetValue(credentialKey.Trim(), out var credential)
+                && !string.IsNullOrWhiteSpace(credential.ApiBaseUrl))
+            {
+                apiBaseUrl = credential.ApiBaseUrl;
+            }
+
+            return new Uri(new Uri(apiBaseUrl.TrimEnd('/') + "/"), path.TrimStart('/'));
+        }
+
+        private static HttpRequestMessage BuildRequest(HttpMethod method, Uri uri, object? payload, string accessToken)
+        {
+            var request = new HttpRequestMessage(method, uri);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 

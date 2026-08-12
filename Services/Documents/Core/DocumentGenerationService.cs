@@ -48,11 +48,12 @@ namespace api.Services.Documents.Core
                 ReadParameterString(request, "asOfDate"));
 
             _logger.LogInformation(
-                "Document generation started. CorrelationId={CorrelationId}, DocumentType={DocumentType}, SubjectId={SubjectId}, DeliveryMode={DeliveryMode}, User={User}",
+                "Document generation started. CorrelationId={CorrelationId}, DocumentType={DocumentType}, SubjectId={SubjectId}, DeliveryMode={DeliveryMode}, RenderEngine={RenderEngine}, User={User}",
                 context.CorrelationId,
                 definition.Key,
                 request.SubjectId,
                 request.DeliveryMode,
+                definition.RenderEngine,
                 context.UserName ?? "anonymous");
 
             var provider = (IDocumentDataProvider)_serviceProvider.GetRequiredService(definition.DataProviderType);
@@ -62,11 +63,13 @@ namespace api.Services.Documents.Core
             var rendered = await renderer.RenderAsync(model, definition, context, cancellationToken);
             var fileName = SanitizeFileName(rendered.FileName ?? BuildFileName(definition, request, context));
             var hash = await ComputeHashAsync(rendered.Content, cancellationToken);
+            var metadata = BuildMetadata(definition, context, rendered.Metadata);
 
             _logger.LogInformation(
-                "Document generation completed. CorrelationId={CorrelationId}, DocumentType={DocumentType}, FileName={FileName}, ContentLength={ContentLength}, Hash={Hash}",
+                "Document generation completed. CorrelationId={CorrelationId}, DocumentType={DocumentType}, RenderEngine={RenderEngine}, FileName={FileName}, ContentLength={ContentLength}, Hash={Hash}",
                 context.CorrelationId,
                 definition.Key,
+                definition.RenderEngine,
                 fileName,
                 rendered.Content.CanSeek ? rendered.Content.Length : null,
                 hash);
@@ -80,7 +83,7 @@ namespace api.Services.Documents.Core
                 definition.TemplateVersion,
                 generatedAt,
                 hash,
-                rendered.Metadata);
+                metadata);
         }
 
         private static void EnsureDeliveryModeAllowed(DocumentDefinition definition, DocumentDeliveryMode deliveryMode)
@@ -129,6 +132,33 @@ namespace api.Services.Documents.Core
             return definition.DefaultFileNamePattern
                 .Replace("{subjectId}", subject, StringComparison.OrdinalIgnoreCase)
                 .Replace("{date}", date, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static IReadOnlyDictionary<string, string> BuildMetadata(
+            DocumentDefinition definition,
+            DocumentGenerationContext context,
+            IReadOnlyDictionary<string, string> renderedMetadata)
+        {
+            var options = definition.EffectiveRenderOptions;
+            var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["documentType"] = definition.Key,
+                ["displayName"] = definition.DisplayName,
+                ["templateVersion"] = definition.TemplateVersion,
+                ["renderEngine"] = definition.RenderEngine.ToString(),
+                ["pageSize"] = options.PageSize,
+                ["orientation"] = options.Orientation,
+                ["deliveryMode"] = context.DeliveryMode.ToString(),
+                ["correlationId"] = context.CorrelationId,
+                ["generatedAt"] = context.GeneratedAt.ToString("O")
+            };
+
+            foreach (var item in renderedMetadata)
+            {
+                metadata[item.Key] = item.Value;
+            }
+
+            return metadata;
         }
 
         private static string SanitizeFileName(string fileName)

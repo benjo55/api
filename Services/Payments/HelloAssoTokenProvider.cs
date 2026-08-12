@@ -128,8 +128,9 @@ namespace api.Services.Payments
 
         private HelloAssoCredentialOptions ResolveCredentials(string? credentialKey)
         {
-            if (!string.IsNullOrWhiteSpace(credentialKey)
-                && _options.Credentials.TryGetValue(credentialKey, out var credential)
+            var normalizedCredentialKey = NormalizeCredentialKey(credentialKey);
+            if (normalizedCredentialKey != "__global__"
+                && _options.Credentials.TryGetValue(normalizedCredentialKey, out var credential)
                 && credential.HasCredentials)
             {
                 return new HelloAssoCredentialOptions

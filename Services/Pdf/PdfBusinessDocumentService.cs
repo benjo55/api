@@ -38,6 +38,32 @@ namespace api.Services.Pdf
             return await _pdfDocumentService.GenerateAsync(documentRequest, cancellationToken);
         }
 
+        public async Task<PdfGeneratedFileDto> GenerateOperationsHistoryAsync(GenerateOperationsHistoryRequestDto request, CancellationToken cancellationToken = default)
+        {
+            var contract = await LoadContractOrThrowAsync(request.ContractId);
+            var operations = await LoadOperationsAsync(request.ContractId);
+            var documentRequest = BuildOperationsHistoryDocument(
+                contract,
+                operations,
+                request.FileName,
+                request.LogoBase64,
+                request.LogoUrl);
+
+            return await _pdfDocumentService.GenerateAsync(documentRequest, cancellationToken);
+        }
+
+        public async Task<PdfGeneratedFileDto> GenerateAssetAllocationReportAsync(GenerateAssetAllocationReportRequestDto request, CancellationToken cancellationToken = default)
+        {
+            var contract = await LoadContractOrThrowAsync(request.ContractId);
+            var documentRequest = BuildAssetAllocationDocument(
+                contract,
+                request.FileName,
+                request.LogoBase64,
+                request.LogoUrl);
+
+            return await _pdfDocumentService.GenerateAsync(documentRequest, cancellationToken);
+        }
+
         public async Task<PdfGeneratedFileDto> GenerateClientCaseFileAsync(GenerateClientCaseFileRequestDto request, CancellationToken cancellationToken = default)
         {
             var contract = await LoadContractOrThrowAsync(request.ContractId);

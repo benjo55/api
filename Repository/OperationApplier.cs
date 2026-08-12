@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using api.Interfaces;
 using api.Models;
+using api.Models.Enum;
 using Microsoft.EntityFrameworkCore;
 
 namespace api.Repository
@@ -22,6 +23,17 @@ namespace api.Repository
     /// </summary>
     public sealed class OperationApplier : IOperationApplier
     {
+        private readonly IEuroFundLotService? _euroFundLotService;
+
+        public OperationApplier()
+        {
+        }
+
+        public OperationApplier(IEuroFundLotService euroFundLotService)
+        {
+            _euroFundLotService = euroFundLotService;
+        }
+
         public async Task ApplyAsync(
             Operation operation,
             DbContext context,
@@ -53,6 +65,9 @@ namespace api.Repository
                 case OperationType.InitialPayment:
                 case OperationType.FreePayment:
                 case OperationType.ScheduledPayment:
+                case OperationType.ParticipationBenefit:
+                case OperationType.InterestPayment:
+                case OperationType.CouponDetachment:
                     await ApplyPaymentAsync(operation, allocations, context, cancellationToken);
                     break;
 
@@ -73,6 +88,11 @@ namespace api.Repository
                     break;
                 default:
                     return;
+            }
+
+            if (_euroFundLotService != null)
+            {
+                await _euroFundLotService.ApplyOperationAsync(operation, context, cancellationToken);
             }
         }
 
@@ -106,6 +126,13 @@ namespace api.Repository
 
                 var shares = alloc.Shares ?? 0m;
                 var amount = alloc.Amount ?? 0m;
+                if (shares <= 0m && amount > 0m && await IsEuroFundAsync(alloc, context, ct))
+                {
+                    shares = amount;
+                    alloc.Shares = shares;
+                    alloc.NavAtOperation ??= 1m;
+                    alloc.NavDateAtOperation ??= operation.OperationDate.Date;
+                }
 
                 if (shares <= 0 || amount <= 0)
                     throw new InvalidOperationException(
@@ -144,6 +171,13 @@ namespace api.Repository
 
                 var shares = alloc.Shares ?? 0m;
                 var amount = alloc.Amount ?? 0m;
+                if (shares <= 0m && amount > 0m && await IsEuroFundAsync(alloc, context, ct))
+                {
+                    shares = amount;
+                    alloc.Shares = shares;
+                    alloc.NavAtOperation ??= 1m;
+                    alloc.NavDateAtOperation ??= operation.OperationDate.Date;
+                }
 
                 if (shares <= 0 || amount <= 0)
                     throw new InvalidOperationException(
@@ -217,6 +251,13 @@ namespace api.Repository
 
                 var shares = alloc.Shares ?? 0m;
                 var amount = alloc.Amount ?? 0m;
+                if (shares <= 0m && amount > 0m && await IsEuroFundAsync(alloc, context, ct))
+                {
+                    shares = amount;
+                    alloc.Shares = shares;
+                    alloc.NavAtOperation ??= 1m;
+                    alloc.NavDateAtOperation ??= operation.OperationDate.Date;
+                }
 
                 if (shares <= 0 || amount <= 0)
                     throw new InvalidOperationException(
@@ -303,6 +344,13 @@ namespace api.Repository
 
                 var shares = alloc.Shares ?? 0m;
                 var amount = alloc.Amount ?? 0m;
+                if (shares <= 0m && amount > 0m && await IsEuroFundAsync(alloc, context, ct))
+                {
+                    shares = amount;
+                    alloc.Shares = shares;
+                    alloc.NavAtOperation ??= 1m;
+                    alloc.NavDateAtOperation ??= operation.OperationDate.Date;
+                }
 
                 if (shares <= 0 || amount <= 0)
                     throw new InvalidOperationException("Arbitrage SOURCE invalide");
@@ -373,6 +421,13 @@ namespace api.Repository
 
                 var shares = alloc.Shares ?? 0m;
                 var amount = alloc.Amount ?? 0m;
+                if (shares <= 0m && amount > 0m && await IsEuroFundAsync(alloc, context, ct))
+                {
+                    shares = amount;
+                    alloc.Shares = shares;
+                    alloc.NavAtOperation ??= 1m;
+                    alloc.NavDateAtOperation ??= operation.OperationDate.Date;
+                }
 
                 if (shares <= 0 || amount <= 0)
                     throw new InvalidOperationException("Arbitrage TARGET invalide");
@@ -409,6 +464,21 @@ namespace api.Repository
 
         private static decimal RoundBasis(decimal value) =>
             Math.Round(value, 7, MidpointRounding.AwayFromZero);
+
+        private static async Task<bool> IsEuroFundAsync(
+            OperationSupportAllocation allocation,
+            DbContext context,
+            CancellationToken ct)
+        {
+            if (allocation.Support?.SupportNature == FinancialSupportNature.EuroFund)
+                return true;
+
+            var support = await context.Set<FinancialSupport>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Id == allocation.SupportId, ct);
+
+            return support?.SupportNature == FinancialSupportNature.EuroFund;
+        }
 
         private static async Task<FinancialSupportAllocation> GetOrCreateFsaAsync(
             Operation operation,

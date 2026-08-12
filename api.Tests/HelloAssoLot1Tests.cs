@@ -243,6 +243,80 @@ public sealed class HelloAssoLot1Tests
         Assert.Equal("1964-09-29", document.RootElement.GetProperty("payer").GetProperty("dateOfBirth").GetString());
     }
 
+    [Fact]
+    public async Task Checkout_uses_credential_specific_api_base_url()
+    {
+        var requestedUris = new List<Uri>();
+        var handler = new FakeHttpHandler(request =>
+        {
+            requestedUris.Add(request.RequestUri!);
+            if (request.RequestUri?.AbsolutePath == "/oauth2/token")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"access_token\":\"token-1\",\"expires_in\":3600}", Encoding.UTF8, "application/json"),
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"id\":\"checkout-1\",\"redirectUrl\":\"https://helloasso.example/checkout-1\"}", Encoding.UTF8, "application/json"),
+            };
+        });
+        var client = new HttpClient(handler) { BaseAddress = new Uri("https://api.helloasso.com") };
+        var factory = new SingleClientFactory(client);
+        var options = Options.Create(new HelloAssoOptions
+        {
+            Enabled = true,
+            BaseUrl = "https://api.helloasso.com",
+            TokenBaseUrl = "https://api.helloasso.com",
+            ApiBaseUrl = "https://api.helloasso.com",
+            ClientId = "global-id",
+            ClientSecret = "global-secret",
+            RetryCount = 1,
+            Credentials = new Dictionary<string, HelloAssoCredentialOptions>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["acic-sandbox"] = new()
+                {
+                    ClientId = "sandbox-id",
+                    ClientSecret = "sandbox-secret",
+                    TokenBaseUrl = "https://api.helloasso-sandbox.com",
+                    ApiBaseUrl = "https://api.helloasso-sandbox.com",
+                },
+            },
+        });
+        var provider = new HelloAssoPaymentProvider(
+            factory,
+            new HelloAssoTokenProvider(factory, options, NullLogger<HelloAssoTokenProvider>.Instance),
+            options,
+            NullLogger<HelloAssoPaymentProvider>.Instance);
+
+        var result = await provider.CreateCheckoutAsync(
+            new CreateCheckoutCommand(
+                "acic-tests",
+                5000,
+                "Don INT-2026-000001",
+                "https://cerfa.top/return",
+                "https://cerfa.top/back",
+                "https://cerfa.top/error",
+                "Alain",
+                "Verse",
+                "alain@example.com",
+                "5 Rue Truffaut",
+                "75017",
+                "Paris",
+                "FR",
+                null,
+                new Dictionary<string, string>(),
+                "acic-sandbox"),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Contains(
+            requestedUris,
+            uri => uri.AbsoluteUri == "https://api.helloasso-sandbox.com/v5/organizations/acic-tests/checkout-intents");
+    }
+
     private sealed class SingleClientFactory : IHttpClientFactory
     {
         private readonly HttpClient _client;

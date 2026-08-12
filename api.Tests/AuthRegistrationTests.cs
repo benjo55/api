@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using System.Text.Json;
 using api.Configuration;
 using api.Controllers;
 using api.Data;
@@ -279,6 +280,66 @@ public class AuthRegistrationTests
         Assert.Contains(
             AuthenticationAccountService.EmailConfirmationRequiredCode,
             unauthorized.Value?.ToString() ?? "");
+    }
+
+    [Fact]
+    public async Task Login_ReturnsHydratedUserForImmediateFrontendSession()
+    {
+        await using var db = CreateDbContext();
+        var role = new Role
+        {
+            RoleCode = "User",
+            RoleName = "Utilisateur"
+        };
+        var permission = new Permission
+        {
+            PermissionCode = "MENU_CONTRACTS",
+            PermissionName = "Menu - Contrats"
+        };
+        var user = new User
+        {
+            Username = "benjamin",
+            NormalizedUsername = "BENJAMIN",
+            FirstName = "Benjamin",
+            LastName = "Dupont",
+            Email = "benjamin@example.com",
+            NormalizedEmail = "BENJAMIN@EXAMPLE.COM",
+            PhoneNumber = "0612345678",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Motdepasse10!"),
+            EmailConfirmed = true,
+            Status = UserStatus.Active
+        };
+        db.Users.Add(user);
+        db.Roles.Add(role);
+        db.Permissions.Add(permission);
+        await db.SaveChangesAsync();
+
+        db.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = role.Id });
+        db.RolePermissions.Add(new RolePermission
+        {
+            RoleId = role.Id,
+            PermissionId = permission.Id
+        });
+        await db.SaveChangesAsync();
+        var (controller, _) = CreateController(db);
+
+        var result = await controller.Login(new LoginRequestDto
+        {
+            Username = "benjamin",
+            Password = "Motdepasse10!"
+        });
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+        var root = json.RootElement;
+        Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("token").GetString()));
+        Assert.Equal("benjamin", root.GetProperty("user").GetProperty("username").GetString());
+        Assert.Equal(
+            "User",
+            root.GetProperty("user").GetProperty("roles")[0].GetProperty("roleCode").GetString());
+        Assert.Equal(
+            "MENU_CONTRACTS",
+            root.GetProperty("user").GetProperty("roles")[0].GetProperty("rolePermissions")[0].GetProperty("permissionCode").GetString());
     }
 
     [Fact]

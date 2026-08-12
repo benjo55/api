@@ -192,6 +192,13 @@ namespace api.Services
 
                     foreach (var alloc in op.Allocations)
                     {
+                        if (alloc.Support?.SupportNature == FinancialSupportNature.EuroFund)
+                        {
+                            var amount = alloc.Amount ?? 0m;
+                            finalized.Add((alloc, 1m, op.OperationDate.Date, NumericPolicy.RoundShares(amount)));
+                            continue;
+                        }
+
                         var navRow = await _context.SupportHistoricalDatas
                             .Where(h =>
                                 h.FinancialSupportId == alloc.SupportId &&
@@ -960,6 +967,9 @@ namespace api.Services
 
         private async Task<decimal> GetPostingNavAsync(FinancialSupport support, int supportId, DateTime valuationDate)
         {
+            if (support.SupportNature == FinancialSupportNature.EuroFund)
+                return 1m;
+
             decimal? historicalNav = await _context.SupportHistoricalDatas
                 .Where(h =>
                     h.FinancialSupportId == supportId &&
@@ -1073,7 +1083,7 @@ namespace api.Services
                 return allocation.Flow == OperationFlow.Target ? shares : -shares;
             }
 
-            if (allocation.Operation.Type.IsPayment())
+            if (allocation.Operation.Type.IsPositionIncrease())
                 return shares;
 
             if (allocation.Operation.Type.IsWithdrawal())

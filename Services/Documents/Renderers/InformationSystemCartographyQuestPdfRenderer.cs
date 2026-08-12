@@ -14,8 +14,6 @@ namespace api.Services.Documents.Renderers
     {
         private const string DocumentFontFamily = "Century Gothic";
         private const int BodyFontSize = 11;
-        private const int HorizontalMargin = 60;
-        private const int VerticalMargin = 30;
 
         public Task<RenderedDocument> RenderAsync(
             object model,
@@ -25,14 +23,17 @@ namespace api.Services.Documents.Renderers
         {
             var document = (InformationSystemCartographyDocumentModel)model;
             var theme = DocumentTheme.Default;
+            var options = definition.EffectiveRenderOptions;
 
             var bytes = QuestPDF.Fluent.Document.Create(container =>
             {
                 container.Page(page =>
                 {
-                    page.Size(PageSizes.A3);
-                    page.MarginHorizontal(HorizontalMargin);
-                    page.MarginVertical(VerticalMargin);
+                    page.Size(DocumentRendererHelpers.ResolvePageSize(options));
+                    page.MarginTop(DocumentRendererHelpers.Millimeters(options.MarginTopMm));
+                    page.MarginRight(DocumentRendererHelpers.Millimeters(options.MarginRightMm));
+                    page.MarginBottom(DocumentRendererHelpers.Millimeters(options.MarginBottomMm));
+                    page.MarginLeft(DocumentRendererHelpers.Millimeters(options.MarginLeftMm));
                     page.DefaultTextStyle(style => style
                         .FontFamily(DocumentFontFamily)
                         .FontSize(BodyFontSize)
@@ -154,6 +155,12 @@ namespace api.Services.Documents.Renderers
                     continue;
                 }
 
+                if (block.Table is not null)
+                {
+                    ComposeRichTable(sectionColumn, block.Table);
+                    continue;
+                }
+
                 if (block.ImageBytes is not null)
                 {
                     var imageContainer = sectionColumn.Item()
@@ -175,6 +182,91 @@ namespace api.Services.Documents.Renderers
             }
         }
 
+        private static void ComposeRichTable(
+            ColumnDescriptor sectionColumn,
+            RichContentTable richTable)
+        {
+            var columnCount = richTable.Rows.Max(row => row.Cells.Count);
+            if (columnCount <= 0)
+            {
+                return;
+            }
+
+            sectionColumn.Item().PaddingTop(5).PaddingBottom(5).Table(table =>
+            {
+                table.ColumnsDefinition(columns =>
+                {
+                    for (var index = 0; index < columnCount; index++)
+                    {
+                        columns.RelativeColumn();
+                    }
+                });
+
+                foreach (var row in richTable.Rows)
+                {
+                    for (var cellIndex = 0; cellIndex < columnCount; cellIndex++)
+                    {
+                        var cell = cellIndex < row.Cells.Count
+                            ? row.Cells[cellIndex]
+                            : new RichContentCell(string.Empty, false, null);
+                        var text = table.Cell()
+                            .Element(container => StyleRichTableCell(container, richTable, row, cell))
+                            .Text(cell.Text);
+
+                        text.FontSize(BodyFontSize)
+                            .LineHeight(1.2f)
+                            .FontColor(Colors.Grey.Darken4);
+
+                        if (cell.IsHeader)
+                        {
+                            text.Bold();
+                        }
+                    }
+                }
+            });
+        }
+
+        private static IContainer StyleRichTableCell(
+            IContainer container,
+            RichContentTable richTable,
+            RichContentRow row,
+            RichContentCell cell)
+        {
+            var borderWidth = CssSizeToPoints(richTable.BorderWidth, 1, 0, 3);
+            var padding = CssSizeToPoints(richTable.CellPadding, 8, 2, 14);
+            var styled = container;
+
+            if (borderWidth > 0)
+            {
+                styled = styled
+                    .Border(borderWidth)
+                    .BorderColor(NormalizePdfColor(richTable.BorderColor, Colors.Grey.Lighten2));
+            }
+
+            var rowBackground = NormalizePdfColor(row.BackgroundColor, string.Empty, allowTransparent: true);
+            var headerBackground = NormalizePdfColor(richTable.HeaderBg, string.Empty, allowTransparent: true);
+            if (!string.IsNullOrWhiteSpace(rowBackground) &&
+                !rowBackground.Equals("transparent", StringComparison.OrdinalIgnoreCase))
+            {
+                styled = styled.Background(rowBackground);
+            }
+            else if (cell.IsHeader &&
+                !string.IsNullOrWhiteSpace(headerBackground) &&
+                !headerBackground.Equals("transparent", StringComparison.OrdinalIgnoreCase))
+            {
+                styled = styled.Background(headerBackground);
+            }
+
+            styled = styled.Padding(padding);
+
+            return (cell.TextAlign ?? string.Empty).Trim().ToLowerInvariant() switch
+            {
+                "center" => styled.AlignCenter(),
+                "right" => styled.AlignRight(),
+                _ => styled.AlignLeft()
+            };
+        }
+
         private static IEnumerable<RichContentBlock> ParseRichContentBlocks(
             string? html,
             string fallbackText)
@@ -190,33 +282,48 @@ namespace api.Services.Documents.Renderers
                 yield break;
             }
 
-            var imageMatches = Regex.Matches(html, "<img\\b[^>]*>", RegexOptions.IgnoreCase);
+            var embeddedBlockMatches = Regex.Matches(
+                html,
+                "<table\\b[\\s\\S]*?</table>|<img\\b[^>]*>",
+                RegexOptions.IgnoreCase);
             var cursor = 0;
             var emitted = false;
 
-            foreach (Match imageMatch in imageMatches)
+            foreach (Match embeddedBlockMatch in embeddedBlockMatches)
             {
-                foreach (var textBlock in ParseTextBlocks(html[cursor..imageMatch.Index]))
+                foreach (var textBlock in ParseTextBlocks(html[cursor..embeddedBlockMatch.Index]))
                 {
                     emitted = true;
                     yield return RichContentBlock.ForText(textBlock);
                 }
 
-                var imageTag = imageMatch.Value;
-                var src = ReadHtmlAttribute(imageTag, "src");
-                var width = ParseImageWidthPoints(
-                    ReadHtmlAttribute(imageTag, "width") ??
-                    ReadStyleWidth(ReadHtmlAttribute(imageTag, "style")));
-
-                if (TryReadDataImage(src, out var imageBytes, out var svg))
+                if (embeddedBlockMatch.Value.StartsWith("<table", StringComparison.OrdinalIgnoreCase))
                 {
-                    emitted = true;
-                    yield return svg is null
-                        ? RichContentBlock.ForImage(imageBytes!, width)
-                        : RichContentBlock.ForSvg(svg, width);
+                    var table = ParseHtmlTable(embeddedBlockMatch.Value);
+                    if (table is not null)
+                    {
+                        emitted = true;
+                        yield return RichContentBlock.ForTable(table);
+                    }
+                }
+                else
+                {
+                    var imageTag = embeddedBlockMatch.Value;
+                    var src = ReadHtmlAttribute(imageTag, "src");
+                    var width = ParseImageWidthPoints(
+                        ReadHtmlAttribute(imageTag, "width") ??
+                        ReadStyleWidth(ReadHtmlAttribute(imageTag, "style")));
+
+                    if (TryReadDataImage(src, out var imageBytes, out var svg))
+                    {
+                        emitted = true;
+                        yield return svg is null
+                            ? RichContentBlock.ForImage(imageBytes!, width)
+                            : RichContentBlock.ForSvg(svg, width);
+                    }
                 }
 
-                cursor = imageMatch.Index + imageMatch.Length;
+                cursor = embeddedBlockMatch.Index + embeddedBlockMatch.Length;
             }
 
             foreach (var textBlock in ParseTextBlocks(html[cursor..]))
@@ -233,6 +340,71 @@ namespace api.Services.Documents.Renderers
                     yield return RichContentBlock.ForText(fallback);
                 }
             }
+        }
+
+        private static RichContentTable? ParseHtmlTable(string tableHtml)
+        {
+            var tableTag = Regex.Match(tableHtml, "^\\s*<table\\b[^>]*>", RegexOptions.IgnoreCase).Value;
+            var rows = new List<RichContentRow>();
+            var rowMatches = Regex.Matches(
+                tableHtml,
+                "<tr\\b(?<attrs>[^>]*)>(?<content>[\\s\\S]*?)</tr>",
+                RegexOptions.IgnoreCase);
+
+            foreach (Match rowMatch in rowMatches)
+            {
+                var cells = new List<RichContentCell>();
+                var cellMatches = Regex.Matches(
+                    rowMatch.Groups["content"].Value,
+                    "<(?<tag>td|th)\\b(?<attrs>[^>]*)>(?<content>[\\s\\S]*?)</\\k<tag>>",
+                    RegexOptions.IgnoreCase);
+
+                foreach (Match cellMatch in cellMatches)
+                {
+                    var attrs = cellMatch.Groups["attrs"].Value;
+                    var tag = cellMatch.Groups["tag"].Value;
+                    var style = ReadHtmlAttribute(attrs, "style");
+                    var textAlign =
+                        ReadHtmlAttribute(attrs, "data-text-align") ??
+                        ReadStyleValue(style, "text-align");
+
+                    cells.Add(new RichContentCell(
+                        StripInlineHtml(cellMatch.Groups["content"].Value),
+                        tag.Equals("th", StringComparison.OrdinalIgnoreCase),
+                        textAlign));
+                }
+
+                if (cells.Count > 0)
+                {
+                    var rowAttrs = rowMatch.Groups["attrs"].Value;
+                    var rowStyle = ReadHtmlAttribute(rowAttrs, "style");
+                    rows.Add(new RichContentRow(
+                        cells,
+                        ReadHtmlAttribute(rowAttrs, "data-row-bg") ??
+                        ReadStyleValue(rowStyle, "background-color")));
+                }
+            }
+
+            if (rows.Count == 0)
+            {
+                return null;
+            }
+
+            var tableStyle = ReadHtmlAttribute(tableTag, "style");
+            return new RichContentTable(
+                rows,
+                ReadHtmlAttribute(tableTag, "data-border-width") ??
+                    ReadStyleValue(tableStyle, "--rte-table-border-width") ??
+                    "1px",
+                ReadHtmlAttribute(tableTag, "data-border-color") ??
+                    ReadStyleValue(tableStyle, "--rte-table-border-color") ??
+                    Colors.Grey.Lighten2,
+                ReadHtmlAttribute(tableTag, "data-cell-padding") ??
+                    ReadStyleValue(tableStyle, "--rte-table-cell-padding") ??
+                    "8px",
+                ReadHtmlAttribute(tableTag, "data-header-bg") ??
+                    ReadStyleValue(tableStyle, "--rte-table-header-bg") ??
+                    Colors.Blue.Lighten5);
         }
 
         private static IEnumerable<string> ParseTextBlocks(string html)
@@ -416,13 +588,74 @@ namespace api.Services.Documents.Renderers
 
         private static string? ReadStyleWidth(string? style)
         {
+            return ReadStyleValue(style, "width");
+        }
+
+        private static string? ReadStyleValue(string? style, string property)
+        {
             if (string.IsNullOrWhiteSpace(style))
             {
                 return null;
             }
 
-            var match = Regex.Match(style, "(?:^|;)\\s*width\\s*:\\s*(?<value>[^;]+)", RegexOptions.IgnoreCase);
+            var match = Regex.Match(
+                style,
+                "(?:^|;)\\s*" + Regex.Escape(property) + "\\s*:\\s*(?<value>[^;]+)",
+                RegexOptions.IgnoreCase);
             return match.Success ? match.Groups["value"].Value.Trim() : null;
+        }
+
+        private static float CssSizeToPoints(string? value, float fallbackPixels, float minPoints, float maxPoints)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return (float)Math.Clamp(fallbackPixels * 0.75d, minPoints, maxPoints);
+            }
+
+            var match = Regex.Match(value, "(?<value>[0-9]+(?:[\\.,][0-9]+)?)");
+            if (!match.Success ||
+                !double.TryParse(
+                    match.Groups["value"].Value.Replace(',', '.'),
+                    NumberStyles.Number,
+                    CultureInfo.InvariantCulture,
+                    out var pixels))
+            {
+                return (float)Math.Clamp(fallbackPixels * 0.75d, minPoints, maxPoints);
+            }
+
+            return (float)Math.Clamp(pixels * 0.75d, minPoints, maxPoints);
+        }
+
+        private static string NormalizePdfColor(
+            string? value,
+            string fallback,
+            bool allowTransparent = false)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return fallback;
+            }
+
+            var normalized = value.Trim();
+            if (allowTransparent &&
+                normalized.Equals("transparent", StringComparison.OrdinalIgnoreCase))
+            {
+                return "transparent";
+            }
+
+            var match = Regex.Match(normalized, "^#(?<hex>[0-9a-f]{3}|[0-9a-f]{6})$", RegexOptions.IgnoreCase);
+            if (!match.Success)
+            {
+                return fallback;
+            }
+
+            var hex = match.Groups["hex"].Value;
+            if (hex.Length == 3)
+            {
+                hex = string.Concat(hex.Select(character => $"{character}{character}"));
+            }
+
+            return $"#{hex.ToUpperInvariant()}";
         }
 
         private static float? ParseImageWidthPoints(string? width)
@@ -621,15 +854,35 @@ namespace api.Services.Documents.Renderers
             string? Text,
             byte[]? ImageBytes,
             string? Svg,
-            float? WidthPoints)
+            float? WidthPoints,
+            RichContentTable? Table)
         {
-            public static RichContentBlock ForText(string text) => new(text, null, null, null);
+            public static RichContentBlock ForText(string text) => new(text, null, null, null, null);
 
             public static RichContentBlock ForImage(byte[] imageBytes, float? widthPoints) =>
-                new(null, imageBytes, null, widthPoints);
+                new(null, imageBytes, null, widthPoints, null);
 
             public static RichContentBlock ForSvg(string svg, float? widthPoints) =>
-                new(null, null, svg, widthPoints);
+                new(null, null, svg, widthPoints, null);
+
+            public static RichContentBlock ForTable(RichContentTable table) =>
+                new(null, null, null, null, table);
         }
+
+        private sealed record RichContentTable(
+            IReadOnlyList<RichContentRow> Rows,
+            string BorderWidth,
+            string BorderColor,
+            string CellPadding,
+            string HeaderBg);
+
+        private sealed record RichContentRow(
+            IReadOnlyList<RichContentCell> Cells,
+            string? BackgroundColor);
+
+        private sealed record RichContentCell(
+            string Text,
+            bool IsHeader,
+            string? TextAlign);
     }
 }

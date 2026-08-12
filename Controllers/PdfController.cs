@@ -18,8 +18,11 @@ namespace api.Controllers
         }
 
         [HttpPost("generate")]
+        [Obsolete("Use /api/documents/{documentType}/generate instead.")]
         public async Task<IActionResult> Generate([FromBody] GeneratePdfRequestDto request, CancellationToken cancellationToken)
         {
+            AddDeprecatedEndpointHeader();
+
             if (!ModelState.IsValid)
             {
                 return ValidationProblem(ModelState);
@@ -30,8 +33,11 @@ namespace api.Controllers
         }
 
         [HttpPost("merge")]
+        [Obsolete("Use /api/documents/{documentType}/generate instead.")]
         public async Task<IActionResult> Merge([FromBody] MergePdfRequestDto request, CancellationToken cancellationToken)
         {
+            AddDeprecatedEndpointHeader();
+
             if (!ModelState.IsValid)
             {
                 return ValidationProblem(ModelState);
@@ -47,8 +53,11 @@ namespace api.Controllers
         }
 
         [HttpPost("contract-sheet")]
+        [Obsolete("Use /api/documents/contract-sheet/generate instead.")]
         public async Task<IActionResult> GenerateContractSheet([FromBody] GenerateContractSheetRequestDto request, CancellationToken cancellationToken)
         {
+            AddDeprecatedEndpointHeader();
+
             if (!ModelState.IsValid)
             {
                 return ValidationProblem(ModelState);
@@ -66,8 +75,11 @@ namespace api.Controllers
         }
 
         [HttpPost("client-case-file")]
+        [Obsolete("Use /api/documents/client-case-file/generate instead.")]
         public async Task<IActionResult> GenerateClientCaseFile([FromBody] GenerateClientCaseFileRequestDto request, CancellationToken cancellationToken)
         {
+            AddDeprecatedEndpointHeader();
+
             if (!ModelState.IsValid)
             {
                 return ValidationProblem(ModelState);
@@ -86,6 +98,11 @@ namespace api.Controllers
             {
                 return BadRequest(ex.Message);
             }
+        }
+
+        private void AddDeprecatedEndpointHeader()
+        {
+            Response.Headers["Warning"] = "299 - \"Deprecated PDF endpoint; use /api/documents/{documentType}/generate\"";
         }
     }
 }

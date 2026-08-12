@@ -20,11 +20,12 @@ public class CostBasisServiceTests
         context.AddRange(contract, source, target, compartment);
         context.Operations.AddRange(
             Operation(1, OperationType.FreePayment, Allocation(source, compartment, 100m, 10m)),
-            Operation(2, OperationType.PartialWithdrawal, Allocation(source, compartment, 30m, 2m)),
-            Operation(3, OperationType.Arbitrage,
+            Operation(2, OperationType.InterestPayment, Allocation(source, compartment, 20m, 2m)),
+            Operation(3, OperationType.PartialWithdrawal, Allocation(source, compartment, 30m, 2m)),
+            Operation(4, OperationType.Arbitrage,
                 Allocation(source, compartment, 45m, 3m, OperationFlow.Source),
                 Allocation(target, compartment, 45m, 5m, OperationFlow.Target)),
-            Operation(4, OperationType.ManagementFee, Allocation(source, compartment, 10m, 1m)));
+            Operation(5, OperationType.ManagementFee, Allocation(source, compartment, 10m, 1m)));
 
         context.FinancialSupportAllocations.AddRange(
             new FinancialSupportAllocation
@@ -35,7 +36,7 @@ public class CostBasisServiceTests
                 SupportId = 1,
                 Compartment = compartment,
                 CompartmentId = 1,
-                CurrentShares = 4m,
+                CurrentShares = 6m,
             },
             new FinancialSupportAllocation
             {
@@ -48,7 +49,7 @@ public class CostBasisServiceTests
                 CurrentShares = 5m,
             });
         context.ContractSupportHoldings.AddRange(
-            new ContractSupportHolding { Contract = contract, ContractId = 1, Support = source, SupportId = 1, CompartmentId = 1, TotalShares = 4m },
+            new ContractSupportHolding { Contract = contract, ContractId = 1, Support = source, SupportId = 1, CompartmentId = 1, TotalShares = 6m },
             new ContractSupportHolding { Contract = contract, ContractId = 1, Support = target, SupportId = 2, CompartmentId = 1, TotalShares = 5m });
         await context.SaveChangesAsync();
 
@@ -59,11 +60,11 @@ public class CostBasisServiceTests
         var sourceHolding = await context.ContractSupportHoldings.SingleAsync(h => h.SupportId == 1);
         var targetHolding = await context.ContractSupportHoldings.SingleAsync(h => h.SupportId == 2);
 
-        Assert.Equal(40m, sourceFsa.InvestedAmount);
+        Assert.Equal(60m, sourceFsa.InvestedAmount);
         Assert.Equal(45m, targetFsa.InvestedAmount);
         Assert.Equal(10m, sourceHolding.Pru);
         Assert.Equal(9m, targetHolding.Pru);
-        Assert.Equal(85m, result.TotalRemainingCostBasis);
+        Assert.Equal(105m, result.TotalRemainingCostBasis);
         Assert.Equal(0m, result.MaximumShareDelta);
     }
 
