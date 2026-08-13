@@ -1,5 +1,4 @@
 
-using System.Data.SqlClient;
 using api.Data;
 using api.Dtos.Generic;
 using api.Dtos.Insurer;
@@ -7,6 +6,7 @@ using api.Helpers;
 using api.Interfaces;
 using api.Mappers;
 using api.Models;
+using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewComponents;
 using Microsoft.EntityFrameworkCore;
@@ -85,9 +85,19 @@ namespace api.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateInsurerRequestDto InsurerDto)
         {
-            var InsurerModel = InsurerDto.ToInsurerFromCreateDto();
-            await _insurerRepository.CreateAsync(InsurerModel);
-            return CreatedAtAction(nameof(GetById), new { Id = InsurerModel.Id }, InsurerModel.ToInsurerDto());
+            var duplicateResult = await FindDuplicateInsurerAsync(InsurerDto);
+            if (duplicateResult != null) return duplicateResult;
+
+            try
+            {
+                var InsurerModel = InsurerDto.ToInsurerFromCreateDto();
+                await _insurerRepository.CreateAsync(InsurerModel);
+                return CreatedAtAction(nameof(GetById), new { Id = InsurerModel.Id }, InsurerModel.ToInsurerDto());
+            }
+            catch (DbUpdateException ex) when (IsUniqueInsurerConstraintViolation(ex))
+            {
+                return Conflict(new { message = GetUniqueInsurerConstraintMessage(ex) });
+            }
         }
 
         [HttpPut]
@@ -127,6 +137,79 @@ namespace api.Controllers
             var insurer = await _insurerRepository.PatchLockedAsync(id, locked);
             if (insurer == null) return NotFound();
             return Ok(insurer.ToInsurerDto());
+        }
+
+        private async Task<IActionResult?> FindDuplicateInsurerAsync(CreateInsurerRequestDto insurerDto)
+        {
+            if (!string.IsNullOrWhiteSpace(insurerDto.Siren))
+            {
+                var siren = insurerDto.Siren.Trim();
+                var existingBySiren = await _context.Insurers
+                    .AsNoTracking()
+                    .Where(insurer => insurer.Siren == siren)
+                    .Select(insurer => new { insurer.Id, insurer.Name })
+                    .FirstOrDefaultAsync();
+
+                if (existingBySiren != null)
+                {
+                    return Conflict(new
+                    {
+                        message = $"Un assureur existe déjà avec le SIREN {siren} : {existingBySiren.Name}.",
+                        field = "siren",
+                        existingId = existingBySiren.Id,
+                        existingName = existingBySiren.Name
+                    });
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(insurerDto.Lei))
+            {
+                var lei = insurerDto.Lei.Trim().ToUpperInvariant();
+                var existingByLei = await _context.Insurers
+                    .AsNoTracking()
+                    .Where(insurer => insurer.Lei == lei)
+                    .Select(insurer => new { insurer.Id, insurer.Name })
+                    .FirstOrDefaultAsync();
+
+                if (existingByLei != null)
+                {
+                    return Conflict(new
+                    {
+                        message = $"Un assureur existe déjà avec le LEI {lei} : {existingByLei.Name}.",
+                        field = "lei",
+                        existingId = existingByLei.Id,
+                        existingName = existingByLei.Name
+                    });
+                }
+            }
+
+            return null;
+        }
+
+        private static bool IsUniqueInsurerConstraintViolation(DbUpdateException ex)
+        {
+            if (ex.InnerException is not SqlException sqlException) return false;
+            if (sqlException.Number is not (2601 or 2627)) return false;
+
+            return sqlException.Message.Contains("UX_Insurers_Siren", StringComparison.OrdinalIgnoreCase)
+                || sqlException.Message.Contains("UX_Insurers_Lei", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string GetUniqueInsurerConstraintMessage(DbUpdateException ex)
+        {
+            var message = ex.InnerException?.Message ?? ex.Message;
+
+            if (message.Contains("UX_Insurers_Siren", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Un assureur existe déjà avec ce SIREN.";
+            }
+
+            if (message.Contains("UX_Insurers_Lei", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Un assureur existe déjà avec ce LEI.";
+            }
+
+            return "Un assureur existe déjà avec cet identifiant unique.";
         }
 
     }

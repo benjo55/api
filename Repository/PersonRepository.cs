@@ -233,13 +233,21 @@ namespace api.Repository
             return existingPerson;
         }
 
-        public async Task<List<PersonTypeaheadDto>> GetTypeaheadAsync(string search)
+        public async Task<List<PersonTypeaheadDto>> GetTypeaheadAsync(string search, bool hasContracts = false, int limit = 50)
         {
             if (string.IsNullOrWhiteSpace(search) || search.Length < 2)
                 return new List<PersonTypeaheadDto>();
 
-            return await _context.Persons
-                .Where(p => p.FirstName.Contains(search) || p.LastName.Contains(search))
+            var normalizedLimit = Math.Clamp(limit, 1, 100);
+
+            var persons = _context.Persons
+                .AsNoTracking()
+                .Where(p => p.FirstName.Contains(search) || p.LastName.Contains(search));
+
+            if (hasContracts)
+                persons = persons.Where(p => p.Contracts.Any());
+
+            return await persons
                 .OrderBy(p => p.LastName)
                 .ThenBy(p => p.FirstName)
                 .Select(p => new PersonTypeaheadDto
@@ -250,7 +258,7 @@ namespace api.Repository
                     BirthDate = p.BirthDate,
                     BirthCity = p.BirthCity,
                 })
-                .Take(50)
+                .Take(normalizedLimit)
                 .ToListAsync();
         }
 

@@ -19,7 +19,7 @@ namespace api.Interfaces
         Task<Person?> UpdateAsync(int id, UpdatePersonRequestDto personDto);
         Task<Person?> DeleteAsync(int id);
         Task<bool> PersonExists(int id);
-        Task<List<PersonTypeaheadDto>> GetTypeaheadAsync(string search);
+        Task<List<PersonTypeaheadDto>> GetTypeaheadAsync(string search, bool hasContracts = false, int limit = 50);
         Task<bool> IsPersonBeneficiary(int personId);
         Task<bool> HasContracts(int personId);
         Task<Person?> PatchLockedAsync(int id, bool locked);

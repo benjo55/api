@@ -113,9 +113,12 @@ namespace api.Controllers
         }
 
         [HttpGet("typeahead")]
-        public async Task<IActionResult> GetTypeahead([FromQuery] string search)
+        public async Task<IActionResult> GetTypeahead(
+            [FromQuery] string search,
+            [FromQuery] bool hasContracts = false,
+            [FromQuery] int limit = 50)
         {
-            var results = await _personRepository.GetTypeaheadAsync(search);
+            var results = await _personRepository.GetTypeaheadAsync(search, hasContracts, limit);
             return Ok(new { items = results });
         }
 
