@@ -40,6 +40,14 @@ namespace api.Models
         Custom
     }
 
+    public enum EuroFundValueDateRule
+    {
+        SameDay,
+        NextCalendarDay,
+        NextBusinessDay,
+        FixedDelay
+    }
+
     public enum EuroFundRateNature
     {
         NetOfManagementFees,
@@ -89,6 +97,8 @@ namespace api.Models
         [Precision(18, 7)] public decimal? PreviousFinalRatePercentage { get; set; }
         public EuroFundEarlyExitRateMethod EarlyExitRateMethod { get; set; } = EuroFundEarlyExitRateMethod.ProvisionalRate;
         public EuroFundLotConsumptionMethod LotConsumptionMethod { get; set; } = EuroFundLotConsumptionMethod.ProRata;
+        public EuroFundValueDateRule ValueDateRule { get; set; } = EuroFundValueDateRule.NextBusinessDay;
+        public int ValueDateDelayDays { get; set; } = 1;
         public EuroFundRateNature RateNature { get; set; } = EuroFundRateNature.NetOfManagementFees;
         public EuroFundManagementFeeTreatment ManagementFeeTreatment { get; set; } = EuroFundManagementFeeTreatment.IncludedInServedRate;
         [Precision(18, 7)] public decimal? MinimumGuaranteedRate { get; set; }

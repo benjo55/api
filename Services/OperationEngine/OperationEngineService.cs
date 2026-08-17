@@ -56,7 +56,9 @@ namespace api.Services
                 onlyStrategy);
 
             IQueryable<FinancialSupport> query = _context.FinancialSupports
-                .Where(s => !string.IsNullOrWhiteSpace(s.ISIN));
+                .Where(s =>
+                    !string.IsNullOrWhiteSpace(s.ISIN) &&
+                    s.SupportNature != FinancialSupportNature.EuroFund);
 
             // 🔹 Mode test : uniquement supports “stratégie”
             if (onlyStrategy)

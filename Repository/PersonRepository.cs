@@ -117,9 +117,47 @@ namespace api.Repository
 
             var pagedPersons = await _context.Persons
                 .AsNoTracking()
-                .AsSplitQuery()
-                .Include(p => p.Contracts)
                 .Where(p => pagedIds.Contains(p.Id))
+                .Select(p => new Person
+                {
+                    Id = p.Id,
+                    FirstName = p.FirstName,
+                    LastName = p.LastName,
+                    BirthCountry = p.BirthCountry,
+                    BirthCity = p.BirthCity,
+                    BirthDate = p.BirthDate,
+                    Sex = p.Sex,
+                    Role = p.Role,
+                    Status = p.Status,
+                    PhoneNumber = p.PhoneNumber,
+                    Email1 = p.Email1,
+                    Email2 = p.Email2,
+                    TaxAddress = p.TaxAddress,
+                    PostalAddress = p.PostalAddress,
+                    UserId = p.UserId,
+                    CreatedDate = p.CreatedDate,
+                    UpdatedDate = p.UpdatedDate,
+                    Locked = p.Locked,
+                    Contracts = p.Contracts
+                        .OrderByDescending(c => c.CreatedDate)
+                        .Select(c => new Contract
+                        {
+                            Id = c.Id,
+                            ContractNumber = c.ContractNumber,
+                            ContractLabel = c.ContractLabel,
+                            ContractType = c.ContractType,
+                            Status = c.Status,
+                            PersonId = c.PersonId,
+                            ProductId = c.ProductId,
+                            ProductVersionId = c.ProductVersionId,
+                            BeneficiaryClauseId = c.BeneficiaryClauseId,
+                            CurrentValue = c.CurrentValue,
+                            CreatedDate = c.CreatedDate,
+                            UpdatedDate = c.UpdatedDate,
+                            Locked = c.Locked
+                        })
+                        .ToList()
+                })
                 .ToListAsync();
 
             var order = pagedIds
@@ -137,7 +175,8 @@ namespace api.Repository
                 Items = pagedPersons,
                 TotalCount = totalCount,
                 TotalPages = totalPages,
-                HasNextPage = hasNextPage
+                HasNextPage = hasNextPage,
+                CurrentPage = query.PageNumber
             };
         }
 

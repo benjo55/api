@@ -447,10 +447,10 @@ namespace api.Services
                     EmailDelivered: true);
             }
 
-            _logger.LogWarning("E-mail de confirmation non envoyé (SMTP/Mailjet indisponible ou mal configuré) pour UserId={UserId}", user.Id);
+            _logger.LogWarning("E-mail de confirmation non envoyé (SMTP/Brevo indisponible ou mal configuré) pour UserId={UserId}", user.Id);
             return new AuthActionResult(
                 "CONFIRMATION_EMAIL_RESEND_FAILED",
-                "Le message de confirmation n’a pas pu être envoyé. Vérifiez la configuration SMTP/Mailjet et les journaux serveur.",
+                "Le message de confirmation n’a pas pu être envoyé. Vérifiez la configuration SMTP/Brevo et les journaux serveur.",
                 EmailDelivered: false);
         }
 

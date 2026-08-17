@@ -6,6 +6,8 @@ using api.Interfaces;
 using api.Models;
 using api.Services;
 using api.Mappers;
+using api.Dtos.Person;
+using api.Models.Enum;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -174,11 +176,121 @@ namespace api.Repository
         // -------------------- GET --------------------
         public async Task<PagedResult<Contract>> GetAllAsync(QueryObject query)
         {
-            var contracts = _context.Contracts
+            var contracts = BuildContractListQuery(query)
                 .Include(c => c.Person)
                 .Include(c => c.Product)
                 .Include(c => c.ProductVersion)
-                .Include(c => c.BeneficiaryClause)
+                .AsQueryable();
+
+            var totalCount = await contracts.CountAsync();
+            var totalPages = (int)Math.Ceiling((double)totalCount / query.PageSize);
+            var skipNumber = (query.PageNumber - 1) * query.PageSize;
+
+            return new PagedResult<Contract>
+            {
+                Items = await contracts.Skip(skipNumber).Take(query.PageSize).ToListAsync(),
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                HasNextPage = query.PageNumber < totalPages,
+                CurrentPage = query.PageNumber
+            };
+        }
+
+        public async Task<PagedResult<ContractDto>> GetListAsync(QueryObject query)
+        {
+            var contracts = BuildContractListQuery(query);
+
+            var totalCount = await contracts.CountAsync();
+            var totalPages = (int)Math.Ceiling((double)totalCount / query.PageSize);
+            var skipNumber = (query.PageNumber - 1) * query.PageSize;
+
+            var items = await contracts
+                .Skip(skipNumber)
+                .Take(query.PageSize)
+                .Select(c => new ContractDto
+                {
+                    Id = c.Id,
+                    ContractNumber = c.ContractNumber,
+                    ContractLabel = c.ContractLabel,
+                    ContractType = c.ContractType,
+                    Status = c.Status,
+                    Locked = c.Locked,
+
+                    DateSign = c.DateSign,
+                    DateEffect = c.DateEffect,
+                    DateMaturity = c.DateMaturity,
+
+                    PostalAddress = c.PostalAddress,
+                    TaxAddress = c.TaxAddress,
+                    Currency = c.Currency,
+                    PersonId = c.PersonId,
+                    ProductId = c.ProductId,
+                    ProductVersionId = c.ProductVersionId,
+                    ProductVersionCode = c.ProductVersion != null ? c.ProductVersion.VersionCode : null,
+                    ProductVersionName = c.ProductVersion != null ? c.ProductVersion.VersionName : null,
+                    ProductCode = c.Product != null ? c.Product.ProductCode : null,
+                    ProductName = c.Product != null ? c.Product.ProductName : null,
+                    ContractFamily = c.Product != null ? c.Product.ContractFamily : null,
+
+                    BeneficiaryClauseId = c.BeneficiaryClauseId,
+                    InitialPremium = c.InitialPremium,
+                    TotalPaidPremiums = c.TotalPaidPremiums,
+                    TotalPayments = c.TotalPayments,
+                    TotalWithdrawals = c.TotalWithdrawals,
+                    TotalSwitches = c.TotalSwitches,
+                    TotalSwitchesAmount = c.TotalSwitchesAmount,
+                    NetInvested = c.NetInvested,
+                    PerformancePercent = c.PerformancePercent,
+                    CurrentValue = c.CurrentValue,
+                    RedemptionValue = c.RedemptionValue,
+
+                    PaymentMode = c.PaymentMode,
+                    ScheduledPayment = c.ScheduledPayment,
+
+                    EntryFeesRate = c.EntryFeesRate,
+                    ManagementFeesRate = c.ManagementFeesRate,
+                    ExitFeesRate = c.ExitFeesRate,
+                    AdvisorComment = c.AdvisorComment,
+                    HasAlert = c.HasAlert,
+                    ExternalReference = c.ExternalReference,
+
+                    CreatedByUserId = c.CreatedByUserId,
+                    LastModifiedByUserId = c.LastModifiedByUserId,
+                    CreatedDate = c.CreatedDate,
+                    UpdatedDate = c.UpdatedDate,
+
+                    Person = c.Person == null ? null : new PersonDto
+                    {
+                        Id = c.Person.Id,
+                        FirstName = c.Person.FirstName,
+                        LastName = c.Person.LastName,
+                        BirthDate = c.Person.BirthDate,
+                        BirthCity = c.Person.BirthCity
+                    }
+                })
+                .ToListAsync();
+
+            foreach (var item in items)
+            {
+                item.ContractFamilyLabel = item.ContractFamily.HasValue
+                    ? item.ContractFamily.Value.ToLabel()
+                    : null;
+            }
+
+            return new PagedResult<ContractDto>
+            {
+                Items = items,
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                HasNextPage = query.PageNumber < totalPages,
+                CurrentPage = query.PageNumber
+            };
+        }
+
+        private IQueryable<Contract> BuildContractListQuery(QueryObject query)
+        {
+            var contracts = _context.Contracts
+                .AsNoTracking()
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(query.Search))
@@ -194,25 +306,12 @@ namespace api.Repository
             if (query.PersonId.HasValue)
                 contracts = contracts.Where(c => c.PersonId == query.PersonId.Value);
 
-            contracts = query.SortBy switch
+            return query.SortBy switch
             {
                 "ContractNumber" => query.IsDescending ? contracts.OrderByDescending(c => c.ContractNumber) : contracts.OrderBy(c => c.ContractNumber),
                 "ContractLabel" => query.IsDescending ? contracts.OrderByDescending(c => c.ContractLabel) : contracts.OrderBy(c => c.ContractLabel),
                 "CreatedDate" => query.IsDescending ? contracts.OrderByDescending(c => c.CreatedDate) : contracts.OrderBy(c => c.CreatedDate),
                 _ => contracts.OrderByDescending(c => c.CreatedDate)
-            };
-
-            var totalCount = await contracts.CountAsync();
-            var totalPages = (int)Math.Ceiling((double)totalCount / query.PageSize);
-            var skipNumber = (query.PageNumber - 1) * query.PageSize;
-
-            return new PagedResult<Contract>
-            {
-                Items = await contracts.Skip(skipNumber).Take(query.PageSize).ToListAsync(),
-                TotalCount = totalCount,
-                TotalPages = totalPages,
-                HasNextPage = query.PageNumber < totalPages,
-                CurrentPage = query.PageNumber
             };
         }
 

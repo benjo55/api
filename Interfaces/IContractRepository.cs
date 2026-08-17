@@ -12,6 +12,7 @@ namespace api.Interfaces
     public interface IContractRepository
     {
         Task<PagedResult<Contract>> GetAllAsync(QueryObject query);
+        Task<PagedResult<ContractDto>> GetListAsync(QueryObject query);
         Task<Contract?> GetByIdAsync(int id);
         Task<Contract> CreateAsync(Contract contractModel, CreateContractRequestDto contractDto);
         Task<Contract?> UpdateAsync(int id, UpdateContractRequestDto contractDto);

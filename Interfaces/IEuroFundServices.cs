@@ -9,6 +9,11 @@ namespace api.Interfaces
         Task ApplyOperationAsync(Operation operation, DbContext context, CancellationToken cancellationToken = default);
     }
 
+    public interface IEuroFundValueDateService
+    {
+        DateTime ComputeValueDate(DateTime operationDate, EuroFundConfiguration? settings);
+    }
+
     public interface IEuroFundValuationService
     {
         Task<EuroFundValuationDto> GetValuationAsync(

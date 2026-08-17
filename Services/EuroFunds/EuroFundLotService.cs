@@ -8,6 +8,17 @@ namespace api.Services.EuroFunds
     public sealed class EuroFundLotService : IEuroFundLotService
     {
         private const decimal AmountTolerance = 0.0000001m;
+        private readonly IEuroFundValueDateService _valueDateService;
+
+        public EuroFundLotService()
+            : this(new EuroFundValueDateService())
+        {
+        }
+
+        public EuroFundLotService(IEuroFundValueDateService valueDateService)
+        {
+            _valueDateService = valueDateService;
+        }
 
         public async Task ApplyOperationAsync(
             Operation operation,
@@ -26,6 +37,8 @@ namespace api.Services.EuroFunds
             if (!allocations.Any())
                 return;
 
+            var euroFundAllocations = new List<OperationSupportAllocation>();
+
             foreach (var allocation in allocations)
             {
                 var support = allocation.Support
@@ -34,9 +47,16 @@ namespace api.Services.EuroFunds
                 if (support?.SupportNature != FinancialSupportNature.EuroFund)
                     continue;
 
-                var amount = Math.Round(allocation.Amount ?? 0m, 7, MidpointRounding.AwayFromZero);
+                euroFundAllocations.Add(allocation);
+            }
+
+            foreach (var group in euroFundAllocations.GroupBy(a => new { a.SupportId, a.Flow }))
+            {
+                var amount = Math.Round(group.Sum(a => a.Amount ?? 0m), 7, MidpointRounding.AwayFromZero);
                 if (amount <= 0m)
                     continue;
+
+                var allocation = group.First();
 
                 if (IsEuroFundIncrease(operation.Type, allocation.Flow))
                 {
@@ -44,10 +64,7 @@ namespace api.Services.EuroFunds
                 }
                 else if (IsEuroFundDecrease(operation.Type, allocation.Flow))
                 {
-                    var movementType = operation.Type is OperationType.ManagementFee or OperationType.OperationFee
-                        ? EuroFundLotMovementType.Out
-                        : EuroFundLotMovementType.Out;
-                    await ConsumeLotsAsync(operation, allocation, amount, movementType, context, cancellationToken);
+                    await ConsumeLotsAsync(operation, allocation, amount, EuroFundLotMovementType.Out, context, cancellationToken);
                 }
             }
         }
@@ -77,23 +94,33 @@ namespace api.Services.EuroFunds
                 or OperationType.OperationFee;
         }
 
-        private static async Task CreateLotAsync(
+        private async Task CreateLotAsync(
             Operation operation,
             OperationSupportAllocation allocation,
             decimal amount,
             DbContext context,
             CancellationToken ct)
         {
-            var existingLot = await context.Set<EuroFundLot>()
+            var existingLot = context.Set<EuroFundLot>().Local
+                .FirstOrDefault(l =>
+                    l.SourceOperationId == operation.Id &&
+                    l.ContractId == operation.ContractId &&
+                    l.FinancialSupportId == allocation.SupportId);
+
+            existingLot ??= await context.Set<EuroFundLot>()
                 .FirstOrDefaultAsync(l =>
                     l.SourceOperationId == operation.Id &&
                     l.ContractId == operation.ContractId &&
-                    l.FinancialSupportId == allocation.SupportId &&
-                    l.InitialAmount == amount,
+                    l.FinancialSupportId == allocation.SupportId,
                     ct);
 
             if (existingLot != null)
                 return;
+
+            var settings = await context.Set<EuroFundConfiguration>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.FinancialSupportId == allocation.SupportId, ct);
+            var valueDate = _valueDateService.ComputeValueDate(operation.OperationDate, settings);
 
             var lot = new EuroFundLot
             {
@@ -102,7 +129,7 @@ namespace api.Services.EuroFunds
                 SourceOperationId = operation.Id,
                 InitialAmount = amount,
                 RemainingAmount = amount,
-                ValueDate = operation.OperationDate.Date,
+                ValueDate = valueDate,
                 CreatedAt = DateTime.UtcNow,
             };
 
@@ -113,7 +140,7 @@ namespace api.Services.EuroFunds
                 ContractId = operation.ContractId,
                 FinancialSupportId = allocation.SupportId,
                 OperationId = operation.Id,
-                MovementDate = operation.OperationDate.Date,
+                MovementDate = valueDate,
                 Amount = amount,
                 MovementType = operation.Type == OperationType.ParticipationBenefit
                     ? EuroFundLotMovementType.ProfitParticipation

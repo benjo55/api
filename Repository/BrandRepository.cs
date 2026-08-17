@@ -43,12 +43,15 @@ namespace api.Repository
 
         public async Task<PagedResult<Brand>> GetAllAsync(QueryObject query)
         {
-            var brands = _context.Brands.AsQueryable();
+            var brands = _context.Brands
+                .AsNoTracking()
+                .AsQueryable();
+
             if (!string.IsNullOrWhiteSpace(query.Search))
             {
                 brands = brands.Where(p => p.BrandCode.Contains(query.Search) || p.BrandName.Contains(query.Search));
             }
-            brands.OrderBy(p => p.BrandCode);
+            brands = brands.OrderBy(p => p.BrandCode);
 
             // Calcul du total avant pagination
             var totalCount = await brands.CountAsync();

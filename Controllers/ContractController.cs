@@ -74,8 +74,7 @@ namespace api.Controllers
                 query.PersonId = scope.LinkedPersonId.Value;
             }
 
-            var contracts = await _contractRepository.GetAllAsync(query);
-            var contractDtos = contracts.Items.Select(s => s.ToContractDto()).ToList();
+            var contracts = await _contractRepository.GetListAsync(query);
 
             return Ok(new
             {
@@ -83,7 +82,7 @@ namespace api.Controllers
                 contracts.TotalPages,
                 contracts.HasNextPage,
                 contracts.CurrentPage,
-                Items = contractDtos
+                contracts.Items
             });
         }
 

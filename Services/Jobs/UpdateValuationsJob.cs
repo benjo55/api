@@ -41,7 +41,8 @@ public class UpdateValuationsJob : IJob
             var supports = supportsPage.Items
                 .Where(s =>
                     !string.IsNullOrWhiteSpace(s.Label) &&
-                    s.Label.Contains("strategie", StringComparison.OrdinalIgnoreCase)
+                    s.Label.Contains("strategie", StringComparison.OrdinalIgnoreCase) &&
+                    s.SupportNature != api.Models.Enum.FinancialSupportNature.EuroFund
                 )
                 .ToList();
             _logger.LogInformation($"📊 {supports.Count} supports chargés pour mise à jour EOD.");

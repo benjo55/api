@@ -14,6 +14,8 @@ namespace api.Dtos.EuroFund
         public decimal? PreviousFinalRatePercentage { get; set; }
         public EuroFundEarlyExitRateMethod EarlyExitRateMethod { get; set; } = EuroFundEarlyExitRateMethod.ProvisionalRate;
         public EuroFundLotConsumptionMethod LotConsumptionMethod { get; set; } = EuroFundLotConsumptionMethod.ProRata;
+        public EuroFundValueDateRule ValueDateRule { get; set; } = EuroFundValueDateRule.NextBusinessDay;
+        public int ValueDateDelayDays { get; set; } = 1;
         public EuroFundRateNature RateNature { get; set; } = EuroFundRateNature.NetOfManagementFees;
         public EuroFundManagementFeeTreatment ManagementFeeTreatment { get; set; } = EuroFundManagementFeeTreatment.IncludedInServedRate;
         public decimal? MinimumGuaranteedRate { get; set; }

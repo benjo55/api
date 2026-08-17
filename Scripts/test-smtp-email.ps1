@@ -2,16 +2,30 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Recipient,
 
-    [string]$ApiBaseUrl = "http://localhost:5247"
+    [string]$ApiBaseUrl = "http://localhost:5247",
+
+    [string]$BearerToken = "",
+
+    [switch]$Admin
 )
 
 $ErrorActionPreference = "Stop"
 
-$uri = "$ApiBaseUrl/api/development/email/test"
+$path = if ($Admin) { "api/admin/mail/test" } else { "api/development/email/test" }
+$uri = "$($ApiBaseUrl.TrimEnd('/'))/$path"
 $body = @{ recipient = $Recipient } | ConvertTo-Json -Depth 3
+$headers = @{}
+
+if ($Admin) {
+    if ([string]::IsNullOrWhiteSpace($BearerToken)) {
+        throw "Le mode -Admin requiert -BearerToken avec un JWT administrateur."
+    }
+
+    $headers["Authorization"] = "Bearer $BearerToken"
+}
 
 try {
-    $response = Invoke-RestMethod -Method Post -Uri $uri -ContentType "application/json" -Body $body
+    $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -ContentType "application/json" -Body $body
     Write-Host "Réponse API :"
     $response | ConvertTo-Json -Depth 5
 }

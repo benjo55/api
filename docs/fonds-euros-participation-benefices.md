@@ -49,22 +49,22 @@ La route est :
 L'entrée de menu est dans la section :
 
 ```text
-Gestion Assurance > Fonds euros
+Back-office Assurance > Fonds euros
 ```
 
 ## Modèle de données
 
 Les tables ajoutées sont :
 
-| Table | Rôle |
-| --- | --- |
-| `EuroFundConfigurations` | Paramétrage permanent du fonds euros. |
-| `EuroFundFinancialYears` | Exercice annuel du fonds : TME, rendement actif, PPB, taux final servi, statut. |
-| `ReferenceRates` | Historique des taux de référence, notamment le TME. |
-| `EuroFundLots` | Lots de capital détenus par contrat et par fonds euros. |
-| `EuroFundLotMovements` | Historique des mouvements qui augmentent ou diminuent les lots. |
-| `EuroFundRevaluations` | Trace d'une clôture annuelle par contrat. |
-| `EuroFundRevaluationDetails` | Détail des segments de calcul de PB. |
+| Table                        | Rôle                                                                            |
+| ---------------------------- | ------------------------------------------------------------------------------- |
+| `EuroFundConfigurations`     | Paramétrage permanent du fonds euros.                                           |
+| `EuroFundFinancialYears`     | Exercice annuel du fonds : TME, rendement actif, PPB, taux final servi, statut. |
+| `ReferenceRates`             | Historique des taux de référence, notamment le TME.                             |
+| `EuroFundLots`               | Lots de capital détenus par contrat et par fonds euros.                         |
+| `EuroFundLotMovements`       | Historique des mouvements qui augmentent ou diminuent les lots.                 |
+| `EuroFundRevaluations`       | Trace d'une clôture annuelle par contrat.                                       |
+| `EuroFundRevaluationDetails` | Détail des segments de calcul de PB.                                            |
 
 La table existante `FinancialSupports` est utilisée comme référentiel principal. Un fonds euros est identifié par :
 
@@ -216,13 +216,13 @@ Les intérêts courus estimés sont calculés sans créer d'opération. Ils serv
 
 Le taux provisoire peut être paramétré avec :
 
-| Méthode | Libellé écran | Usage |
-| --- | --- | --- |
-| `None` | Aucun | Aucun intérêt provisoire. |
-| `FixedRate` | Taux fixe | Utilise un taux saisi manuellement. |
-| `TmePercentage` | Pourcentage du TME | Utilise le dernier TME connu multiplié par un pourcentage. |
+| Méthode                       | Libellé écran                       | Usage                                                       |
+| ----------------------------- | ----------------------------------- | ----------------------------------------------------------- |
+| `None`                        | Aucun                               | Aucun intérêt provisoire.                                   |
+| `FixedRate`                   | Taux fixe                           | Utilise un taux saisi manuellement.                         |
+| `TmePercentage`               | Pourcentage du TME                  | Utilise le dernier TME connu multiplié par un pourcentage.  |
 | `PreviousFinalRatePercentage` | Pourcentage du taux final précédent | Utilise un pourcentage du taux servi de l'année précédente. |
-| `Custom` | Personnalisé | Réservé à une extension métier. |
+| `Custom`                      | Personnalisé                        | Réservé à une extension métier.                             |
 
 Des planchers et plafonds peuvent être configurés.
 
@@ -278,7 +278,7 @@ Sinon il ne remonte pas dans l'écran `Fonds euros`.
 Aller dans :
 
 ```text
-Back-office > Gestion Assurance > Fonds euros
+Back-office > Back-office Assurance > Fonds euros
 ```
 
 ou directement :
@@ -387,18 +387,18 @@ Base route :
 
 Endpoints principaux :
 
-| Méthode | Route | Rôle |
-| --- | --- | --- |
-| `GET` | `/api/euro-funds` | Liste les supports fonds euros. |
-| `GET` | `/api/euro-funds/{id}` | Charge un fonds euros. |
-| `PUT` | `/api/euro-funds/{id}/configuration` | Enregistre la configuration. |
-| `GET` | `/api/euro-funds/{id}/financial-years` | Liste les exercices annuels. |
-| `POST` | `/api/euro-funds/{id}/financial-years` | Crée un exercice annuel. |
-| `PUT` | `/api/euro-funds/{id}/financial-years/{year}` | Met à jour un exercice annuel. |
-| `POST` | `/api/euro-funds/{id}/financial-years/{year}/preview` | Simule la PB. |
-| `POST` | `/api/euro-funds/{id}/financial-years/{year}/finalize` | Finalise la PB annuelle. |
-| `POST` | `/api/euro-funds/reference-rates` | Ajoute un taux de référence. |
-| `GET` | `/api/euro-funds/{id}/contracts/{contractId}/valuation` | Valorise un fonds euros pour un contrat. |
+| Méthode | Route                                                   | Rôle                                     |
+| ------- | ------------------------------------------------------- | ---------------------------------------- |
+| `GET`   | `/api/euro-funds`                                       | Liste les supports fonds euros.          |
+| `GET`   | `/api/euro-funds/{id}`                                  | Charge un fonds euros.                   |
+| `PUT`   | `/api/euro-funds/{id}/configuration`                    | Enregistre la configuration.             |
+| `GET`   | `/api/euro-funds/{id}/financial-years`                  | Liste les exercices annuels.             |
+| `POST`  | `/api/euro-funds/{id}/financial-years`                  | Crée un exercice annuel.                 |
+| `PUT`   | `/api/euro-funds/{id}/financial-years/{year}`           | Met à jour un exercice annuel.           |
+| `POST`  | `/api/euro-funds/{id}/financial-years/{year}/preview`   | Simule la PB.                            |
+| `POST`  | `/api/euro-funds/{id}/financial-years/{year}/finalize`  | Finalise la PB annuelle.                 |
+| `POST`  | `/api/euro-funds/reference-rates`                       | Ajoute un taux de référence.             |
+| `GET`   | `/api/euro-funds/{id}/contracts/{contractId}/valuation` | Valorise un fonds euros pour un contrat. |
 
 ## Migration et déploiement
 
@@ -468,4 +468,3 @@ Les points suivants sont prêts dans le modèle mais pas encore entièrement aut
 - reprise historique automatique des encours fonds euros existants.
 
 Pour reprendre un historique existant, il faudra créer des `EuroFundLots` initiaux à partir des holdings ou allocations actuels, avec une date de valeur métier validée.
-

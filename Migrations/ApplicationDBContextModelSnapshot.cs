@@ -3407,6 +3407,14 @@ namespace api.Migrations
                     b.Property<DateTime>("UpdatedDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<int>("ValueDateDelayDays")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ValueDateRule")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("FinancialSupportId")
@@ -3537,6 +3545,11 @@ namespace api.Migrations
 
                     b.HasIndex("ContractId", "FinancialSupportId")
                         .HasDatabaseName("IX_EuroFundLots_Contract_Fund");
+
+                    b.HasIndex("SourceOperationId", "ContractId", "FinancialSupportId")
+                        .IsUnique()
+                        .HasFilter("[SourceOperationId] IS NOT NULL")
+                        .HasDatabaseName("UX_EuroFundLots_SourceOperation_Contract_Fund");
 
                     b.ToTable("EuroFundLots", (string)null);
                 });

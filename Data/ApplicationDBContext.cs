@@ -438,6 +438,7 @@ namespace api.Data
                 entity.Property(e => e.ProvisionalRateMethod).HasConversion<string>().HasMaxLength(40);
                 entity.Property(e => e.EarlyExitRateMethod).HasConversion<string>().HasMaxLength(40);
                 entity.Property(e => e.LotConsumptionMethod).HasConversion<string>().HasMaxLength(40);
+                entity.Property(e => e.ValueDateRule).HasConversion<string>().HasMaxLength(40);
                 entity.Property(e => e.RateNature).HasConversion<string>().HasMaxLength(40);
                 entity.Property(e => e.ManagementFeeTreatment).HasConversion<string>().HasMaxLength(40);
                 entity.HasOne(e => e.FinancialSupport)
@@ -495,6 +496,10 @@ namespace api.Data
                     .HasDatabaseName("IX_EuroFundLots_ValueDate");
                 entity.HasIndex(e => e.SourceOperationId)
                     .HasDatabaseName("IX_EuroFundLots_SourceOperation");
+                entity.HasIndex(e => new { e.SourceOperationId, e.ContractId, e.FinancialSupportId })
+                    .IsUnique()
+                    .HasFilter("[SourceOperationId] IS NOT NULL")
+                    .HasDatabaseName("UX_EuroFundLots_SourceOperation_Contract_Fund");
             });
 
             modelBuilder.Entity<EuroFundLotMovement>(entity =>

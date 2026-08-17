@@ -377,6 +377,8 @@ namespace api.Services.EuroFunds
                 PreviousFinalRatePercentage = config.PreviousFinalRatePercentage,
                 EarlyExitRateMethod = config.EarlyExitRateMethod,
                 LotConsumptionMethod = config.LotConsumptionMethod,
+                ValueDateRule = config.ValueDateRule,
+                ValueDateDelayDays = config.ValueDateDelayDays,
                 RateNature = config.RateNature,
                 ManagementFeeTreatment = config.ManagementFeeTreatment,
                 MinimumGuaranteedRate = config.MinimumGuaranteedRate,
@@ -395,6 +397,8 @@ namespace api.Services.EuroFunds
             config.PreviousFinalRatePercentage = dto.PreviousFinalRatePercentage;
             config.EarlyExitRateMethod = dto.EarlyExitRateMethod;
             config.LotConsumptionMethod = dto.LotConsumptionMethod;
+            config.ValueDateRule = dto.ValueDateRule;
+            config.ValueDateDelayDays = Math.Max(0, dto.ValueDateDelayDays);
             config.RateNature = dto.RateNature;
             config.ManagementFeeTreatment = dto.ManagementFeeTreatment;
             config.MinimumGuaranteedRate = dto.MinimumGuaranteedRate;

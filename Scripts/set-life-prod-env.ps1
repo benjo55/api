@@ -43,9 +43,9 @@ $SqlConnectionString = "Data Source=$SqlServerInstance;Initial Catalog=$SqlDatab
 # JWT: valeur longue, aleatoire, 32 caracteres minimum, idealement 64+.
 $JwtKey = "MaSuperCleSecreteTresLongue123456789"
 
-# Mailjet.
-$MailjetApiKey = "cd9e5aca591b25395f76272e468c2258"
-$MailjetSecretKey = "07edaa4e0f06e0e2700850808720c2e0"
+# Brevo SMTP. Utiliser le login SMTP Brevo et une cle SMTP, pas une cle API.
+$BrevoSmtpLogin = "b5c207001@smtp-brevo.com"
+$BrevoSmtpKey = "__A_COMPLETER_BREVO_SMTP_KEY__"
 
 # EOD Historical Data.
 $EodApiKey = "684f34554390c3.19045690"
@@ -79,8 +79,8 @@ function Assert-Configured {
 Assert-Configured "SqlConnectionString" $SqlConnectionString
 Assert-Configured "SqlPassword" $SqlPassword
 Assert-Configured "JwtKey" $JwtKey
-Assert-Configured "MailjetApiKey" $MailjetApiKey
-Assert-Configured "MailjetSecretKey" $MailjetSecretKey
+Assert-Configured "BrevoSmtpLogin" $BrevoSmtpLogin
+Assert-Configured "BrevoSmtpKey" $BrevoSmtpKey
 Assert-Configured "EodApiKey" $EodApiKey
 Assert-Configured "InseeApiKey" $InseeApiKey
 Assert-Configured "HelloAssoClientId" $HelloAssoClientId
@@ -117,13 +117,14 @@ $vars = [ordered]@{
     "Authentication__MinimumEmailResendInterval"                      = "00:02:00"
     "Authentication__PasswordMinLength"                               = "10"
 
-    "MailSettings__Host"                                              = "in-v3.mailjet.com"
+    "MailSettings__Provider"                                          = "Brevo"
+    "MailSettings__Host"                                              = "smtp-relay.brevo.com"
     "MailSettings__Port"                                              = "587"
     "MailSettings__EnableSsl"                                         = "true"
-    "MailSettings__UserName"                                          = $MailjetApiKey
-    "MailSettings__Password"                                          = $MailjetSecretKey
+    "MailSettings__UserName"                                          = $BrevoSmtpLogin
+    "MailSettings__Password"                                          = $BrevoSmtpKey
     "MailSettings__FromAddress"                                       = "no-reply@euroboost.top"
-    "MailSettings__FromName"                                          = "Life"
+    "MailSettings__FromName"                                          = "Financial Life"
 
     "Eod__ApiKey"                                                     = $EodApiKey
     "EodSettings__OnlyStrategyMode"                                   = "true"

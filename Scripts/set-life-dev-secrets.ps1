@@ -2,8 +2,8 @@ param(
     [string]$ApiProject = "C:\Life\api\api.csproj",
     [string]$FrontendBaseUrl = "http://localhost:5173",
     [string]$PaymentsPublicBaseUrl = $FrontendBaseUrl,
-    [string]$MailjetApiKey = "",
-    [string]$MailjetSecretKey = "",
+    [string]$BrevoSmtpLogin = "b5c207001@smtp-brevo.com",
+    [string]$BrevoSmtpKey = "",
     [string]$EodApiKey = "",
     [string]$HelloAssoClientId = "",
     [string]$HelloAssoClientSecret = "",
@@ -44,13 +44,14 @@ Set-UserSecret "Authentication:PasswordResetTokenLifetime" "00:30:00"
 Set-UserSecret "Authentication:MinimumEmailResendInterval" "00:02:00"
 Set-UserSecret "Authentication:PasswordMinLength" "10"
 
-Set-UserSecret "MailSettings:Host" "in-v3.mailjet.com"
+Set-UserSecret "MailSettings:Provider" "Brevo"
+Set-UserSecret "MailSettings:Host" "smtp-relay.brevo.com"
 Set-UserSecret "MailSettings:Port" "587"
 Set-UserSecret "MailSettings:EnableSsl" "true"
-Set-UserSecret "MailSettings:UserName" $MailjetApiKey
-Set-UserSecret "MailSettings:Password" $MailjetSecretKey
+Set-UserSecret "MailSettings:UserName" $BrevoSmtpLogin
+Set-UserSecret "MailSettings:Password" $BrevoSmtpKey
 Set-UserSecret "MailSettings:FromAddress" "no-reply@euroboost.top"
-Set-UserSecret "MailSettings:FromName" "Life"
+Set-UserSecret "MailSettings:FromName" "Financial Life"
 
 Set-UserSecret "Eod:ApiKey" $EodApiKey
 

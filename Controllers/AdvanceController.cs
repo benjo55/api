@@ -1,5 +1,6 @@
 using api.Dtos.Advance;
 using api.Interfaces;
+using api.Models.Enum;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -78,8 +79,20 @@ namespace api.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateAdvanceRequestDto dto)
         {
-            if (!(await _access.GetScopeAsync()).IsBackOffice)
-                return Forbid();
+            var scope = await _access.GetScopeAsync();
+            if (!scope.IsBackOffice)
+            {
+                if (!await _access.CanCreateOperationAsync(OperationType.Advance, dto.ContractId))
+                    return Forbid();
+
+                dto.AdvanceNumber = null;
+                dto.ApprovalDate = null;
+                dto.DisbursementDate = null;
+                dto.ApprovedAmount = null;
+                dto.OutstandingCapital = null;
+                dto.InterestRate = 0m;
+                dto.Status = AdvanceStatus.Requested;
+            }
 
             try
             {

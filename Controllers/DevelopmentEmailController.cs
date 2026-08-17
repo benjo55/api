@@ -82,7 +82,7 @@ namespace api.Controllers
             {
                 return StatusCode(StatusCodes.Status502BadGateway, new
                 {
-                    message = "Le message de test n'a pas pu être envoyé. Vérifiez la configuration SMTP/Mailjet.",
+                    message = "Le message de test n'a pas pu être envoyé. Vérifiez la configuration SMTP/Brevo.",
                     recipient = request.Recipient.Trim(),
                     errorType = sent.ErrorType,
                     errorMessage = sent.ErrorMessage,

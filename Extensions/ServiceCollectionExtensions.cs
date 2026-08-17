@@ -340,6 +340,7 @@ namespace api.Extensions
             services.AddScoped<IContractValuationService, ContractValuationService>();
             services.AddScoped<ICostBasisService, CostBasisService>();
             services.AddScoped<EuroFundAccrualCalculator>();
+            services.AddScoped<IEuroFundValueDateService, EuroFundValueDateService>();
             services.AddScoped<IEuroFundLotService, EuroFundLotService>();
             services.AddScoped<IEuroFundValuationService, EuroFundValuationService>();
             services.AddScoped<IEuroFundRevaluationService, EuroFundRevaluationService>();
@@ -765,7 +766,17 @@ namespace api.Extensions
 
             // Configuration des options
             services.Configure<EodSettings>(config.GetSection("EodSettings"));
-            services.Configure<MailSettings>(config.GetSection("MailSettings"));
+            services
+                .AddOptions<MailSettings>()
+                .Bind(config.GetSection("MailSettings"))
+                .PostConfigure(options =>
+                {
+                    var smtpSection = config.GetSection("Smtp");
+                    if (smtpSection.Exists())
+                    {
+                        smtpSection.Bind(options);
+                    }
+                });
             services.Configure<AuthenticationOptions>(config.GetSection("Authentication"));
             services
                 .AddOptions<ExternalFeedsOptions>()
