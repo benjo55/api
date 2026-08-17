@@ -2,6 +2,7 @@ using api.Dtos.TaxReceipts;
 using api.Helpers;
 using api.Interfaces;
 using api.Exceptions;
+using api.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -10,7 +11,7 @@ namespace api.Controllers
 {
     [Route("api/tax-receipts")]
     [ApiController]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.CerfaAccess)]
     public sealed class TaxReceiptsController : ControllerBase
     {
         private readonly ITaxReceiptService _service;

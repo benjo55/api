@@ -3,7 +3,9 @@ using api.Dtos.Cmdb;
 using api.Dtos.Generic;
 using api.Helpers;
 using api.Models.Cmdb;
+using api.Security;
 using api.Services.Cmdb;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,6 +13,7 @@ namespace api.Controllers;
 
 [ApiController]
 [Route("api/configurationItems")]
+[Authorize(Policy = AuthorizationPolicies.UrbanisationAccess)]
 public sealed class ConfigurationItemsController : ControllerBase
 {
     private readonly ApplicationDBContext _db;

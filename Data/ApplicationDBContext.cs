@@ -1306,6 +1306,14 @@ namespace api.Data
                 .HasMaxLength(100)
                 .IsRequired();
 
+            modelBuilder.Entity<User>(entity =>
+            {
+                entity.Property(u => u.Origin)
+                    .HasConversion<int>()
+                    .HasDefaultValue(UserOrigin.Life)
+                    .IsRequired();
+            });
+
             modelBuilder.Entity<Permission>()
                 .HasIndex(p => p.PermissionCode)
                 .IsUnique()

@@ -8,11 +8,14 @@ using Microsoft.AspNetCore.Mvc;
 using api.Helpers;
 using api.Mappers;
 using api.Dtos.Generic;
+using api.Security;
+using Microsoft.AspNetCore.Authorization;
 
 namespace api.Controllers
 {
     [Route("api/products")]
     [ApiController]
+    [Authorize(Policy = AuthorizationPolicies.LifeAccess)]
     public class ProductController : ControllerBase
     {
         private readonly IProductRepository _productRepository;

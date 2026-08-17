@@ -2,6 +2,8 @@ using api.Data;
 using api.Dtos.Cmdb;
 using api.Models.Cmdb;
 using api.Services.Cmdb;
+using api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
@@ -10,6 +12,7 @@ namespace api.Controllers;
 
 [ApiController]
 [Route("api/cartography")]
+[Authorize(Policy = AuthorizationPolicies.UrbanisationAccess)]
 public sealed class CartographyDocumentsController : ControllerBase
 {
     private const string GeneralDomainCode = "GENERAL";

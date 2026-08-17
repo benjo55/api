@@ -1,5 +1,6 @@
 using api.Dtos.PersonalDashboard;
 using api.Interfaces;
+using api.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,7 +8,7 @@ namespace api.Controllers
 {
     [ApiController]
     [Route("api/personal-dashboard")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.LifeAccess)]
     public sealed class PersonalDashboardController : ControllerBase
     {
         private readonly INewsFeedService _newsFeedService;

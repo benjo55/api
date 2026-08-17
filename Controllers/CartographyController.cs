@@ -1,6 +1,8 @@
 using api.Data;
 using api.Dtos.Cmdb;
+using api.Security;
 using api.Services.Cmdb;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -9,6 +11,7 @@ namespace api.Controllers;
 
 [ApiController]
 [Route("api/cartography")]
+[Authorize(Policy = AuthorizationPolicies.UrbanisationAccess)]
 public sealed class CartographyController : ControllerBase
 {
     private const string EmployerEntitiesCacheKey = "cartography:employer-entities:v3";

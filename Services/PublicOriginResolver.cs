@@ -19,7 +19,18 @@ namespace api.Services
 
         public ResolvedPublicOrigin ResolveCurrent()
         {
-            var host = _httpContextAccessor.HttpContext?.Request.Host.Host;
+            var request = _httpContextAccessor.HttpContext?.Request;
+            var origin = request?.Headers.Origin.FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(origin))
+            {
+                var resolvedFromOrigin = ResolveKnownOrigin(origin);
+                if (resolvedFromOrigin is not null)
+                {
+                    return resolvedFromOrigin;
+                }
+            }
+
+            var host = request?.Host.Host;
             return Resolve(host);
         }
 
@@ -60,6 +71,35 @@ namespace api.Services
             return NormalizeOrigin(experienceOptions.Origin);
         }
 
+        private ResolvedPublicOrigin? ResolveKnownOrigin(string origin)
+        {
+            if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+            {
+                return null;
+            }
+
+            var normalizedOrigin = NormalizeOrigin(uri.GetLeftPart(UriPartial.Authority));
+            foreach (var entry in _options.Experiences)
+            {
+                if (!string.Equals(
+                        NormalizeOrigin(entry.Value.Origin),
+                        normalizedOrigin,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                return new ResolvedPublicOrigin(
+                    entry.Key,
+                    NormalizeOrigin(entry.Value.Origin),
+                    NormalizeHost(uri.Host),
+                    true,
+                    _options.UnknownHostPolicy);
+            }
+
+            return null;
+        }
+
         private static string NormalizeHost(string? value)
         {
             var host = (value ?? string.Empty).Trim().ToLowerInvariant();
@@ -87,4 +127,3 @@ namespace api.Services
         private static string NormalizeOrigin(string value) => value.Trim().TrimEnd('/');
     }
 }
-

@@ -10,6 +10,9 @@ namespace api.Security
         public const string ManageRoles = "ManageRoles";
         public const string ViewRoles = "ViewRoles";
         public const string ViewSecurityAudit = "ViewSecurityAudit";
+        public const string LifeAccess = "LifeAccess";
+        public const string CerfaAccess = "CerfaAccess";
+        public const string UrbanisationAccess = "UrbanisationAccess";
     }
 
     public static class SystemPermissions
@@ -77,6 +80,9 @@ namespace api.Security
         public const string UserManager = "UserManager";
         public const string SecurityAuditor = "SecurityAuditor";
         public const string StandardUser = "StandardUser";
+        public const string LifeUser = "LifeUser";
+        public const string CerfaUser = "CerfaUser";
+        public const string UrbanisationUser = "UrbanisationUser";
         public const string Cartography = "Cartographie";
         public const string Donor = "Donateur";
         public const string LegacyAdmin = "Admin";

@@ -11,6 +11,8 @@ using api.Dtos.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using api.Data;
+using api.Configuration;
+using api.Security;
 
 namespace api.Controllers
 {
@@ -24,6 +26,7 @@ namespace api.Controllers
         private readonly IRoleRepository _roleRepository;
         private readonly ApplicationDBContext _context;
         private readonly IAuthenticationAccountService _accountService;
+        private readonly IPublicOriginResolver? _publicOriginResolver;
 
         public AuthController(
             IUserRepository userRepository,
@@ -31,7 +34,8 @@ namespace api.Controllers
             AuthService authService,
             IRoleRepository roleRepository,
             ApplicationDBContext context,
-            IAuthenticationAccountService accountService)
+            IAuthenticationAccountService accountService,
+            IPublicOriginResolver? publicOriginResolver = null)
         {
             _userRepository = userRepository;
             _rolePermissionRepository = rolePermissionRepository;
@@ -39,6 +43,7 @@ namespace api.Controllers
             _roleRepository = roleRepository;
             _context = context;
             _accountService = accountService;
+            _publicOriginResolver = publicOriginResolver;
         }
 
         [HttpPost("register")]
@@ -221,6 +226,16 @@ namespace api.Controllers
                 .Select(ur => ur.Role!.RoleCode) // Utilisation du null-forgiving operator '!'
                 .ToList();
 
+            var loginExperience = ResolveLoginExperience();
+            if (!CanAccessExperience(loginExperience, roles))
+            {
+                return Unauthorized(new
+                {
+                    code = "SITE_ACCESS_DENIED",
+                    message = "Ce compte ne possède pas d'accès à cet espace applicatif."
+                });
+            }
+
             var permissions = rolePermissionRows
                 .Select(rp => rp.permissionCode)
                 .Distinct()
@@ -260,6 +275,7 @@ namespace api.Controllers
                 lastName = dbUser.LastName,
                 username = dbUser.Username,
                 email = dbUser.Email,
+                origin = dbUser.Origin.ToString(),
                 emailConfirmed = dbUser.EmailConfirmed,
                 accountStatus = dbUser.Status.ToString(),
                 lastLoginAt = dbUser.LastLoginAt,
@@ -296,6 +312,40 @@ namespace api.Controllers
             });
         }
 
+        private SiteExperience ResolveLoginExperience()
+        {
+            try
+            {
+                return _publicOriginResolver?.ResolveCurrent().Experience
+                    ?? SiteExperience.Insurance;
+            }
+            catch
+            {
+                return SiteExperience.Insurance;
+            }
+        }
+
+        private static bool CanAccessExperience(SiteExperience experience, IReadOnlyCollection<string> roles)
+        {
+            var roleSet = roles.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (roleSet.Contains(SystemRoles.LegacyAdmin)
+                || roleSet.Contains(SystemRoles.Administrator)
+                || roleSet.Contains(SystemRoles.SuperAdministrator))
+            {
+                return true;
+            }
+
+            return experience switch
+            {
+                SiteExperience.Donation => roleSet.Contains(SystemRoles.CerfaUser)
+                    || roleSet.Contains(SystemRoles.Donor),
+                SiteExperience.Urbanization => roleSet.Contains(SystemRoles.UrbanisationUser)
+                    || roleSet.Contains(SystemRoles.Cartography),
+                _ => roleSet.Contains(SystemRoles.LifeUser)
+                    || roleSet.Contains(SystemRoles.LegacyUser)
+            };
+        }
+
         [HttpGet("me")]
         [Authorize]
         public async Task<IActionResult> GetCurrentUser()
@@ -330,6 +380,7 @@ namespace api.Controllers
                 lastName = dbUser.LastName,
                 username = dbUser.Username,
                 email = dbUser.Email,
+                origin = dbUser.Origin.ToString(),
                 emailConfirmed = dbUser.EmailConfirmed,
                 personId = dbUser.Person?.Id,
                 accountStatus = dbUser.Status.ToString(),

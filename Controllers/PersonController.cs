@@ -5,6 +5,8 @@ using api.Interfaces;
 using api.Mappers;
 using api.Models;
 using api.Exceptions;
+using api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +16,7 @@ namespace api.Controllers
 {
     [Route("api/persons")]
     [ApiController]
+    [Authorize(Policy = AuthorizationPolicies.LifeAccess)]
     public class PersonController : ControllerBase
     {
         private readonly ApplicationDBContext _context;

@@ -69,21 +69,21 @@ public class AuthRegistrationTests
     [Theory]
     [InlineData(
         SiteExperience.Urbanization,
-        SystemRoles.Cartography,
-        "Confirmez votre adresse e-mail Urbanisation.world",
-        "Votre compte Urbanisation.world a été créé.",
+        SystemRoles.UrbanisationUser,
+        "Confirmez votre adresse e-mail Urbanisation",
+        "Votre compte Urbanisation a été créé.",
         "https://urbanisation.world/confirm-email")]
     [InlineData(
         SiteExperience.Donation,
-        SystemRoles.Donor,
-        "Confirmez votre adresse e-mail CERFA.top",
-        "Votre compte CERFA.top a été créé.",
+        SystemRoles.CerfaUser,
+        "Confirmez votre adresse e-mail CERFA",
+        "Votre compte CERFA a été créé.",
         "https://cerfa.top/confirm-email")]
     [InlineData(
         SiteExperience.Insurance,
-        SystemRoles.LegacyUser,
-        "Confirmez votre adresse e-mail Euroboost",
-        "Votre compte Euroboost espace client a été créé.",
+        SystemRoles.LifeUser,
+        "Confirmez votre adresse e-mail Financial Life",
+        "Votre compte Financial Life espace client a été créé.",
         "https://euroboost.top/confirm-email")]
     public async Task Register_AssignsRoleForRequestedSiteExperience(
         SiteExperience siteExperience,
@@ -94,11 +94,11 @@ public class AuthRegistrationTests
     {
         await using var db = CreateDbContext();
         db.Roles.AddRange(
-            new Role { RoleCode = SystemRoles.Cartography, RoleName = "Cartographie" },
-            new Role { RoleCode = SystemRoles.Donor, RoleName = "Donateur" },
-            new Role { RoleCode = SystemRoles.LegacyUser, RoleName = "Utilisateur" });
+            new Role { RoleCode = SystemRoles.UrbanisationUser, RoleName = "Utilisateur Urbanisation" },
+            new Role { RoleCode = SystemRoles.CerfaUser, RoleName = "Utilisateur CERFA" },
+            new Role { RoleCode = SystemRoles.LifeUser, RoleName = "Utilisateur LIFE" });
         await db.SaveChangesAsync();
-        var (controller, emailService) = CreateController(db, new FakePublicOriginResolver());
+        var (controller, emailService) = CreateController(db, new FakePublicOriginResolver(siteExperience));
 
         var result = await controller.Register(new RegisterRequestDto
         {
@@ -108,8 +108,7 @@ public class AuthRegistrationTests
             Password = "Motdepasse10!",
             FirstName = "Benjamin",
             LastName = "Dupont",
-            AcceptPrivacyPolicy = true,
-            SiteExperience = siteExperience
+            AcceptPrivacyPolicy = true
         }, CancellationToken.None);
 
         Assert.IsType<CreatedResult>(result);
@@ -118,12 +117,42 @@ public class AuthRegistrationTests
             .Select(ur => ur.Role!.RoleCode)
             .SingleAsync();
         Assert.Equal(expectedRoleCode, roleCode);
+        var user = await db.Users.SingleAsync();
+        Assert.Equal(SiteBrandingProvider.ToUserOrigin(siteExperience), user.Origin);
         var confirmationEmail = Assert.Single(emailService.SentMessages);
         Assert.Equal(expectedSubject, confirmationEmail.Subject);
         var decodedBody = WebUtility.HtmlDecode(confirmationEmail.HtmlBody);
         Assert.Contains(expectedBodyFragment, decodedBody);
         Assert.Contains(expectedConfirmationUrl, decodedBody);
     }
+
+    [Fact]
+    public Task Register_FromLife_AssignsLifeUser() =>
+        AssertRegistrationRoleAsync(
+            SiteExperience.Insurance,
+            SystemRoles.LifeUser,
+            unexpectedRoleCode: null);
+
+    [Fact]
+    public Task Register_FromCerfa_AssignsCerfaUser() =>
+        AssertRegistrationRoleAsync(
+            SiteExperience.Donation,
+            SystemRoles.CerfaUser,
+            unexpectedRoleCode: null);
+
+    [Fact]
+    public Task Register_FromUrbanisation_AssignsUrbanisationUser() =>
+        AssertRegistrationRoleAsync(
+            SiteExperience.Urbanization,
+            SystemRoles.UrbanisationUser,
+            unexpectedRoleCode: null);
+
+    [Fact]
+    public Task Register_FromCerfa_DoesNotAssignLifeUser() =>
+        AssertRegistrationRoleAsync(
+            SiteExperience.Donation,
+            SystemRoles.CerfaUser,
+            SystemRoles.LifeUser);
 
     [Fact]
     public async Task Register_AllowsConfiguredTestEmailThroughUniqueAlias()
@@ -196,8 +225,8 @@ public class AuthRegistrationTests
         Assert.NotNull(user.EmailConfirmedAt);
         Assert.NotNull(token.UsedAt);
         Assert.Equal(2, emailService.SentMessages.Count);
-        Assert.Contains("Félicitations", emailService.SentMessages[1].Subject);
-        Assert.Contains("/my-space", emailService.SentMessages[1].HtmlBody);
+        Assert.Contains("Financial Life", emailService.SentMessages[1].Subject);
+        Assert.Contains("/client/home", emailService.SentMessages[1].HtmlBody);
     }
 
     [Fact]
@@ -402,6 +431,39 @@ public class AuthRegistrationTests
     }
 
     [Fact]
+    public async Task CerfaPasswordReset_UsesCerfaDomain()
+    {
+        await using var db = CreateDbContext();
+        db.Users.Add(new User
+        {
+            Username = "donor",
+            NormalizedUsername = "DONOR",
+            Email = "donor@example.com",
+            NormalizedEmail = "DONOR@EXAMPLE.COM",
+            PhoneNumber = "0612345678",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Motdepasse10!"),
+            EmailConfirmed = true,
+            EmailConfirmedAt = DateTime.UtcNow,
+            Origin = UserOrigin.Cerfa
+        });
+        await db.SaveChangesAsync();
+        var (controller, emailService) = CreateController(
+            db,
+            new FakePublicOriginResolver(SiteExperience.Donation));
+
+        await controller.ForgotPassword(new ForgotPasswordRequestDto
+        {
+            Email = "donor@example.com"
+        }, CancellationToken.None);
+
+        var resetEmail = Assert.Single(emailService.SentMessages);
+        var decodedBody = WebUtility.HtmlDecode(resetEmail.HtmlBody);
+        Assert.Equal("Réinitialisation de votre mot de passe CERFA", resetEmail.Subject);
+        Assert.Contains("https://cerfa.top/reset-password", decodedBody);
+        Assert.DoesNotContain("https://euroboost.top/reset-password", decodedBody);
+    }
+
+    [Fact]
     public async Task Register_ReturnsConflictWhenEmailAlreadyExistsCaseInsensitive()
     {
         await using var db = CreateDbContext();
@@ -467,6 +529,44 @@ public class AuthRegistrationTests
             LastName = "Dupont",
             AcceptPrivacyPolicy = true
         }, CancellationToken.None);
+    }
+
+    private static async Task AssertRegistrationRoleAsync(
+        SiteExperience siteExperience,
+        string expectedRoleCode,
+        string? unexpectedRoleCode)
+    {
+        await using var db = CreateDbContext();
+        db.Roles.AddRange(
+            new Role { RoleCode = SystemRoles.LifeUser, RoleName = "Utilisateur LIFE" },
+            new Role { RoleCode = SystemRoles.CerfaUser, RoleName = "Utilisateur CERFA" },
+            new Role { RoleCode = SystemRoles.UrbanisationUser, RoleName = "Utilisateur Urbanisation" });
+        await db.SaveChangesAsync();
+        var (controller, _) = CreateController(
+            db,
+            new FakePublicOriginResolver(siteExperience));
+
+        var result = await controller.Register(new RegisterRequestDto
+        {
+            UserName = "siteuser",
+            Email = "siteuser@example.com",
+            PhoneNumber = "06 12 34 56 78",
+            Password = "Motdepasse10!",
+            FirstName = "Site",
+            LastName = "User",
+            AcceptPrivacyPolicy = true
+        }, CancellationToken.None);
+
+        Assert.IsType<CreatedResult>(result);
+        var roles = await db.UserRoles
+            .Include(ur => ur.Role)
+            .Select(ur => ur.Role!.RoleCode)
+            .ToListAsync();
+        Assert.Contains(expectedRoleCode, roles);
+        if (unexpectedRoleCode is not null)
+        {
+            Assert.DoesNotContain(unexpectedRoleCode, roles);
+        }
     }
 
     private static (AuthController Controller, FakeEmailService EmailService) CreateController(
@@ -553,7 +653,20 @@ public class AuthRegistrationTests
 
     private sealed class FakePublicOriginResolver : IPublicOriginResolver
     {
-        public ResolvedPublicOrigin ResolveCurrent() => Resolve("euroboost.top");
+        private readonly SiteExperience _currentExperience;
+
+        public FakePublicOriginResolver(SiteExperience currentExperience = SiteExperience.Insurance)
+        {
+            _currentExperience = currentExperience;
+        }
+
+        public ResolvedPublicOrigin ResolveCurrent() =>
+            new(
+                _currentExperience,
+                GetOrigin(_currentExperience),
+                _currentExperience.ToString(),
+                true,
+                UnknownHostPolicy.UseDefaultExperience);
 
         public ResolvedPublicOrigin Resolve(string? host)
         {

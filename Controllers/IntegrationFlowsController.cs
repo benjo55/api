@@ -3,6 +3,8 @@ using api.Dtos.Cmdb;
 using api.Dtos.Generic;
 using api.Helpers;
 using api.Models.Cmdb;
+using api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,6 +12,7 @@ namespace api.Controllers;
 
 [ApiController]
 [Route("api/integrationFlows")]
+[Authorize(Policy = AuthorizationPolicies.UrbanisationAccess)]
 public sealed class IntegrationFlowsController : ControllerBase
 {
     private readonly ApplicationDBContext _db;

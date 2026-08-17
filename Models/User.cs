@@ -15,6 +15,13 @@ namespace api.Models
         Expired = 5
     }
 
+    public enum UserOrigin
+    {
+        Life = 1,
+        Cerfa = 2,
+        Urbanisation = 3
+    }
+
     public class User
     {
         [Key]
@@ -57,6 +64,8 @@ namespace api.Models
         public DateTime? PasswordChangedAt { get; set; }
 
         public UserStatus Status { get; set; } = UserStatus.PendingEmailConfirmation;
+
+        public UserOrigin Origin { get; set; } = UserOrigin.Life;
 
         public DateTime? SuspendedAt { get; set; }
 

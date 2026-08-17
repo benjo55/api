@@ -33,19 +33,22 @@ namespace api.Services
         private readonly AuthenticationOptions _options;
         private readonly ILogger<AuthenticationAccountService> _logger;
         private readonly IPublicOriginResolver? _publicOriginResolver;
+        private readonly ISiteBrandingProvider? _siteBrandingProvider;
 
         public AuthenticationAccountService(
             ApplicationDBContext db,
             IEmailService emailService,
             IOptions<AuthenticationOptions> options,
             ILogger<AuthenticationAccountService> logger,
-            IPublicOriginResolver? publicOriginResolver = null)
+            IPublicOriginResolver? publicOriginResolver = null,
+            ISiteBrandingProvider? siteBrandingProvider = null)
         {
             _db = db;
             _emailService = emailService;
             _options = options.Value;
             _logger = logger;
             _publicOriginResolver = publicOriginResolver;
+            _siteBrandingProvider = siteBrandingProvider;
         }
 
         public async Task<RegisterAccountResult> RegisterAsync(
@@ -132,7 +135,8 @@ namespace api.Services
                     "email");
             }
 
-            var registrationExperience = ResolveRegistrationExperience(request.SiteExperience);
+            var registrationExperience = ResolveRegistrationExperience();
+            var registrationOrigin = SiteBrandingProvider.ToUserOrigin(registrationExperience);
             var defaultRole = await ResolveRegistrationRoleAsync(registrationExperience, cancellationToken);
 
             await using var transaction = _db.Database.IsRelational()
@@ -153,6 +157,7 @@ namespace api.Services
                 CreatedDate = now,
                 PrivacyPolicyAcceptedAt = now,
                 EmailConfirmed = false,
+                Origin = registrationOrigin,
                 Status = UserStatus.PendingEmailConfirmation,
                 LastEmailConfirmationSentAt = now,
                 UserRoles = defaultRole == null
@@ -231,14 +236,22 @@ namespace api.Services
         {
             var roleCode = experience switch
             {
+                SiteExperience.Urbanization => SystemRoles.UrbanisationUser,
+                SiteExperience.Donation => SystemRoles.CerfaUser,
+                _ => SystemRoles.LifeUser
+            };
+
+            return await _db.Roles.FirstOrDefaultAsync(r => r.RoleCode == roleCode, cancellationToken)
+                ?? await _db.Roles.FirstOrDefaultAsync(r => r.RoleCode == GetLegacyRegistrationRoleCode(experience), cancellationToken);
+        }
+
+        private static string GetLegacyRegistrationRoleCode(SiteExperience experience) =>
+            experience switch
+            {
                 SiteExperience.Urbanization => SystemRoles.Cartography,
                 SiteExperience.Donation => SystemRoles.Donor,
                 _ => SystemRoles.LegacyUser
             };
-
-            return await _db.Roles.FirstOrDefaultAsync(r => r.RoleCode == roleCode, cancellationToken)
-                ?? await _db.Roles.FirstOrDefaultAsync(r => r.RoleCode == SystemRoles.LegacyUser, cancellationToken);
-        }
 
         private async Task<string> ResolveRegistrationEmailAsync(
             string requestedEmail,
@@ -304,13 +317,8 @@ namespace api.Services
             return $"{localPart}+test-{suffix}@{domain}";
         }
 
-        private SiteExperience ResolveRegistrationExperience(SiteExperience? requestedExperience)
+        private SiteExperience ResolveRegistrationExperience()
         {
-            if (requestedExperience.HasValue)
-            {
-                return requestedExperience.Value;
-            }
-
             try
             {
                 return _publicOriginResolver?.ResolveCurrent().Experience
@@ -435,7 +443,7 @@ namespace api.Services
             var confirmationSent = await SendConfirmationEmailAsync(
                 user,
                 rawToken,
-                ResolveEmailExperience(user),
+                user.Origin,
                 cancellationToken);
 
             if (confirmationSent)
@@ -475,7 +483,7 @@ namespace api.Services
                 ipAddress,
                 cancellationToken);
             await _db.SaveChangesAsync(cancellationToken);
-            var passwordResetEmailSent = await SendPasswordResetEmailAsync(user, rawToken, cancellationToken);
+            var passwordResetEmailSent = await SendPasswordResetEmailAsync(user, rawToken, user.Origin, cancellationToken);
 
             _logger.LogInformation(
                 "Demande de mot de passe oublié enregistrée pour UserId={UserId}, passwordResetEmailSent={PasswordResetEmailSent}",
@@ -651,16 +659,30 @@ namespace api.Services
             SiteExperience experience,
             CancellationToken cancellationToken)
         {
-            var link = BuildLink("confirm-email", user.Id, rawToken, experience);
-            var template = GetEmailTemplate(experience);
+            return await SendConfirmationEmailAsync(
+                user,
+                rawToken,
+                SiteBrandingProvider.ToUserOrigin(experience),
+                cancellationToken);
+        }
+
+        private async Task<bool> SendConfirmationEmailAsync(
+            User user,
+            string rawToken,
+            UserOrigin origin,
+            CancellationToken cancellationToken)
+        {
+            var branding = GetBranding(origin);
+            var link = BuildLink("confirm-email", user.Id, rawToken, branding);
+            var template = GetEmailTemplate(branding);
             var html = BuildActionEmail(
-                template.BrandName,
+                branding.DisplayName,
                 template.Title,
                 template.Explanation,
                 template.ButtonText,
                 link,
                 $"Ce lien est valable {EmailConfirmationLifetime.TotalHours:0} heures.",
-                template.AccentColor,
+                branding.AccentColor,
                 template.Signature);
 
             return await _emailService.SendEmailAsync(
@@ -670,36 +692,14 @@ namespace api.Services
                 cancellationToken);
         }
 
-        private SiteExperience ResolveEmailExperience(User user)
-        {
-            if (user.UserRoles.Any(ur => ur.Role?.RoleCode == SystemRoles.Cartography))
-            {
-                return SiteExperience.Urbanization;
-            }
-
-            if (user.UserRoles.Any(ur => ur.Role?.RoleCode == SystemRoles.Donor))
-            {
-                return SiteExperience.Donation;
-            }
-
-            try
-            {
-                return _publicOriginResolver?.ResolveCurrent().Experience
-                    ?? SiteExperience.Insurance;
-            }
-            catch
-            {
-                return SiteExperience.Insurance;
-            }
-        }
-
         private async Task SendWelcomeEmailAsync(User user, CancellationToken cancellationToken)
         {
-            var profileLink = $"{ResolveFrontendOrigin()}/my-space";
-            var html = BuildWelcomeEmail(user, profileLink);
+            var branding = GetBranding(user.Origin);
+            var profileLink = $"{branding.BaseUrl}/{GetAccountHomePath(user.Origin)}";
+            var html = BuildWelcomeEmail(user, profileLink, branding);
             var sent = await _emailService.SendEmailAsync(
                 user.Email,
-                "Félicitations, bienvenue dans Life",
+                $"Bienvenue dans {branding.DisplayName}",
                 html,
                 cancellationToken);
 
@@ -712,22 +712,24 @@ namespace api.Services
         private async Task<bool> SendPasswordResetEmailAsync(
             User user,
             string rawToken,
+            UserOrigin origin,
             CancellationToken cancellationToken)
         {
-            var link = BuildLink("reset-password", user.Id, rawToken);
+            var branding = GetBranding(origin);
+            var link = BuildLink("reset-password", user.Id, rawToken, branding);
             var html = BuildActionEmail(
-                "Life",
+                branding.DisplayName,
                 "Réinitialiser votre mot de passe",
-                "Une demande de réinitialisation de mot de passe Life a été reçue.",
+                $"Une demande de réinitialisation de mot de passe {branding.DisplayName} a été reçue.",
                 "Réinitialiser mon mot de passe",
                 link,
                 $"Ce lien est valable {_options.PasswordResetTokenLifetime.TotalMinutes:0} minute(s) et ne fonctionne qu'une fois.",
-                "#0ea5e9",
-                "L'équipe Life");
+                branding.AccentColor,
+                $"L'équipe {branding.DisplayName}");
 
             return await _emailService.SendEmailAsync(
                 user.Email,
-                "Réinitialisation de votre mot de passe Life",
+                $"Réinitialisation de votre mot de passe {branding.DisplayName}",
                 html,
                 cancellationToken);
         }
@@ -736,13 +738,10 @@ namespace api.Services
             string path,
             int userId,
             string rawToken,
-            SiteExperience? experience = null)
+            SiteBranding branding)
         {
-            var baseUrl = experience.HasValue
-                ? ResolveFrontendOrigin(experience.Value)
-                : ResolveFrontendOrigin();
             return QueryHelpers.AddQueryString(
-                $"{baseUrl}/{path}",
+                $"{branding.BaseUrl}/{path}",
                 new Dictionary<string, string?>
                 {
                     ["userId"] = userId.ToString(),
@@ -750,31 +749,57 @@ namespace api.Services
                 });
         }
 
-        private string ResolveFrontendOrigin()
+        private SiteBranding GetBranding(UserOrigin origin)
         {
+            if (_siteBrandingProvider is not null)
+            {
+                return _siteBrandingProvider.Get(origin);
+            }
+
+            var experience = origin switch
+            {
+                UserOrigin.Cerfa => SiteExperience.Donation,
+                UserOrigin.Urbanisation => SiteExperience.Urbanization,
+                _ => SiteExperience.Insurance
+            };
+            var baseUrl = _options.FrontendBaseUrl.TrimEnd('/');
             try
             {
-                return _publicOriginResolver?.ResolveCurrent().Origin
-                    ?? _options.FrontendBaseUrl.TrimEnd('/');
+                baseUrl = _publicOriginResolver?.GetOrigin(experience) ?? baseUrl;
             }
             catch
             {
-                return _options.FrontendBaseUrl.TrimEnd('/');
             }
+
+            return new SiteBranding
+            {
+                Site = origin,
+                DisplayName = origin switch
+                {
+                    UserOrigin.Cerfa => "CERFA",
+                    UserOrigin.Urbanisation => "Urbanisation",
+                    _ => "Financial Life"
+                },
+                BaseUrl = baseUrl,
+                LogoUrl = $"{baseUrl}/favicon.svg",
+                EmailFromName = "Financial Life",
+                SupportEmail = "support@financial-life.fr",
+                AccentColor = origin switch
+                {
+                    UserOrigin.Cerfa => "#2563eb",
+                    UserOrigin.Urbanisation => "#0891b2",
+                    _ => "#0ea5e9"
+                }
+            };
         }
 
-        private string ResolveFrontendOrigin(SiteExperience experience)
-        {
-            try
+        private static string GetAccountHomePath(UserOrigin origin) =>
+            origin switch
             {
-                return _publicOriginResolver?.GetOrigin(experience)
-                    ?? _options.FrontendBaseUrl.TrimEnd('/');
-            }
-            catch
-            {
-                return _options.FrontendBaseUrl.TrimEnd('/');
-            }
-        }
+                UserOrigin.Cerfa => "donation-space",
+                UserOrigin.Urbanisation => "back-office/cartography",
+                _ => "client/home"
+            };
 
         private static string BuildActionEmail(
             string brandName,
@@ -814,36 +839,30 @@ namespace api.Services
                 """;
         }
 
-        private static EmailTemplate GetEmailTemplate(SiteExperience experience) =>
-            experience switch
+        private static EmailTemplate GetEmailTemplate(SiteBranding branding) =>
+            branding.Site switch
             {
-                SiteExperience.Urbanization => new EmailTemplate(
-                    "Urbanisation.world",
-                    "Confirmez votre adresse e-mail Urbanisation.world",
+                UserOrigin.Urbanisation => new EmailTemplate(
+                    $"Confirmez votre adresse e-mail {branding.DisplayName}",
                     "Confirmer votre accès cartographie",
-                    "Votre compte Urbanisation.world a été créé. Confirmez votre adresse e-mail pour accéder à la cartographie du système d'information.",
+                    $"Votre compte {branding.DisplayName} a été créé. Confirmez votre adresse e-mail pour accéder à la cartographie du système d'information.",
                     "Confirmer mon accès",
-                    "#0891b2",
-                    "L'équipe Urbanisation.world"),
-                SiteExperience.Donation => new EmailTemplate(
-                    "CERFA.top",
-                    "Confirmez votre adresse e-mail CERFA.top",
+                    $"L'équipe {branding.DisplayName}"),
+                UserOrigin.Cerfa => new EmailTemplate(
+                    $"Confirmez votre adresse e-mail {branding.DisplayName}",
                     "Confirmer votre espace donateur",
-                    "Votre compte CERFA.top a été créé. Confirmez votre adresse e-mail pour accéder à votre espace donateur et suivre vos dons.",
+                    $"Votre compte {branding.DisplayName} a été créé. Confirmez votre adresse e-mail pour accéder à votre espace donateur et suivre vos dons.",
                     "Confirmer mon espace donateur",
-                    "#2563eb",
-                    "L'équipe CERFA.top"),
+                    $"L'équipe {branding.DisplayName}"),
                 _ => new EmailTemplate(
-                    "Euroboost",
-                    "Confirmez votre adresse e-mail Euroboost",
+                    $"Confirmez votre adresse e-mail {branding.DisplayName}",
                     "Confirmer votre espace client",
-                    "Votre compte Euroboost espace client a été créé. Confirmez votre adresse e-mail pour accéder à votre espace client assurance.",
+                    $"Votre compte {branding.DisplayName} espace client a été créé. Confirmez votre adresse e-mail pour accéder à votre espace client assurance.",
                     "Confirmer mon espace client",
-                    "#0ea5e9",
-                    "L'équipe Euroboost")
+                    $"L'équipe {branding.DisplayName}")
             };
 
-        private static string BuildWelcomeEmail(User user, string profileLink)
+        private static string BuildWelcomeEmail(User user, string profileLink, SiteBranding branding)
         {
             var encodedLink = WebUtility.HtmlEncode(profileLink);
             var displayName = string.Join(" ", new[] { user.FirstName, user.LastName }.Where(x => !string.IsNullOrWhiteSpace(x)));
@@ -858,22 +877,22 @@ namespace api.Services
                 <body style="margin:0;font-family:Arial,sans-serif;background:#f6f8fb;color:#102033;">
                   <div style="max-width:620px;margin:0 auto;padding:28px 16px;">
                     <div style="background:#ffffff;border:1px solid #d8e2ee;border-radius:12px;padding:30px;">
-                      <p style="margin:0 0 8px;color:#2563eb;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;">Life</p>
+                      <p style="margin:0 0 8px;color:{WebUtility.HtmlEncode(branding.AccentColor)};font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;">{WebUtility.HtmlEncode(branding.DisplayName)}</p>
                       <h1 style="margin:0 0 16px;font-size:26px;line-height:1.25;">Félicitations, votre compte est confirmé.</h1>
                       <p style="font-size:16px;line-height:1.55;">Bonjour {WebUtility.HtmlEncode(displayName)},</p>
                       <p style="font-size:16px;line-height:1.55;">
-                        Votre adresse e-mail est maintenant vérifiée. Vous êtes connecté à l'écosystème Life et votre espace personnel est prêt.
+                        Votre adresse e-mail est maintenant vérifiée. Votre espace {WebUtility.HtmlEncode(branding.DisplayName)} est prêt.
                       </p>
                       <p style="font-size:16px;line-height:1.55;">
-                        Vous pouvez compléter votre profil donateur, suivre vos dons et retrouver progressivement vos documents fiscaux depuis un seul poste de pilotage.
+                        Vous pouvez revenir dans votre espace pour poursuivre votre parcours.
                       </p>
                       <p style="margin:24px 0;">
-                        <a href="{encodedLink}" style="display:inline-block;background:#0ea5e9;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700;">
+                        <a href="{encodedLink}" style="display:inline-block;background:{WebUtility.HtmlEncode(branding.AccentColor)};color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700;">
                           Accéder à mon espace
                         </a>
                       </p>
                       <p style="color:#5f6f82;font-size:14px;line-height:1.55;">
-                        Si vous n'êtes pas à l'origine de cette confirmation, contactez l'équipe Life.
+                        Si vous n'êtes pas à l'origine de cette confirmation, contactez {WebUtility.HtmlEncode(branding.SupportEmail)}.
                       </p>
                     </div>
                   </div>
@@ -918,12 +937,10 @@ namespace api.Services
     }
 
     internal sealed record EmailTemplate(
-        string BrandName,
         string Subject,
         string Title,
         string Explanation,
         string ButtonText,
-        string AccentColor,
         string Signature);
 
     public sealed class AuthFunctionalException : Exception

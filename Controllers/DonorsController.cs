@@ -1,12 +1,15 @@
 using api.Dtos.TaxReceipts;
 using api.Helpers;
 using api.Interfaces;
+using api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers
 {
     [Route("api/donors")]
     [ApiController]
+    [Authorize(Policy = AuthorizationPolicies.CerfaAccess)]
     public sealed class DonorsController : ControllerBase
     {
         private readonly IDonorService _service;

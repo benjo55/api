@@ -264,6 +264,27 @@ namespace api.Extensions
                         || context.User.HasClaim("permission", SystemPermissions.RolesAssignPermissions)));
                 options.AddPolicy(AuthorizationPolicies.ViewSecurityAudit, policy =>
                     policy.RequireClaim("permission", SystemPermissions.AuditView));
+                options.AddPolicy(AuthorizationPolicies.LifeAccess, policy =>
+                    policy.RequireRole(
+                        SystemRoles.LifeUser,
+                        SystemRoles.LegacyUser,
+                        SystemRoles.LegacyAdmin,
+                        SystemRoles.Administrator,
+                        SystemRoles.SuperAdministrator));
+                options.AddPolicy(AuthorizationPolicies.CerfaAccess, policy =>
+                    policy.RequireRole(
+                        SystemRoles.CerfaUser,
+                        SystemRoles.Donor,
+                        SystemRoles.LegacyAdmin,
+                        SystemRoles.Administrator,
+                        SystemRoles.SuperAdministrator));
+                options.AddPolicy(AuthorizationPolicies.UrbanisationAccess, policy =>
+                    policy.RequireRole(
+                        SystemRoles.UrbanisationUser,
+                        SystemRoles.Cartography,
+                        SystemRoles.LegacyAdmin,
+                        SystemRoles.Administrator,
+                        SystemRoles.SuperAdministrator));
 
                 options.FallbackPolicy = new AuthorizationPolicyBuilder()
                     .RequireAuthenticatedUser()
@@ -309,6 +330,7 @@ namespace api.Extensions
                 .Validate(o => o.Experiences.Values.All(x => Uri.TryCreate(x.Origin, UriKind.Absolute, out _)), "Chaque PublicOrigins:Experiences:*:Origin doit etre une URL absolue")
                 .ValidateOnStart();
             services.AddScoped<IPublicOriginResolver, PublicOriginResolver>();
+            services.AddScoped<ISiteBrandingProvider, SiteBrandingProvider>();
 
             services.AddScoped<IPersonRepository, PersonRepository>();
             services.AddScoped<IInsurerRepository, InsurerRepository>();

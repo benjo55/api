@@ -1,6 +1,8 @@
 using api.Data;
 using api.Dtos.Cmdb;
 using api.Models.Cmdb;
+using api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +10,7 @@ namespace api.Controllers;
 
 [ApiController]
 [Route("api/cartography/layout")]
+[Authorize(Policy = AuthorizationPolicies.UrbanisationAccess)]
 public sealed class CartographyLayoutsController : ControllerBase
 {
     private static readonly string[] AllowedScopeTypes =

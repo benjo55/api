@@ -3,6 +3,7 @@ using api.Data;
 using api.Dtos.Me;
 using api.Helpers;
 using api.Interfaces;
+using api.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +12,7 @@ namespace api.Controllers
 {
     [ApiController]
     [Route("api/me/donations")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.CerfaAccess)]
     public sealed class MeDonationsController : ControllerBase
     {
         private readonly IMeDonationsService _service;

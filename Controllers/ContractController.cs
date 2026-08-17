@@ -18,7 +18,7 @@ namespace api.Controllers
 {
     [Route("api/contracts")]
     [ApiController]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.LifeAccess)]
     public class ContractController : ControllerBase
     {
         private readonly ApplicationDBContext _db;

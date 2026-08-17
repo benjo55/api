@@ -1,13 +1,16 @@
 using api.Data;
 using api.Dtos.Workflow;
 using api.Models.Workflow;
+using api.Security;
 using api.Services.Workflow;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace api.Controllers;
 
 [ApiController]
+[Authorize(Policy = AuthorizationPolicies.UrbanisationAccess)]
 public sealed class ProcessesController : ControllerBase
 {
     private readonly ApplicationDBContext _db;
